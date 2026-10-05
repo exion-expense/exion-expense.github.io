@@ -1,5 +1,6 @@
 // หน้าเข้าสู่ระบบ: อีเมล + รหัสผ่าน (รหัสเดิมจากระบบเก่าใช้ได้)
 // ลืมรหัส → ลิงก์ทางอีเมล (ถ้าเปิดไว้) หรือ รหัสชั่วคราว 6 หลักจากหัวหน้า
+// ใช้ครั้งแรก (ยังไม่เคยมีรหัส · ช่วงเปิดระบบ SELF_SETUP_UNTIL) → ตั้งรหัสเองได้เลย
 // ข้อความทุกแบบไม่บอกว่าอีเมลไหนมีในระบบ (กันคนนอกสุ่มหารายชื่อพนักงาน)
 import { auth, esc, cfg, state, MOCK_MODE, passwordProblem } from '../core.js';
 import { icon, toast, withBtn } from '../ui.js';
@@ -92,7 +93,8 @@ export function render({ el, onLoggedIn }) {
       withBtn(f.querySelector('[type=submit]'), async () => {
         try {
           const r = await auth.requestReset(v);
-          if (r.mode === 'email') stepSent(r.message);
+          if (r.mode === 'setup') stepSetup();
+          else if (r.mode === 'email') stepSent(r.message);
           else stepCode(r.message, 'info');
         } catch (err) { stepForgot(err.message); }
       });
@@ -112,6 +114,37 @@ export function render({ el, onLoggedIn }) {
       </div>`;
     af.querySelector('[data-back]').onclick = () => stepLogin();
     af.querySelector('[data-code]').onclick = () => stepCode();
+  }
+
+  // ── 3b) ใช้ครั้งแรก: ยังไม่เคยมีรหัส → ตั้งรหัสเองได้เลย (ช่วงเปิดระบบ) ──
+  function stepSetup(msg = '') {
+    af.innerHTML = `
+      <div class="logo-mark">EX</div>
+      <h1>ตั้งรหัสผ่านครั้งแรก</h1>
+      <p class="sub">บัญชี <b>${esc(email)}</b> ยังไม่มีรหัสผ่าน — ตั้งรหัสของคุณได้เลย</p>
+      ${alertBox(msg)}
+      <form class="stack" id="f" novalidate>
+        <input type="email" autocomplete="username" value="${esc(email)}" hidden>
+        <div class="field"><label for="p1">รหัสผ่านใหม่</label><input class="input" id="p1" type="password" autocomplete="new-password" autofocus>
+          <div class="hint">อย่างน้อย 8 ตัว มีทั้งตัวอักษรและตัวเลข ห้ามมีชื่ออีเมลอยู่ข้างใน</div></div>
+        <div class="field"><label for="p2">ยืนยันรหัสผ่านใหม่</label><input class="input" id="p2" type="password" autocomplete="new-password"></div>
+        <button class="btn btn-primary btn-lg btn-block" type="submit">ตั้งรหัสและเข้าสู่ระบบ</button>
+        <button class="btn btn-ghost btn-block" type="button" data-back>${icon('chevron-left', 'sm')} กลับไปหน้าเข้าสู่ระบบ</button>
+      </form>
+      <p class="muted text-sm mt-16">ระบบจะแจ้งหัวหน้าของคุณว่าบัญชีนี้ตั้งรหัสแล้ว</p>`;
+    af.querySelector('[data-back]').onclick = () => stepLogin();
+    const f = af.querySelector('#f');
+    f.onsubmit = (e) => {
+      e.preventDefault();
+      const p1 = af.querySelector('#p1').value, p2 = af.querySelector('#p2').value;
+      const prob = passwordProblem(p1, email);
+      if (prob) return toast(prob, 'bad');
+      if (p1 !== p2) return toast('รหัสผ่านทั้งสองช่องไม่ตรงกัน', 'bad');
+      withBtn(f.querySelector('[type=submit]'), async () => {
+        try { await auth.firstSetup(email, p1); toast('ตั้งรหัสผ่านเรียบร้อย ยินดีต้อนรับ'); onLoggedIn(); }
+        catch (err) { stepSetup(err.message); }
+      });
+    };
   }
 
   // ── 4) รหัสชั่วคราว 6 หลัก + ตั้งรหัสใหม่ ──
