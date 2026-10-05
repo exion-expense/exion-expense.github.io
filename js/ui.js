@@ -150,8 +150,8 @@ export function requestRow(r, { who = false, href = '', select = false, checked 
 export function thumbs(paths = [], { removable = false } = {}) {
   if (!paths.length) return '';
   return `<div class="thumbs">${paths.map((p, i) => {
-    const pdf = /\.pdf($|\?)/i.test(p);
-    return `<div class="thumb ${pdf ? 'pdf' : ''}" data-thumb="${esc(p)}" data-i="${i}">${pdf ? 'PDF' : icon('image')}${removable ? `<button class="x" data-rm="${i}" aria-label="ลบ">${icon('x')}</button>` : ''}</div>`;
+    const pdf = /\.pdf($|\?)/i.test(p), drive = /^https?:/.test(p);
+    return `<div class="thumb ${pdf || drive ? 'pdf' : ''}" data-thumb="${esc(p)}" data-i="${i}" ${drive ? 'title="ไฟล์เดิมใน Google Drive"' : ''}>${drive ? 'Drive' : pdf ? 'PDF' : icon('image')}${removable ? `<button class="x" data-rm="${i}" aria-label="ลบ">${icon('x')}</button>` : ''}</div>`;
   }).join('')}</div>`;
 }
 /** เรียกหลังใส่ thumbs() ลงหน้า เพื่อโหลดรูปจริง + คลิกขยาย */
@@ -159,7 +159,7 @@ export function hydrateThumbs(root) {
   const all = $$('[data-thumb]', root);
   all.forEach(async (t) => {
     const p = t.dataset.thumb;
-    if (/\.pdf($|\?)/i.test(p)) return;
+    if (/\.pdf($|\?)/i.test(p) || /^https?:/.test(p)) return;
     try { const u = await api.fileUrl(p); t.style.backgroundImage = `url("${u}")`; t.firstChild?.nodeType === 1 && !t.firstChild.classList?.contains('x') && t.firstChild.remove(); } catch { t.innerHTML = icon('alert'); }
   });
   if (root.__thumbBound) return;
@@ -193,6 +193,7 @@ export async function lightbox(paths, idx = 0) {
     try {
       const u = await api.fileUrl(paths[i]);
       el.querySelector('[data-open]').href = u;
+      if (/^https?:/.test(paths[i])) { img = null; stage.innerHTML = u ? `<div style="color:#fff;text-align:center;padding:24px">ไฟล์นี้อยู่ใน Google Drive ของระบบเดิม<br><br><a class="btn btn-glass" href="${esc(u)}" target="_blank" rel="noopener noreferrer">เปิดใน Google Drive</a></div>` : '<div style="color:#fff">ลิงก์ไฟล์ไม่ถูกต้อง</div>'; return; }
       if (/\.pdf($|\?)/i.test(paths[i])) { stage.innerHTML = `<iframe src="${esc(u)}"></iframe>`; img = null; }
       else { stage.innerHTML = `<img src="${esc(u)}" alt="ใบเสร็จ">`; img = stage.querySelector('img'); }
     } catch (e) { stage.innerHTML = `<div style="color:#fff">${esc(e.message)}</div>`; }
