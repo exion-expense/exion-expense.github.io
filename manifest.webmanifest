@@ -1,0 +1,17 @@
+{
+  "name": "EXION Expense",
+  "short_name": "EXION",
+  "description": "ระบบเบิกค่าใช้จ่ายและเงินสดย่อย Exion Thailand",
+  "start_url": "./#/",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F5F6F8",
+  "theme_color": "#B7081D",
+  "lang": "th",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
