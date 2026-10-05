@@ -9,7 +9,7 @@ import { start } from './shell.js';
     await initClient();
     await start();
   } catch (e) {
-    document.getElementById('app').innerHTML = `<div class="auth-form"><div class="logo-mark">EX</div><h1>เปิดแอปไม่ได้</h1><p class="sub">${String(e.message || e).replace(/</g, '&lt;')}</p>
+    document.getElementById('app').innerHTML = `<div class="auth-form"><img class="auth-logo" src="brand/logo.png" alt="EXION Thailand"><h1>เปิดแอปไม่ได้</h1><p class="sub">${String(e.message || e).replace(/</g, '&lt;')}</p>
       <button class="btn btn-primary" id="retry">ลองใหม่</button></div>`;
     document.getElementById('retry')?.addEventListener('click', () => location.reload());
   }

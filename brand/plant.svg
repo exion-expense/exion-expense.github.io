@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 360" preserveAspectRatio="xMidYMax slice" fill="#fff">
+  <!-- ฉากหลัง (จางกว่า) -->
+  <g fill-opacity=".45">
+    <rect x="40" y="70" width="22" height="270"/><rect x="34" y="62" width="34" height="10" rx="3"/>
+    <path d="M590 340 L620 40 L650 340 Z M600 250 H640 M606 180 H634 M612 110 H628" stroke="#fff" stroke-width="5" fill="none"/>
+    <rect x="612" y="30" width="16" height="12"/>
+    <rect x="980" y="110" width="34" height="230" rx="6"/><ellipse cx="997" cy="110" rx="17" ry="12"/>
+    <rect x="1330" y="150" width="18" height="190"/><rect x="1324" y="142" width="30" height="10" rx="3"/>
+    <circle cx="560" cy="300" r="34"/><circle cx="700" cy="302" r="30"/>
+  </g>
+  <!-- หอกลั่น -->
+  <rect x="140" y="92" width="46" height="248" rx="8"/><ellipse cx="163" cy="92" rx="23" ry="16"/>
+  <g stroke="#fff" stroke-width="5"><path d="M128 150 H198 M128 205 H198 M128 262 H198"/></g>
+  <rect x="205" y="140" width="32" height="200" rx="6"/><ellipse cx="221" cy="140" rx="16" ry="11"/>
+  <rect x="166" y="60" width="6" height="34"/>
+  <path d="M186 175 H205 M186 235 H205" stroke="#fff" stroke-width="6"/>
+  <!-- ถังทรงกลม -->
+  <circle cx="330" cy="268" r="50"/><rect x="292" y="300" width="7" height="40"/><rect x="361" y="300" width="7" height="40"/>
+  <circle cx="436" cy="282" r="40"/><rect x="406" y="306" width="6" height="34"/><rect x="460" y="306" width="6" height="34"/>
+  <!-- แร็คท่อ -->
+  <g><rect x="480" y="246" width="290" height="7" rx="3"/><rect x="480" y="260" width="290" height="7" rx="3"/><rect x="480" y="274" width="290" height="7" rx="3"/>
+    <rect x="490" y="246" width="7" height="94"/><rect x="545" y="246" width="7" height="94"/><rect x="600" y="246" width="7" height="94"/>
+    <rect x="655" y="246" width="7" height="94"/><rect x="710" y="246" width="7" height="94"/><rect x="760" y="246" width="7" height="94"/>
+    <path d="M520 246 V210 H610 V246" stroke="#fff" stroke-width="8" fill="none"/></g>
+  <!-- ถังเก็บ -->
+  <path d="M785 340 V262 Q860 236 935 262 V340 Z"/><path d="M955 340 V286 Q1010 268 1065 286 V340 Z"/>
+  <path d="M800 280 H920 M800 300 H920" stroke-opacity=".0"/>
+  <!-- หอเผาก๊าซ + เปลวไฟ -->
+  <rect x="1092" y="62" width="12" height="278"/><path d="M1085 330 L1098 120 L1111 330 Z" fill-opacity=".6"/>
+  <path d="M1098 18 C1084 36 1086 48 1098 60 C1110 48 1112 36 1098 18 Z" fill="#FFC531" fill-opacity=".95"/>
+  <!-- ปล่องควัน -->
+  <rect x="1148" y="118" width="28" height="222" rx="4"/><rect x="1144" y="112" width="36" height="10" rx="3"/>
+  <g fill-opacity=".28"><circle cx="1170" cy="88" r="18"/><circle cx="1196" cy="66" r="24"/><circle cx="1232" cy="48" r="30"/></g>
+  <!-- โรงงานหลังคาฟันเลื่อย -->
+  <path d="M1196 340 V250 L1236 222 V250 L1276 222 V250 L1316 222 V250 L1356 222 V250 L1396 222 V250 L1436 222 V340 Z"/>
+  <g fill="#000" fill-opacity=".18"><rect x="1214" y="270" width="26" height="18" rx="2"/><rect x="1258" y="270" width="26" height="18" rx="2"/>
+    <rect x="1302" y="270" width="26" height="18" rx="2"/><rect x="1346" y="270" width="26" height="18" rx="2"/><rect x="1390" y="270" width="26" height="18" rx="2"/></g>
+  <!-- พื้น -->
+  <rect x="0" y="338" width="1440" height="22"/>
+</svg>

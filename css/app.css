@@ -243,6 +243,7 @@ a.row:hover, button.row:hover, .row.click:hover { background: var(--surface-2); 
 .kv { display: grid; grid-template-columns: minmax(96px, 34%) 1fr; gap: 8px 12px; font-size: 14px; }
 .kv dt { color: var(--muted); } .kv dd { margin: 0; font-weight: 500; word-break: break-word; }
 .kv.tight { gap: 4px 10px; font-size: 13.5px; }
+.kv-min { flex: 1 1 240px; min-width: 0; }   /* ไม่ให้ถูกบีบจนอีเมลแตกทีละตัวอักษร — ยอดเงินจะขึ้นบรรทัดใหม่แทน */
 
 /* ═══════════ Tabs / toolbar ═══════════ */
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; margin-bottom: 16px; }
@@ -388,10 +389,10 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
 @media (min-width: 1024px) { .submit-bar { bottom: 16px; } }
 
 /* ═══════════ Auth screen ═══════════ */
-.auth { min-height: 100vh; display: grid; grid-template-columns: 1fr; background: var(--surface); }
+.auth { min-height: 100vh; display: grid; grid-template-columns: 1fr; grid-template-rows: auto 1fr; background: var(--surface); }
 .auth-art { display: none; }
 @media (min-width: 960px) {
-  .auth { grid-template-columns: 1.1fr 1fr; }
+  .auth { grid-template-columns: 1.1fr 1fr; grid-template-rows: 1fr; }
   .auth-art { display: flex; flex-direction: column; justify-content: space-between; padding: 48px; color: #fff; position: relative; overflow: hidden;
     background: radial-gradient(90% 80% at 90% 10%, #E33B50 0%, rgba(227, 59, 80, 0) 60%), radial-gradient(60% 60% at 0% 100%, #5A0410 0%, rgba(90, 4, 16, 0) 70%), linear-gradient(140deg, #B7081D, #6E0412); }
   .auth-art h2 { font-size: 40px; line-height: 1.2; font-weight: 700; letter-spacing: -.02em; max-width: 460px; }
@@ -399,6 +400,27 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
   .auth-art .feat { display: flex; gap: 10px; align-items: center; margin-top: 10px; opacity: .92; }
 }
 .auth-art .ring { position: absolute; border-radius: 50%; border: 48px solid rgba(255, 255, 255, .05); }
+/* โลโก้จริง + ภาพโรงงาน */
+.art-logo { position: relative; z-index: 1; align-self: flex-start; background: #fff; border-radius: 18px; padding: 14px 20px; box-shadow: 0 14px 34px rgba(60, 0, 10, .35); }
+.art-logo img { display: block; height: 58px; width: auto; }
+.art-plant { position: absolute; left: -6%; bottom: 0; width: 112%; height: auto; opacity: .2; pointer-events: none; }
+.auth-art::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .5;
+  background-image: linear-gradient(rgba(255, 255, 255, .06) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, .06) 1px, transparent 1px); background-size: 44px 44px;
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 75%); mask-image: linear-gradient(180deg, #000 0%, transparent 75%); }
+.auth-art > * { position: relative; }
+.auth-art > .art-plant, .auth-art > .ring { position: absolute; }
+.auth-logo { height: 46px; width: auto; align-self: flex-start; margin-bottom: 10px; }
+.auth-hero { position: relative; overflow: hidden; height: 190px; display: grid; place-items: center; border-radius: 0 0 28px 28px;
+  background: radial-gradient(90% 90% at 85% 0%, #E33B50 0%, rgba(227, 59, 80, 0) 60%), linear-gradient(150deg, #B7081D, #6E0412); padding-top: env(safe-area-inset-top); }
+.auth-hero .art-plant { left: -30%; width: 160%; opacity: .22; }
+.auth-hero .art-logo { align-self: center; padding: 10px 16px; border-radius: 16px; margin-bottom: 26px; }
+.auth-hero .art-logo img { height: 46px; }
+.auth-hero + .auth-form { padding-top: 22px; justify-content: flex-start; }
+.auth-hero + .auth-form .auth-logo { display: none; }
+.auth-hero + .auth-form h1 { margin-top: 4px; }
+@media (min-width: 960px) { .auth-hero { display: none; } .auth-hero + .auth-form { justify-content: center; padding-top: 32px; } .auth-hero + .auth-form .auth-logo { display: block; } }
+.logo-mark.is-img { background: #fff; padding: 3px; box-shadow: 0 2px 8px rgba(20, 20, 30, .12); border: 1px solid #ECEEF2; }
+.logo-mark.is-img img { background: transparent; }
 .auth-form { display: flex; flex-direction: column; justify-content: center; padding: 32px 22px; max-width: 440px; width: 100%; margin: 0 auto; }
 .auth-form h1 { font-size: 26px; margin-top: 22px; } .auth-form .sub { color: var(--muted); margin-top: 4px; margin-bottom: 22px; }
 .code-inputs { display: flex; gap: 8px; justify-content: space-between; }
@@ -427,3 +449,18 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
 .content { min-width: 0; }
 [data-bar] { display: contents; }
 .code-input { text-align: center; font-size: 26px; font-weight: 600; letter-spacing: .5em; min-height: 56px; font-variant-numeric: tabular-nums; padding-left: calc(12px + .5em); }
+
+/* ═══ มือถือ: ใช้ง่ายขึ้น ═══ */
+@media (max-width: 959px) {
+  /* ตัวอักษรในช่องกรอก ≥16px — iPhone จะไม่ซูมหน้าจอทุกครั้งที่แตะช่อง */
+  .input, input.input, select.input, textarea.input, .code-input { font-size: 16px; }
+  /* เป้าแตะใหญ่ขึ้น (≈44px) */
+  .btn-sm { min-height: 40px; }
+  .chip { height: 38px; }
+  .seg button { padding: 9px 14px; }
+  .row .check { padding: 12px; margin: -12px -2px -12px -12px; }
+  .row .check input { width: 22px; height: 22px; }
+  /* หมวดค่าใช้จ่าย 4 คอลัมน์ — เห็นครบโดยเลื่อนน้อยลง */
+  .cat-picker { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .cat-opt { padding: 10px 2px; font-size: 12px; }
+}

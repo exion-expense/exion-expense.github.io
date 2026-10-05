@@ -124,11 +124,14 @@ export async function render(ctx) {
         ${!staff.length ? '<div class="flex"><span class="spin"></span><span class="muted text-sm">กำลังโหลดรายชื่อ…</span></div>' : `
         <div class="stack-sm">
           <div class="bold">${icon('file', 'sm')} ฟอร์มขอเบิก (รายงาน)</div>
-          <p class="hint">ฟอร์มเดียวกับที่ใช้ขอเบิก ตามรอบของเดือนที่เลือก — ใช้ตรวจยอดก่อนขอเบิกจริง</p>
+          <p class="hint">ฟอร์มเดียวกับที่ใช้ขอเบิก รวมทุกรายการที่อนุมัติแล้วในช่วงวัน (รวมรายการที่ขอเบิกรายเดือนไปแล้ว) — ใช้ตรวจยอด</p>
+          <div class="field"><label for="sx-staff">พนักงาน</label>${opts('sx-staff')}</div>
           <div class="form-grid two">
-            <div class="field"><label for="sx-staff">พนักงาน</label>${opts('sx-staff')}</div>
-            <div class="field"><label>&nbsp;</label><button class="btn btn-secondary" data-act="xls-report" data-busy="กำลังสร้างไฟล์…">${icon('download')} ดาวน์โหลดฟอร์ม</button></div>
+            <div class="field"><label for="sx-rfrom">ตั้งแต่วันที่ <span class="muted">(ไม่บังคับ)</span></label><input class="input" type="date" id="sx-rfrom"></div>
+            <div class="field"><label for="sx-rto">ถึงวันที่ <span class="muted">(ไม่บังคับ)</span></label><input class="input" type="date" id="sx-rto"></div>
           </div>
+          <p class="hint">เว้นว่างทั้งสองช่อง = ตามรอบตัดยอดของ${esc(monthLabel(st.y, st.m, true))}</p>
+          <button class="btn btn-secondary btn-block" data-act="xls-report" data-busy="กำลังสร้างไฟล์…">${icon('download')} ดาวน์โหลดฟอร์ม</button>
         </div>
         <div class="divider"></div>
         <div class="stack-sm">
@@ -159,7 +162,12 @@ export async function render(ctx) {
     try {
       if (a === 'more') { st.shown += PAGE; paintBody(); return; }
       let body = null;
-      if (a === 'xls-report') body = { type: 'staff_form', kind: 'report', staffEmail: v('sx-staff'), year: st.y, month: st.m };
+      if (a === 'xls-report') {
+        const f = v('sx-rfrom'), to = v('sx-rto');
+        if (!!f !== !!to) { toast('เลือกให้ครบทั้งวันเริ่มและวันสิ้นสุด หรือเว้นว่างทั้งคู่', 'bad'); return; }
+        if (f && to < f) { toast('วันสิ้นสุดต้องไม่ก่อนวันเริ่ม', 'bad'); return; }
+        body = { type: 'staff_form', kind: 'report', staffEmail: v('sx-staff'), year: st.y, month: st.m, periodStart: f || null, periodEnd: to || null };
+      }
       if (a === 'xls-list') {
         if (v('sx-from') && v('sx-to') && v('sx-to') < v('sx-from')) { toast('วันสิ้นสุดต้องไม่ก่อนวันเริ่ม', 'bad'); return; }
         body = { type: 'request_list', staffEmail: v('sx-lstaff'), dateFrom: v('sx-from'), dateTo: v('sx-to'), status: v('sx-lst') };

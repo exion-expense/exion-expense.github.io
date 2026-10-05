@@ -206,7 +206,7 @@ async function downloadForm(st, p, c, btn) {
   if (!c) return;
   const final = c.exportId && c.exportStatus === 'Approved';
   const body = final ? { type: 'staff_form', kind: 'final', exportId: c.exportId }
-    : { type: 'staff_form', kind: 'report', staffEmail: p.email, year: st.y, month: st.m, periodStart: c.periodStart, periodEnd: c.periodEnd };
+    : { type: 'staff_form', kind: 'draft', staffEmail: p.email, year: st.y, month: st.m, periodStart: c.periodStart, periodEnd: c.periodEnd };
   try {
     const meta = await withBtn(btn, () => api.excel(body));
     toast(`ดาวน์โหลดแล้ว · ${meta.itemCount ?? ''} รายการ · ${money(meta.totalAmount)} บาท${final ? '' : ' (ฉบับตรวจสอบ)'}`);

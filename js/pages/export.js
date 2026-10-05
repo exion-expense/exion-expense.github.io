@@ -252,7 +252,7 @@ async function act(ctx, st, t) {
       const approved = e.stage === 'approved' || e.stage === 'paid';
       const body = approved
         ? { type: 'staff_form', kind: 'final', exportId: e.id }
-        : { type: 'staff_form', kind: 'report', staffEmail: e.staff_email, year: e.year, month: e.month, periodStart: e.period_start || undefined, periodEnd: e.period_end || undefined };
+        : { type: 'staff_form', kind: 'draft', staffEmail: e.staff_email, year: e.year, month: e.month, periodStart: e.period_start || undefined, periodEnd: e.period_end || undefined };
       const meta = await withBtn(t, () => api.excel(body));
       if (meta) {
         toast(`ดาวน์โหลดแล้ว · ${meta.itemCount ?? ''} รายการ · ${money(meta.totalAmount)} บาท`);

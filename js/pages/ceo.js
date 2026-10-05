@@ -85,7 +85,7 @@ function pendingCard(x, isCEO) {
     <div class="card-head"><h3>${icon('crown')} ${esc(ymLabel(x.ym))} · ${esc(deptLabel(x.department))}</h3>${badge(x.status)}</div>
     <div class="pad stack-sm">
       <div class="flex between wrap">
-        <dl class="kv tight grow">
+        <dl class="kv tight grow kv-min">
           <dt>ส่งโดย</dt><dd>${esc(x.requested_by || '-')}</dd>
           <dt>ส่งเมื่อ</dt><dd>${fmtDateTime(x.requested_at)}</dd>
           <dt>จำนวนคน</dt><dd>${money(x.staff_count, 0)} คน</dd>

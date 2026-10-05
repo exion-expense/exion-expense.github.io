@@ -11,8 +11,7 @@ export function render({ el, onLoggedIn }) {
   <div class="auth">
     <div class="auth-art">
       <div class="ring" style="width:420px;height:420px;right:-140px;top:-120px"></div>
-      <div class="ring" style="width:300px;height:300px;left:-120px;bottom:-100px"></div>
-      <div class="flex gap-12" style="position:relative"><div class="logo-mark" style="background:#fff;color:var(--brand)">EX</div><b>${esc(cfg.COMPANY_NAME || 'Exion Thailand')}</b></div>
+      <div class="art-logo"><img src="brand/logo.png" alt="${esc(cfg.COMPANY_NAME || 'Exion Thailand')}"></div>
       <div style="position:relative">
         <h2>เบิกค่าใช้จ่าย<br>เร็ว ง่าย จบในมือถือ</h2>
         <p>ส่งบิล อนุมัติ ขอเบิกรายเดือน และเงินสดย่อย — ในที่เดียว</p>
@@ -22,8 +21,9 @@ export function render({ el, onLoggedIn }) {
           <div class="feat">${icon('check-circle')} ดาวน์โหลดฟอร์ม Excel ได้ในไม่กี่วินาที</div>
         </div>
       </div>
-      <div class="text-sm" style="opacity:.7;position:relative">EXION Expense v10</div>
+      <img class="art-plant" src="brand/plant.svg" alt="">
     </div>
+    <div class="auth-hero"><img class="art-plant" src="brand/plant.svg" alt=""><div class="art-logo"><img src="brand/logo.png" alt="${esc(cfg.COMPANY_NAME || 'Exion Thailand')}"></div></div>
     <div class="auth-form" id="af"></div>
   </div>`;
   const af = el.querySelector('#af');
@@ -34,7 +34,7 @@ export function render({ el, onLoggedIn }) {
   // ── 1) ล็อกอิน ──
   function stepLogin(msg = '', kind = 'bad') {
     af.innerHTML = `
-      <div class="logo-mark">EX</div>
+      <img class="auth-logo" src="brand/logo.png" alt="EXION Thailand">
       <h1>เข้าสู่ระบบ</h1><p class="sub">ใช้อีเมลบริษัท และรหัสผ่านเดิมได้เลย</p>
       ${alertBox(msg, kind)}
       <form class="stack" id="f" novalidate>
@@ -74,7 +74,7 @@ export function render({ el, onLoggedIn }) {
   // ── 2) ลืมรหัสผ่าน ──
   function stepForgot(msg = '') {
     af.innerHTML = `
-      <div class="logo-mark">EX</div>
+      <img class="auth-logo" src="brand/logo.png" alt="EXION Thailand">
       <h1>ลืมรหัสผ่าน</h1><p class="sub">กรอกอีเมลบริษัท แล้วเราจะบอกขั้นตอนถัดไป (ใช้กับการเข้าใช้ครั้งแรกด้วย)</p>
       ${alertBox(msg)}
       <form class="stack" id="f" novalidate>
@@ -104,7 +104,7 @@ export function render({ el, onLoggedIn }) {
   // ── 3) ส่งลิงก์ทางอีเมลแล้ว ──
   function stepSent(message) {
     af.innerHTML = `
-      <div class="logo-mark">EX</div>
+      <img class="auth-logo" src="brand/logo.png" alt="EXION Thailand">
       <h1>เช็คอีเมลของคุณ 📬</h1>
       <div class="alert ok mt-16 mb-16">${icon('check-circle')}<div>${esc(message)}</div></div>
       <p class="muted text-sm">เปิดอีเมลจาก EXION บนเครื่องนี้ แล้วกดลิงก์ "ตั้งรหัสผ่านใหม่" — ถ้าไม่ได้รับภายใน 5 นาที ให้ขอใหม่ หรือขอรหัสชั่วคราวจากหัวหน้า/GM</p>
@@ -119,7 +119,7 @@ export function render({ el, onLoggedIn }) {
   // ── 3b) ใช้ครั้งแรก: ยังไม่เคยมีรหัส → ตั้งรหัสเองได้เลย (ช่วงเปิดระบบ) ──
   function stepSetup(msg = '') {
     af.innerHTML = `
-      <div class="logo-mark">EX</div>
+      <img class="auth-logo" src="brand/logo.png" alt="EXION Thailand">
       <h1>ตั้งรหัสผ่านครั้งแรก</h1>
       <p class="sub">บัญชี <b>${esc(email)}</b> ยังไม่มีรหัสผ่าน — ตั้งรหัสของคุณได้เลย</p>
       ${alertBox(msg)}
@@ -150,7 +150,7 @@ export function render({ el, onLoggedIn }) {
   // ── 4) รหัสชั่วคราว 6 หลัก + ตั้งรหัสใหม่ ──
   function stepCode(msg = '', kind = 'bad') {
     af.innerHTML = `
-      <div class="logo-mark">EX</div>
+      <img class="auth-logo" src="brand/logo.png" alt="EXION Thailand">
       <h1>ตั้งรหัสผ่านใหม่</h1>
       <p class="sub">กรอก <b>รหัสชั่วคราว 6 หลัก</b> ที่ได้จากหัวหน้า แล้วตั้งรหัสผ่านของคุณ</p>
       ${alertBox(msg, kind)}

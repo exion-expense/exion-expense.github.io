@@ -25,9 +25,20 @@ export function catFlags(c) {
   };
 }
 
+/** หมวดที่ใช้บ่อย (จำในเครื่องนี้) — ขึ้นก่อน */
+const USE_KEY = 'exion_cat_use';
+function catUse() { try { return JSON.parse(localStorage.getItem(USE_KEY) || '{}') || {}; } catch { return {}; } }
+export function noteCatUse(code) {
+  try { const u = catUse(); u[code] = (u[code] || 0) + 1; localStorage.setItem(USE_KEY, JSON.stringify(u)); } catch { /* ไม่เป็นไร */ }
+}
+function byUse(cats) {
+  const u = catUse();
+  return cats.map((c, i) => [c, i]).sort((a, b) => (u[b[0].code] || 0) - (u[a[0].code] || 0) || a[1] - b[1]).map((x) => x[0]);
+}
+
 /** ปุ่มเลือกหมวด (.cat-picker) */
 export function catPickerHtml(cats, selected = '') {
-  return `<div class="cat-picker" data-picker>${cats.map((c) => `<button type="button" class="cat-opt ${c.code === selected ? 'on' : ''}" data-act="cat" data-code="${esc(c.code)}" aria-pressed="${c.code === selected}">
+  return `<div class="cat-picker" data-picker>${byUse(cats).map((c) => `<button type="button" class="cat-opt ${c.code === selected ? 'on' : ''}" data-act="cat" data-code="${esc(c.code)}" aria-pressed="${c.code === selected}">
     ${catIcon(c.code)}<span>${esc(c.name_th || catName(c.code))}</span></button>`).join('')}</div>`;
 }
 
@@ -396,7 +407,7 @@ export async function render(ctx) {
       if (a === 'cat' && it) {
         const changed = it.category !== t.dataset.code;
         it.category = t.dataset.code; it.pick = false;
-        if (changed) it.paths = null;
+        if (changed) { it.paths = null; noteCatUse(it.category); }
         clearError(cardOf(it), 'category');
         updateCard(it); totals(); saveDraft();
       } else if (a === 'chcat' && it) { it.pick = true; updateCard(it); }

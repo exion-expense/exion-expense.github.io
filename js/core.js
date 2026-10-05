@@ -407,8 +407,9 @@ export function ymd(d) {
 export function addDays(d, n) { const x = toDate(d); x.setDate(x.getDate() + n); return ymd(x); }
 export function initials(name) {
   const s = String(name || '?').trim();
-  const parts = s.split(/\s+/);
-  return (parts.length > 1 ? parts[0][0] + parts[1][0] : s.slice(0, 2)).toUpperCase();
+  // ข้ามวงเล็บ/เครื่องหมาย และสระหน้า (เ แ โ ใ ไ) เช่น "Air (Manager)" → AM · "สมชาย (เซลล์)" → สซ
+  const parts = s.split(/\s+/).map((p) => p.replace(/^[^\p{L}\p{N}]+/u, '').replace(/^[เแโใไ]/, '')).filter(Boolean);
+  return (parts.length > 1 ? parts[0][0] + parts[1][0] : (parts[0] || s).slice(0, 2)).toUpperCase();
 }
 export function roleLabel(role) {
   if (!role) return 'พนักงาน';

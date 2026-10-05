@@ -155,7 +155,7 @@ function renderShell(root, rt, profile) {
     root.innerHTML = `
     <div class="app">
       <aside class="sidebar">
-        <div class="side-brand"><div class="logo-mark">EX</div><div><div class="t1">EXION Expense</div><div class="t2">${company}</div></div></div>
+        <div class="side-brand"><div class="logo-mark is-img"><img src="brand/mark.png" alt="EXION"></div><div><div class="t1">EXION Expense</div><div class="t2">${company}</div></div></div>
         ${profile.pettyEnabled !== false ? `<div class="app-switch"><a href="#/" class="${rt.app === 'expense' ? 'on' : ''}">เบิกค่าใช้จ่าย</a><a href="#/petty" class="${rt.app === 'petty' ? 'on' : ''}">เงินสดย่อย</a></div>` : ''}
         <div class="side-section">เมนู</div>
         ${side}
@@ -167,7 +167,7 @@ function renderShell(root, rt, profile) {
       <div class="content">
         <header class="topbar">
           <button class="btn-icon back hide-desktop ${rt.back ? '' : 'hidden'}" data-back aria-label="ย้อนกลับ">${icon('chevron-left')}</button>
-          <div class="brand-mini hide-desktop ${rt.back ? 'hidden' : ''}"><div class="logo-mark" style="width:30px;height:30px;font-size:12px">EX</div></div>
+          <div class="brand-mini hide-desktop ${rt.back ? 'hidden' : ''}"><div class="logo-mark is-img" style="width:32px;height:32px"><img src="brand/mark.png" alt="EXION"></div></div>
           <div class="title" id="top-title"></div>
           <button class="btn-icon" data-bell aria-label="การแจ้งเตือน">${icon('bell')}<span class="bell-dot ${badges.notif ? '' : 'hidden'}" id="bell-dot">${badges.notif > 99 ? '99+' : badges.notif}</span></button>
           <button class="btn-icon hide-desktop" data-usermenu aria-label="บัญชี"><span class="avatar sm brand">${esc(initials(profile.name))}</span></button>
