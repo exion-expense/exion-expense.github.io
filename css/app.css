@@ -464,3 +464,9 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
   .cat-picker { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
   .cat-opt { padding: 10px 2px; font-size: 12px; }
 }
+/* ตัวเลือกแบบแถว (เลือกแผนก) */
+.opt-list { display: flex; flex-direction: column; gap: 8px; max-height: 52vh; overflow-y: auto; }
+.opt-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; cursor: pointer; background: var(--surface); }
+.opt-row input { width: 20px; height: 20px; accent-color: var(--brand); flex: none; margin: 0; }
+.opt-row.on { border-color: var(--brand); background: var(--brand-50); box-shadow: 0 0 0 3px rgba(183, 8, 29, .08); }
+.amber-text { color: #B45309; }

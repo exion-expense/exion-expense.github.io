@@ -247,7 +247,7 @@ export async function render(ctx) {
     const it = { category: String(r.category || '').toUpperCase(), expenseDate: r.expense_date || '', mileageKm: r.mileage_km ?? '', amount: r.amount || '',
       venue: r.venue || '', occasion: r.occasion || '', attendees: r.attendees || '', origin: r.origin || '', destination: r.destination || '',
       customer: r.customer || '', customerContact: r.customer_contact || '', jobNo: r.job_no || '' };
-    const cats = (state.cats || []).filter((c) => c.active !== false || c.code === it.category);
+    const cats = (state.cats || []).filter((c) => (c.active !== false && !['ENT', 'GOLF'].includes(c.code)) || c.code === it.category);
     let fuel = null, rp = null;
     const s = sheet({
       title: 'แก้ไขรายการ', wide: true,

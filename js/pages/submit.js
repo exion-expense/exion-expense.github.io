@@ -176,7 +176,8 @@ export async function render(ctx) {
 
   // คนที่มีค่าเหมาจ่ายอัตโนมัติ → ซ่อนหมวดนั้น กันเบิกซ้ำ
   const hideCodes = allow?.auto ? ALLOW_CATS.filter((c) => Number(allow[c]) > 0) : [];
-  const pickable = (cats || []).filter((c) => c.active !== false && !hideCodes.includes(c.code));
+  // ค่ารับรอง / ค่ากอล์ฟ → ต้องขออนุมัติงบล่วงหน้าเท่านั้น (ไม่แสดงในหน้านี้)
+  const pickable = (cats || []).filter((c) => c.active !== false && !hideCodes.includes(c.code) && !ENT_CATS.includes(c.code));
   const S = { items: [], fuel: null, ready: [], batchId: newBatchId(), seq: 0, sending: false, done: false, draftPending: false };
 
   el.innerHTML = `<div style="max-width:780px;margin:0 auto">
@@ -185,6 +186,8 @@ export async function render(ctx) {
       <div class="actions"><a class="btn btn-secondary btn-sm" href="#/preapprovals/new">${icon('shield', 'sm')} ขออนุมัติงบล่วงหน้า</a></div></div>
     <div class="stack">
       <div data-draft class="hidden"></div>
+      <div class="alert neutral">${icon('shield')}<div class="grow">ค่ารับรอง / ค่ากอล์ฟ ต้อง<b>ขออนุมัติงบล่วงหน้า</b>ก่อน แล้วส่งบิลจริงจากงบนั้น
+        <div class="mt-8"><a class="btn btn-secondary btn-sm" href="#/preapprovals/new">${icon('shield', 'sm')} ขออนุมัติงบล่วงหน้า</a></div></div></div>
       ${hideCodes.length ? `<div class="alert neutral">${icon('info')}<span>${hideCodes.map((c) => `${esc(catName(c))} ${money(allow[c], 0)}`).join(' · ')} บาท
         <b>ใส่ให้อัตโนมัติทุกรอบ</b> ไม่ต้องส่งเอง</span></div>` : ''}
       <div class="stack" data-items></div>

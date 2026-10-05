@@ -54,9 +54,18 @@ export async function render(ctx) {
     <datalist id="preCustList"></datalist>
   </div>`;
 
+  // รายชื่อลูกค้า: ยังไม่เลือกประเภท = แสดงทั้งหมด (มี [ประเภท] นำหน้า) · เลือกแล้ว = เฉพาะประเภทนั้น ไม่มีคำนำหน้า
+  let allCust = [];
+  function fillCust() {
+    const dl = $('#preCustList', el); if (!dl) return;
+    const want = (F.custType || '').toLowerCase();
+    const opts = !want ? allCust : [...new Set(allCust.map((c) => /^\[([^\]]+)\]\s*(.*)$/.exec(c))
+      .filter((m) => m && m[1].trim().toLowerCase() === want && m[2].trim()).map((m) => m[2].trim()))].sort((x, y) => x.localeCompare(y));
+    dl.innerHTML = opts.map((c) => `<option value="${esc(c)}"></option>`).join('');
+  }
   api.rpc('get_customers', {}, { ttl: 600 }).then((list) => {
-    const dl = $('#preCustList', el);
-    if (dl && ctx.alive()) dl.innerHTML = (list || []).map((c) => `<option value="${esc(c)}"></option>`).join('');
+    if (!ctx.alive()) return;
+    allCust = list || []; fillCust();
   }).catch(() => {});
 
   const val = (k) => String($(`[data-f="${k}"]`, el)?.value || '').trim();
@@ -64,6 +73,7 @@ export async function render(ctx) {
     F.custType = v;
     $$('[data-act="ctype"]', el).forEach((b) => { b.classList.toggle('on', b.dataset.v === v); b.setAttribute('aria-pressed', String(b.dataset.v === v)); });
     showErr('custType', '');
+    fillCust();
   }
   function showErr(k, m) {
     const x = $(`[data-err="${k}"]`, el); if (x) { x.textContent = m; x.classList.toggle('hidden', !m); }
