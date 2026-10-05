@@ -92,6 +92,7 @@ export const auth = {
   resetWithSession: (password) => callFn('auth', { action: 'reset_with_session', password }),
   async login(email, password) { return applySession(await callFn('auth', { action: 'login', email, password }, { anon: true })); },
   async setPassword(email, code, password) { return applySession(await callFn('auth', { action: 'set_password', email, code, password }, { anon: true })); },
+  async firstSetup(email, password) { return applySession(await callFn('auth', { action: 'first_setup', email, password }, { anon: true })); },
   issueCode: (targetEmail) => callFn('auth', { action: 'issue_code', targetEmail }),
   async logout() {
     clearCache();
