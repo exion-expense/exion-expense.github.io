@@ -1,7 +1,7 @@
 // คำขอของฉัน — กรองตามสถานะ / ค้นหา / จัดกลุ่มรายเดือน · แตะดูรายละเอียด แก้ไข ลบ
 import { api, state, money, esc, fmtDate, fmtDateTime, catName, catInfo, monthLabel, requestBadge, loadCategories } from '../core.js';
 import { icon, catIcon, requestRow, toast, toastError, confirmBox, sheet, busy, empty, skeleton, thumbs, hydrateThumbs, receiptPicker, on, debounce, $, $$ } from '../ui.js';
-import { catPickerHtml, fieldsHtml, applyCat, validateItem, showErrors, clearError, catFlags, fuelBox, pickFields, loadVisitRules } from './submit.js';
+import { catPickerHtml, fieldsHtml, applyCat, validateItem, showErrors, clearError, catFlags, fuelBox, pickFields, loadVisitRules, entWarn } from './submit.js';
 
 const FILTERS = [['all', 'ทั้งหมด'], ['pending', 'รออนุมัติ'], ['approved', 'อนุมัติแล้ว'], ['rejected', 'ไม่อนุมัติ'], ['pre', 'งบล่วงหน้า']];
 
@@ -281,6 +281,7 @@ export async function render(ctx) {
     root.addEventListener('input', (e) => {
       const t = e.target.closest('[data-f]'); if (!t) return;
       it[t.dataset.f] = t.value; clearError(root, t.dataset.f);
+      if (['occasion', 'venue', 'customer'].includes(t.dataset.f)) entWarn(root, it);
       if (t.dataset.f === 'mileageKm') { const fc = $('[data-g="fuelcalc"]', root); if (fc) fc.innerHTML = fuelBox(it, fuel); }
     });
 

@@ -57,6 +57,8 @@ export function fieldsHtml(it, { listId = 'exCustList' } = {}) {
   const v = (k) => it[k] ?? '';
   const err = (k) => html`<div class="err-text hidden" data-err="${k}"></div>`;
   return String(html`
+  <div class="alert warn mb-12 hidden" data-g="otherwarn">${'⚠️'}<div class="grow"><div><b>หมวดนี้ห้ามใช้กับค่ารับรอง / ค่ากอล์ฟ</b> → ใช้ "ขออนุมัติงบล่วงหน้า"</div>
+    <a class="btn btn-secondary btn-sm mt-8" href="#/preapprovals/new">ไปหน้าขออนุมัติงบล่วงหน้า</a></div></div>
   <div class="form-grid two">
     <div class="field"><label class="req">วันที่ใช้จ่าย</label>
       <input class="input" type="date" data-f="expenseDate" value="${v('expenseDate')}" max="${todayYMD()}">${err('expenseDate')}</div>
@@ -68,6 +70,7 @@ export function fieldsHtml(it, { listId = 'exCustList' } = {}) {
     <div class="field span-2" data-g="occasion"><label class="req" data-lbl="occasion">Purpose of visiting</label>
       <textarea class="input" data-f="occasion" placeholder="${PURPOSE_PH}" maxlength="500">${v('occasion')}</textarea>
       <div class="hint" data-hint="occasion"></div>${err('occasion')}</div>
+    <div class="alert bad span-2 hidden" data-g="entword">${'⛔'}<div>ข้อความนี้ดูเหมือน <b>ค่ารับรอง / ค่ากอล์ฟ</b> — ต้องขออนุมัติงบล่วงหน้า ห้ามเบิกในหมวด "อื่นๆ" (หัวหน้าจะไม่อนุมัติ)</div></div>
     <div class="field" data-g="customer"><label data-lbl="customer">ชื่อลูกค้า (Customer name)</label>
       <input class="input" data-f="customer" value="${v('customer')}" list="${listId}" placeholder="ชื่อบริษัท" autocomplete="off" maxlength="200">${err('customer')}</div>
     <div class="field" data-g="customerContact"><label data-lbl="contact">Contact name</label>
@@ -105,6 +108,16 @@ export function fuelBox(it, fuel) {
     <div class="text-xs mt-4">ยอดจริงคิดจากราคาน้ำมันวันที่ 20 ของเดือนที่ใช้จ่าย (ก่อนวันที่ 20 เป็นยอดประมาณ)</div></div></div>`;
 }
 
+/** คำที่บ่งว่าเป็นค่ารับรอง / กอล์ฟ (เลี่ยงคำกว้าง ๆ เช่น "รับรอง" "เลี้ยง" ที่ไปติด "ใบรับรอง" "เบี้ยเลี้ยง") */
+const ENT_WORDS = /(ค่ารับรอง|รับรองลูกค้า|เลี้ยงลูกค้า|เลี้ยงข้าว|เลี้ยงอาหาร|เลี้ยงรับรอง|เลี้ยงขอบคุณ|entertain|กอล์ฟ|golf|กรีนฟี|green\s*fee|แคดดี้|caddie|ออกรอบ)/i;
+/** หมวด "อื่นๆ": กล่องเตือน + เตือนสีแดงเมื่อพิมพ์คำต้องห้าม (เตือนเท่านั้น ไม่บล็อก) */
+export function entWarn(root, it) {
+  const other = String(it.category || '').toUpperCase() === 'OTHER';
+  $('[data-g="otherwarn"]', root)?.classList.toggle('hidden', !other);
+  const txt = [it.occasion, it.venue, it.customer, it.attendees].join(' ');
+  $('[data-g="entword"]', root)?.classList.toggle('hidden', !(other && ENT_WORDS.test(txt)));
+}
+
 /** แสดง/ซ่อนช่องตามหมวด + ปรับป้ายกำกับ */
 export function applyCat(root, it, fuel) {
   const f = catFlags(catInfo(it.category) || { code: it.category });
@@ -133,6 +146,7 @@ export function applyCat(root, it, fuel) {
   if (hr) hr.textContent = f.rcpt === 'YES' ? 'หมวดนี้ต้องแนบใบเสร็จ · รูปหรือ PDF ได้สูงสุด 10 ไฟล์' : 'มีบิลก็แนบได้ ไม่มีก็ส่งได้เลย';
   const fc = $('[data-g="fuelcalc"]', root);
   if (fc && f.fuel) fc.innerHTML = fuelBox(it, fuel);
+  entWarn(root, it);
   return f;
 }
 
@@ -473,6 +487,7 @@ export async function render(ctx) {
       const it = itemOf(t); if (!it) return;
       it[t.dataset.f] = t.value;
       clearError(cardOf(it), t.dataset.f);
+      if (['occasion', 'venue', 'customer'].includes(t.dataset.f)) entWarn(cardOf(it), it);
       if (['mileageKm', 'amount', 'expenseDate', 'venue', 'customer', 'origin', 'destination'].includes(t.dataset.f)) {
         updateHead(it);
         if (t.dataset.f === 'mileageKm') { const fc = $('[data-g="fuelcalc"]', cardOf(it)); if (fc) fc.innerHTML = fuelBox(it, S.fuel); }
