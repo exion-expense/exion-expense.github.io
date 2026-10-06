@@ -470,3 +470,11 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
 .opt-row input { width: 20px; height: 20px; accent-color: var(--brand); flex: none; margin: 0; }
 .opt-row.on { border-color: var(--brand); background: var(--brand-50); box-shadow: 0 0 0 3px rgba(183, 8, 29, .08); }
 .amber-text { color: #B45309; }
+
+/* ═══════════ แดชบอร์ดลูกค้า ═══════════ */
+.pad-x { padding: 0 16px; } @media (min-width: 640px) { .pad-x { padding: 0 20px; } }
+.pb-8 { padding-bottom: 8px; } .gap-8 { gap: 8px; }
+.tbl tr.click { cursor: pointer; }
+@media (max-width: 759px) { .grid-2.collapse-m { grid-template-columns: 1fr; } }
+.team-group { padding: 10px 16px 6px; font-size: 12.5px; font-weight: 600; color: var(--muted); background: var(--surface-2); border-top: 1px solid var(--line-2); }
+.team-group:first-child { border-top: 0; }

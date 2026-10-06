@@ -98,7 +98,7 @@ function paint(ctx, st) {
       <span class="text-sm">แตะชื่อ แล้วกด “ออกรหัสชั่วคราว” เพื่อให้พนักงานตั้งรหัสผ่านเอง</span></div></div>` : ''}
     <div class="split">
       <div class="card"><div class="card-head"><h3>${icon('users')} สมาชิก · ${monthLabel(st.y, st.m)}</h3><span class="text-sm muted">ยอดรวม ${money(sum('total'), 0)}</span></div>
-        <div class="list">${rows.map((x) => memberRow(x)).join('')}</div></div>
+        <div class="list">${memberList(rows, t.manager)}</div></div>
       <div class="stack">
         <div class="card"><div class="card-head"><h3>${icon('trending')} อันดับยอดเบิก</h3></div>
           <div class="pad">${sum('total') ? bars(rows.filter((x) => x.total).map((x) => ({ label: x.p.name, value: x.total }))) : '<p class="muted text-sm">ยังไม่มีรายการในรอบนี้</p>'}</div></div>
@@ -107,6 +107,16 @@ function paint(ctx, st) {
       </div>
     </div>
   </div>`;
+}
+
+/** จัดกลุ่ม: ขึ้นตรงกับฉันก่อน แล้วตามด้วยทีมของหัวหน้าทีมย่อยแต่ละคน */
+function memberList(rows, me) {
+  if (!rows.some((x) => x.p.direct === false)) return rows.map((x) => memberRow(x)).join('');
+  const groups = new Map();
+  rows.forEach((x) => { const k = x.p.direct === false ? String(x.p.managerName || '-') : ''; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(x); });
+  const keys = [...groups.keys()].sort((a, b) => (a === '' ? -1 : b === '' ? 1 : a.localeCompare(b, 'th')));
+  return keys.map((k) => `<div class="team-group">${k === '' ? `ขึ้นตรงกับ${esc(me || 'คุณ')}` : `ทีมของ ${esc(k)}`} · ${groups.get(k).length} คน</div>`
+    + groups.get(k).map((x) => memberRow(x)).join('')).join('');
 }
 
 function memberRow(x) {
