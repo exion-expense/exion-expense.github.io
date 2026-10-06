@@ -198,7 +198,7 @@ function openDetail(st, id) {
     r.mileage_km ? ['ระยะทาง', `${money(r.mileage_km, 0)} กม.`] : null,
     r.origin || r.destination ? ['เส้นทาง', `${r.origin || '-'} → ${r.destination || '-'}`] : null,
     r.customer ? ['ลูกค้า', r.customer] : null, r.customer_contact ? ['Contact name', r.customer_contact] : null,
-    r.venue ? ['สถานที่', r.venue] : null, r.occasion ? ['Purpose of visiting', r.occasion] : null, r.attendees ? ['ผู้เข้าร่วม', r.attendees] : null,
+    r.venue ? ['สถานที่', r.venue] : null, r.occasion ? [(/^(ENT|GOLF)$/i.test(r.category) ? 'Purpose of entertainment' : 'Purpose of visiting'), r.occasion] : null, r.attendees ? ['ผู้เข้าร่วม', r.attendees] : null,
     r.job_no ? ['Job No.', r.job_no] : null, r.remark ? ['หมายเหตุ', String(r.remark).split(' sig:')[0]] : null,
     r.manager_email ? ['หัวหน้า', `${r.manager_email}${r.manager_status ? ' · ' + ({ Approved: 'อนุมัติ', Rejected: 'ไม่อนุมัติ', Pending: 'รอ', Bypassed: 'ข้ามขั้น' }[r.manager_status] || r.manager_status) : ''}`] : null,
     r.manager_remark ? ['ความเห็นหัวหน้า', r.manager_remark] : null,

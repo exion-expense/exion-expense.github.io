@@ -202,7 +202,7 @@ function itemSheet(r) {
   const paths = r.receipt_paths || [];
   const kv = [['วันที่', fmtDate(r.expense_date)], ['จำนวนเงิน', money(r.amount) + ' บาท'], r.mileage_km ? ['ระยะทาง', money(r.mileage_km, 0) + ' กม.'] : null,
     r.origin || r.destination ? ['เส้นทาง', `${r.origin || '-'} → ${r.destination || '-'}`] : null, r.customer ? ['ลูกค้า', r.customer] : null,
-    r.venue ? ['สถานที่', r.venue] : null, r.occasion ? ['Purpose of visiting', r.occasion] : null, r.manager_remark ? ['ความเห็นหัวหน้า', r.manager_remark] : null]
+    r.venue ? ['สถานที่', r.venue] : null, r.occasion ? [(/^(ENT|GOLF)$/i.test(r.category) ? 'Purpose of entertainment' : 'Purpose of visiting'), r.occasion] : null, r.manager_remark ? ['ความเห็นหัวหน้า', r.manager_remark] : null]
     .filter(Boolean).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');
   sheet({
     title: catName(r.category),

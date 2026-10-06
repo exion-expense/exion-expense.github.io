@@ -138,7 +138,7 @@ export async function render(ctx) {
       r.venue ? [f.ent ? 'สถานที่' : 'รายละเอียด', esc(r.venue)] : null,
       r.customer ? ['ลูกค้า', custHtml(r.customer)] : null,
       r.customer_contact ? ['Contact name', esc(r.customer_contact)] : null,
-      r.occasion ? ['Purpose of visiting', esc(r.occasion)] : null,
+      r.occasion ? [(/^(ENT|GOLF)$/i.test(r.category) ? 'Purpose of entertainment' : 'Purpose of visiting'), esc(r.occasion)] : null,
       r.attendees ? ['ผู้ร่วม', esc(r.attendees)] : null,
       r.job_no ? ['เลข Job', esc(r.job_no)] : null,
       fromPre && preBudget != null ? ['งบที่อนุมัติ', `฿${money(preBudget)}${sibs.length > 1 ? ` · ยอดจริงรวม ${sibs.length} บิล ฿${money(billTotal)}` : ''}${over ? ` <span class="badge b-bad">เกินงบ ฿${money(billTotal - preBudget)}</span>` : ''}`] : null,

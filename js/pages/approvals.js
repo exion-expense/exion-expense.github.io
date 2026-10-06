@@ -139,7 +139,7 @@ function detailKv(r) {
     r.customer ? ['ลูกค้า', r.customer] : null,
     r.customer_contact ? ['Contact name', r.customer_contact] : null,
     r.venue ? ['สถานที่', r.venue] : null,
-    r.occasion ? ['Purpose of visiting', r.occasion] : null,
+    r.occasion ? [(/^(ENT|GOLF)$/i.test(r.category) ? 'Purpose of entertainment' : 'Purpose of visiting'), r.occasion] : null,
     r.attendees ? ['ผู้เข้าร่วม', r.attendees] : null,
     r.job_no ? ['Job No.', r.job_no] : null,
     r.remark ? ['หมายเหตุ', String(r.remark).split(' sig:')[0]] : null,

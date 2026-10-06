@@ -37,7 +37,7 @@ export async function render(ctx) {
           <div class="form-grid two">
             <div class="field"><label class="req">ชื่อลูกค้า / Principle</label><input class="input" data-f="customer" list="preCustList" placeholder="ชื่อบริษัท" autocomplete="off" maxlength="200">${err('customer')}</div>
             <div class="field"><label>Contact name <span class="opt">ไม่บังคับ</span></label><input class="input" data-f="customerContact" placeholder="ชื่อ / ตำแหน่ง" maxlength="200"></div>
-            <div class="field span-2"><label class="req">โอกาส / วัตถุประสงค์ (Purpose of visiting)</label><textarea class="input" data-f="occasion" placeholder="เช่น เลี้ยงขอบคุณทีมจัดซื้อ SCG หลังปิดงาน เพื่อเพิ่มโอกาส Bidding โครงการปีหน้า" maxlength="500"></textarea>
+            <div class="field span-2"><label class="req">Purpose of entertainment (โอกาส / วัตถุประสงค์)</label><textarea class="input" data-f="occasion" placeholder="เช่น เลี้ยงขอบคุณทีมจัดซื้อ SCG หลังปิดงาน เพื่อเพิ่มโอกาส Bidding โครงการปีหน้า" maxlength="500"></textarea>
               <div class="hint">อธิบายให้ละเอียด${need ? ` อย่างน้อย ${VISIT.minLen} ตัวอักษร` : ''} — พบใคร เพื่ออะไร คาดหวังอะไร (เช่น เพิ่มโอกาสขาย / Bidding งาน)</div>${err('occasion')}</div>
             <div class="field span-2"><label ${need ? 'class="req"' : ''}>ผู้ร่วม (คาดการณ์)${need ? '' : ' <span class="opt">ไม่บังคับ</span>'}</label><textarea class="input" data-f="attendees" placeholder="ชื่อ + บริษัท เช่น คุณสมชาย (SCG), คุณเอ (EXION)" maxlength="500"></textarea>${err('attendees')}</div>
             <div class="field"><label>เลข Job <span class="opt">ไม่บังคับ</span></label><input class="input" data-f="jobNo" placeholder="เช่น J2026-0142" maxlength="60"></div>
@@ -93,7 +93,7 @@ export async function render(ctx) {
       venue: !val('venue') && 'ใส่สถานที่',
       custType: !F.custType && 'เลือกประเภทลูกค้า',
       customer: !val('customer') && 'ใส่ชื่อลูกค้า / Principle',
-      occasion: !val('occasion') ? 'ใส่โอกาส / วัตถุประสงค์ (Purpose of visiting)'
+      occasion: !val('occasion') ? 'ใส่ Purpose of entertainment — เลี้ยง/พบใคร เพื่ออะไร'
         : need && val('occasion').length < VISIT.minLen && `อธิบายให้ละเอียดกว่านี้ (อย่างน้อย ${VISIT.minLen} ตัวอักษร) — พบใคร เพื่ออะไร`,
       attendees: need && !val('attendees') && 'ใส่ผู้ร่วม (คาดการณ์) — ชื่อ + บริษัท',
       budget: budget <= 0 ? 'ใส่งบประมาณ' : budget > 500000 && 'งบประมาณเกิน 500,000 บาท',

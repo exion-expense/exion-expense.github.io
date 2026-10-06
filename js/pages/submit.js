@@ -118,7 +118,7 @@ export function applyCat(root, it, fuel) {
   if (lv) { lv.innerHTML = f.ent ? 'สถานที่' : 'รายละเอียดเพิ่มเติม <span class="opt">ไม่บังคับ</span>'; lv.classList.toggle('req', f.ent); }
   const need = f.visit;   // บิลทั่วไป = บังคับ · ค่ารับรอง: Contact name ไม่บังคับ (ใช้ "ผู้ร่วม" แทน)
   const lo = $('[data-lbl="occasion"]', root);
-  if (lo) lo.textContent = f.ent ? 'Purpose of visiting (โอกาส / วัตถุประสงค์)' : 'Purpose of visiting';
+  if (lo) lo.textContent = f.ent ? 'Purpose of entertainment (โอกาส / วัตถุประสงค์)' : 'Purpose of visiting';
   const ho = $('[data-hint="occasion"]', root);
   if (ho) ho.textContent = `อธิบายให้ละเอียด อย่างน้อย ${VISIT.minLen} ตัวอักษร — ไปพบใคร ทำอะไร เพื่ออะไร (เช่น เพิ่มโอกาสขาย / Bidding งาน)`;
   const lc = $('[data-lbl="customer"]', root);

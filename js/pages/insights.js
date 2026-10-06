@@ -120,7 +120,7 @@ export async function render(ctx) {
         <span><span class="amount">${money(p.total, 0)}</span> <span class="muted">· ${money(p.visits, 0)} ครั้ง</span></span></div>
       <div class="meter mt-4"><i style="width:${Math.max(2, (p.total / max) * 100)}%;background:var(--brand)"></i></div></div>`).join('');
     return `<div class="card"><div class="card-head"><h3>${icon('flag')} ไปเพื่ออะไร (Purpose)</h3></div><div class="pad stack-sm">${items}
-      <p class="hint mt-12">จัดกลุ่มอัตโนมัติจากข้อความ Purpose of visiting เช่น "เสนอราคา" "Bidding" "ติดตั้ง"</p></div></div>`;
+      <p class="hint mt-12">จัดกลุ่มอัตโนมัติจากข้อความ Purpose (visiting / entertainment) เช่น "เสนอราคา" "Bidding" "ติดตั้ง"</p></div></div>`;
   }
 
   function categoryCard(d) {
@@ -201,7 +201,7 @@ export async function render(ctx) {
     if (!q.bills) return '';
     const row = (l, n) => `<div class="flex between text-sm"><span>${esc(l)}</span><span class="${n ? 'warn-text' : 'muted'}">${money(n, 0)} บิล (${pct(n, q.bills)}%)</span></div>`;
     return `<div class="card"><div class="card-head"><h3>${icon('shield')} คุณภาพข้อมูล</h3><span class="text-sm muted">${money(q.bills, 0)} บิลในช่วงนี้</span></div>
-      <div class="pad stack-sm">${row('ไม่มี Purpose of visiting', q.noPurpose)}${row('ไม่มีชื่อลูกค้า', q.noCustomer)}${row('ไม่มี Contact name', q.noContact)}${row('ไม่มีใบเสร็จ (ไม่นับค่าน้ำมัน)', q.noReceipt)}
+      <div class="pad stack-sm">${row('ไม่มี Purpose', q.noPurpose)}${row('ไม่มีชื่อลูกค้า', q.noCustomer)}${row('ไม่มี Contact name', q.noContact)}${row('ไม่มีใบเสร็จ (ไม่นับค่าน้ำมัน)', q.noReceipt)}
       <p class="hint">บิลเก่าก่อนมีกติกาบังคับกรอกมักไม่มีข้อมูลเหล่านี้ · ชื่อลูกค้าที่สะกดต่างกันมาก (เช่น ไทย/อังกฤษ) จะนับแยกกัน</p></div></div>`;
   }
 
