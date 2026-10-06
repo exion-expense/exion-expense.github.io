@@ -2,7 +2,7 @@
 import { api, money, compact, fmtDate, esc, catName, ymd } from '../core.js';
 import { icon, catIcon, toast, toastError, withBtn, bars, donut, PALETTE, sheet, errorBox, skeleton, on, debounce } from '../ui.js';
 
-const SCOPE_TH = { all: 'ทั้งบริษัท', team: 'ทีมของฉัน' };
+const SCOPE_TH = { all: 'ทั้งบริษัท', team: 'ทีมของฉัน', self: 'ข้อมูลของฉัน' };
 const PRESETS = [['month', 'เดือนนี้'], ['last', 'เดือนก่อน'], ['3m', '3 เดือน'], ['6m', '6 เดือน'], ['ytd', 'ปีนี้'], ['custom', 'กำหนดเอง']];
 const MONTH_TH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 const TOP = 15;

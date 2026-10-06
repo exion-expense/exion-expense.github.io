@@ -20,7 +20,7 @@ const ROUTES = [
   { path: '/team', page: 'team', title: 'ทีมของฉัน', app: 'expense', nav: 'team', icon: 'users', show: (p) => isApprover(p) },
   { path: '/all', page: 'all', title: 'คำขอทั้งบริษัท', app: 'expense', nav: 'all', icon: 'layers', show: (p) => r(p.role).canViewAll || r(p.role).isViewer || r(p.role).isAccountant },
   { path: '/summary', page: 'summary', title: 'สรุป & Excel', app: 'expense', nav: 'summary', icon: 'chart' },
-  { path: '/insights', page: 'insights', title: 'แดชบอร์ดลูกค้า', app: 'expense', nav: 'insights', icon: 'trending', show: (p) => r(p.role).canViewAll || r(p.role).isManager },
+  { path: '/insights', page: 'insights', title: 'แดชบอร์ดลูกค้า', app: 'expense', nav: 'insights', icon: 'trending' },
   { path: '/accounting', page: 'accounting', title: 'บัญชี · โอนเงิน', app: 'expense', nav: 'accounting', icon: 'banknote', show: (p) => r(p.role).isAccountant || r(p.role).isGM },
   { path: '/ceo', page: 'ceo', title: 'อนุมัติสรุปรายเดือน', app: 'expense', nav: 'ceo', icon: 'crown', show: (p) => r(p.role).isCEO },
   { path: '/set-password', page: 'set-password', title: 'ตั้งรหัสผ่านใหม่', app: 'expense', nav: 'profile' },
