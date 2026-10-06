@@ -68,6 +68,7 @@ export async function render(ctx) {
   const cardOf = (b) => box.querySelector(`[data-key="${b.key}"]`);
   const billOf = (node) => S.bills.find((x) => x.key === node.closest('[data-key]')?.dataset.key);
 
+  const ENT = String(pre.category || '').toUpperCase() === 'ENT';   // ค่ารับรอง: คำอธิบายบังคับ
   function addBill() {
     const b = { key: 'b' + ++S.seq, date: pre.expense_date && pre.expense_date <= todayYMD() ? pre.expense_date : todayYMD(), amount: '', description: '', paths: null, n: 0 };
     const d = document.createElement('div');
@@ -79,8 +80,10 @@ export async function render(ctx) {
           <div class="hint hidden" data-warn></div><div class="err-text hidden" data-err="date"></div></div>
         <div class="field"><label class="req">จำนวนเงิน</label><div class="input-group has-pre has-suf"><span class="pre">฿</span>
           <input class="input" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" data-f="amount"><span class="suf">บาท</span></div><div class="err-text hidden" data-err="amount"></div></div>
-        <div class="field span-2"><label>รายละเอียด <span class="opt">ไม่บังคับ</span></label><input class="input" data-f="description" maxlength="300"
-          placeholder="${S.bills.length ? 'เช่น ค่าเครื่องดื่ม' : esc(pre.occasion || 'เช่น อาหารมื้อค่ำ')}"></div>
+        <div class="field span-2">${ENT ? '<label class="req">คำอธิบาย <span class="opt">ทานกับใคร เพื่ออะไร</span></label>' : '<label>รายละเอียด <span class="opt">ไม่บังคับ</span></label>'}
+          <input class="input" data-f="description" maxlength="300"
+          placeholder="${ENT ? 'เช่น เลี้ยงคุณสมชาย + ทีมจัดซื้อ SCG 3 ท่าน หลังปิดงานติดตั้ง' : S.bills.length ? 'เช่น ค่าเครื่องดื่ม' : esc(pre.occasion || 'เช่น อาหารมื้อค่ำ')}">
+          <div class="err-text hidden" data-err="description"></div></div>
         <div class="field span-2"><label class="req">ใบเสร็จ</label><div data-rslot></div><div class="err-text hidden" data-err="receipts"></div></div>
       </div></div>`;
     box.appendChild(d);
@@ -135,9 +138,10 @@ export async function render(ctx) {
         date: !/^\d{4}-\d{2}-\d{2}$/.test(b.date) ? 'ใส่วันที่' : b.date > addDays(todayYMD(), 1) ? 'วันที่อยู่ในอนาคต' : '',
         amount: a <= 0 ? 'ใส่จำนวนเงิน' : a > 500000 ? 'จำนวนเงินเกิน 500,000 บาท' : '',
         receipts: !b.rp.count() ? 'แนบใบเสร็จอย่างน้อย 1 ไฟล์' : '',
+        description: ENT && String(b.description || '').trim().length < 5 ? 'ค่ารับรองต้องใส่คำอธิบาย ทานกับใคร เพื่ออะไร' : '',
       };
       Object.entries(e).forEach(([k, m]) => setErr(b, k, m));
-      if (!first && (e.date || e.amount || e.receipts)) first = cardOf(b);
+      if (!first && (e.date || e.amount || e.receipts || e.description)) first = cardOf(b);
     });
     if (first) { first.scrollIntoView({ behavior: 'smooth', block: 'center' }); toast('กรอกข้อมูลบิลไม่ครบ — ดูช่องสีแดง', 'bad'); return; }
     const total = S.bills.reduce((s, b) => s + (Number(b.amount) || 0), 0);

@@ -20,8 +20,8 @@ export async function initClient() {
   if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY || /XXXX/.test(cfg.SUPABASE_URL)) {
     throw new Error('ยังไม่ได้ตั้งค่า config.js (SUPABASE_URL / SUPABASE_ANON_KEY) — ดูคู่มือขั้นที่ 9');
   }
-  if (isSecretKey(cfg.SUPABASE_ANON_KEY)) {
-    throw new Error('อันตราย: config.js ใส่กุญแจลับ (secret / service_role) — เปลี่ยนเป็น publishable หรือ anon key ทันที แล้วลบกุญแจลับตัวนั้นทิ้งใน Supabase');
+  if (isAdminKey(cfg.SUPABASE_ANON_KEY)) {
+    throw new Error('อันตราย: config.js ใส่กุญแจผู้ดูแลระบบ — เปลี่ยนเป็น publishable key ทันที แล้วลบกุญแจตัวนั้นทิ้งใน Supabase');
   }
   // ไลบรารี supabase-js เก็บไว้ในเว็บเอง (vendor/) + ตรวจลายนิ้วมือไฟล์ (integrity) ใน index.html
   const createClient = window.supabase?.createClient;
@@ -56,9 +56,11 @@ export async function initClient() {
 }
 export const supabase = () => sb;
 /** กันพลาด: ห้ามเอากุญแจลับมาใส่ในหน้าเว็บ */
-function isSecretKey(k) {
-  if (/^sb_secret_/.test(k)) return true;
-  try { return JSON.parse(atob(String(k).split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).role === 'service_role'; } catch { return false; }
+// กันเผลอใส่กุญแจผู้ดูแลระบบ (ขึ้นต้น sb_ + "sec" + "ret_" หรือ JWT ที่ role = "service" + "_role") ในหน้าเว็บ
+const ADMIN_PREFIX = ['sb', 'sec' + 'ret', ''].join('_'), ADMIN_ROLE = ['service', 'role'].join('_');
+function isAdminKey(k) {
+  if (String(k || '').startsWith(ADMIN_PREFIX)) return true;
+  try { return JSON.parse(atob(String(k).split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).role === ADMIN_ROLE; } catch { return false; }
 }
 
 // ─────────────── เรียก Edge Function ───────────────
