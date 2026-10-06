@@ -12,13 +12,23 @@ const DRAFT_DAYS = 7;
 
 // ════════════════════ ตัวช่วยช่องกรอก (ใช้ร่วมกับ requests.js) ════════════════════
 
+/** กติกา Purpose of visiting / ชื่อลูกค้า / Contact name (ตรงกับ app.check_visit_info) */
+export const VISIT = { required: true, minLen: 10 };
+export async function loadVisitRules() {
+  try { Object.assign(VISIT, await api.rpc('get_visit_rules', {}, { ttl: 3600 })); } catch { /* ยังไม่ได้ติดตั้ง SQL → ใช้ค่าเริ่มต้น */ }
+  return VISIT;
+}
+export const PURPOSE_PH = 'อธิบายให้ชัดว่าไปทำอะไร เพื่ออะไร เช่น ไปเสนอราคาวาล์ว เพื่อเพิ่มโอกาสขายโครงการ Q4 / ไปประชุม Bidding งานซ่อมบำรุง';
+
 /** คุณสมบัติของหมวด → ช่องไหนต้องแสดง */
 export function catFlags(c) {
   const code = String(c?.code || '').toUpperCase();
+  const ent = ENT_CATS.includes(code) || !!c?.need_claim_form;
   return {
     code,
     fuel: code === 'FUEL',
-    ent: ENT_CATS.includes(code) || !!c?.need_claim_form,
+    ent,
+    visit: VISIT.required && !!code && !ent,          // บิลทั่วไป: Purpose of visiting + ชื่อลูกค้า + Contact name บังคับ
     travel: code === 'FUEL' || !!c?.need_travel_info,
     rcpt: String(c?.need_receipt || 'NO').toUpperCase(),
     job: !!code && !NO_JOB.includes(code),
@@ -55,16 +65,17 @@ export function fieldsHtml(it, { listId = 'exCustList' } = {}) {
     <div class="field" data-g="amt"><label class="req">จำนวนเงิน</label>
       <div class="input-group has-pre has-suf"><span class="pre">฿</span><input class="input" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" data-f="amount" value="${v('amount')}"><span class="suf">บาท</span></div>${err('amount')}</div>
     <div class="span-2 hidden" data-g="fuelcalc"></div>
+    <div class="field span-2" data-g="occasion"><label class="req" data-lbl="occasion">Purpose of visiting</label>
+      <textarea class="input" data-f="occasion" placeholder="${PURPOSE_PH}" maxlength="500">${v('occasion')}</textarea>
+      <div class="hint" data-hint="occasion"></div>${err('occasion')}</div>
+    <div class="field" data-g="customer"><label data-lbl="customer">ชื่อลูกค้า (Customer name)</label>
+      <input class="input" data-f="customer" value="${v('customer')}" list="${listId}" placeholder="ชื่อบริษัท" autocomplete="off" maxlength="200">${err('customer')}</div>
+    <div class="field" data-g="customerContact"><label data-lbl="contact">Contact name</label>
+      <input class="input" data-f="customerContact" value="${v('customerContact')}" placeholder="ชื่อ / ตำแหน่ง ผู้ที่ไปพบ" maxlength="200">${err('customerContact')}</div>
     <div class="field span-2" data-g="venue"><label data-lbl="venue">รายละเอียด</label>
       <input class="input" data-f="venue" value="${v('venue')}" maxlength="300">${err('venue')}</div>
     <div class="field" data-g="origin"><label>ต้นทาง</label><input class="input" data-f="origin" value="${v('origin')}" placeholder="เช่น ออฟฟิศ" maxlength="200"></div>
     <div class="field" data-g="destination"><label>ปลายทาง</label><input class="input" data-f="destination" value="${v('destination')}" placeholder="เช่น นิคมฯ มาบตาพุด" maxlength="200"></div>
-    <div class="field" data-g="customer"><label data-lbl="customer">ลูกค้า</label>
-      <input class="input" data-f="customer" value="${v('customer')}" list="${listId}" placeholder="ชื่อบริษัท" autocomplete="off" maxlength="200">${err('customer')}</div>
-    <div class="field" data-g="customerContact"><label>ผู้ติดต่อ <span class="opt">ไม่บังคับ</span></label>
-      <input class="input" data-f="customerContact" value="${v('customerContact')}" placeholder="ชื่อ / ตำแหน่ง" maxlength="200"></div>
-    <div class="field span-2" data-g="occasion"><label class="req">โอกาส / วัตถุประสงค์</label>
-      <textarea class="input" data-f="occasion" placeholder="เช่น ประชุมสรุปโครงการ Q4" maxlength="500">${v('occasion')}</textarea>${err('occasion')}</div>
     <div class="field span-2" data-g="attendees"><label class="req">ผู้ร่วม</label>
       <textarea class="input" data-f="attendees" placeholder="ชื่อ + บริษัท เช่น คุณสมชาย (SCG), คุณเอ (EXION)" maxlength="500">${v('attendees')}</textarea>${err('attendees')}</div>
     <div class="field" data-g="jobNo"><label>เลข Job <span class="opt">ไม่บังคับ</span></label>
@@ -99,12 +110,21 @@ export function applyCat(root, it, fuel) {
   const f = catFlags(catInfo(it.category) || { code: it.category });
   const show = {
     km: f.fuel, amt: !f.fuel, fuelcalc: f.fuel, venue: !f.fuel,
-    origin: f.travel, destination: f.travel, customer: f.travel || f.ent,
-    customerContact: (f.travel && !f.fuel) || f.ent, occasion: f.ent, attendees: f.ent, jobNo: f.job, rcpt: f.rcpt !== 'NO',
+    origin: f.travel, destination: f.travel, customer: f.travel || f.ent || f.visit,
+    customerContact: (f.travel && !f.fuel) || f.ent || f.visit, occasion: f.ent || f.visit, attendees: f.ent, jobNo: f.job, rcpt: f.rcpt !== 'NO',
   };
   for (const [g, on_] of Object.entries(show)) $$(`[data-g="${g}"]`, root).forEach((x) => x.classList.toggle('hidden', !on_));
   const lv = $('[data-lbl="venue"]', root);
-  if (lv) { lv.textContent = f.ent ? 'สถานที่' : 'รายละเอียด'; lv.classList.toggle('req', f.ent); }
+  if (lv) { lv.innerHTML = f.ent ? 'สถานที่' : 'รายละเอียดเพิ่มเติม <span class="opt">ไม่บังคับ</span>'; lv.classList.toggle('req', f.ent); }
+  const need = f.visit;   // บิลทั่วไป = บังคับ · ค่ารับรอง: Contact name ไม่บังคับ (ใช้ "ผู้ร่วม" แทน)
+  const lo = $('[data-lbl="occasion"]', root);
+  if (lo) lo.textContent = f.ent ? 'Purpose of visiting (โอกาส / วัตถุประสงค์)' : 'Purpose of visiting';
+  const ho = $('[data-hint="occasion"]', root);
+  if (ho) ho.textContent = `อธิบายให้ละเอียด อย่างน้อย ${VISIT.minLen} ตัวอักษร — ไปพบใคร ทำอะไร เพื่ออะไร (เช่น เพิ่มโอกาสขาย / Bidding งาน)`;
+  const lc = $('[data-lbl="customer"]', root);
+  if (lc) { lc.textContent = 'ชื่อลูกค้า (Customer name)'; lc.classList.toggle('req', need); }
+  const lk = $('[data-lbl="contact"]', root);
+  if (lk) { lk.innerHTML = need ? 'Contact name' : 'Contact name <span class="opt">ไม่บังคับ</span>'; lk.classList.toggle('req', need); }
   const iv = $('[data-f="venue"]', root);
   if (iv) iv.placeholder = f.ent ? 'ชื่อร้าน / สนามกอล์ฟ' : 'เช่น ทางด่วนบางนา–ชลบุรี, ส่งเอกสารให้ลูกค้า';
   const lr = $('[data-lbl="rcpt"]', root);
@@ -140,6 +160,13 @@ export function validateItem(it, rcptCount = 0) {
     if (!String(it.occasion || '').trim()) e.occasion = 'ใส่โอกาส / วัตถุประสงค์';
     if (!String(it.attendees || '').trim()) e.attendees = 'ใส่ชื่อผู้ร่วม';
   }
+  if (f.visit) {
+    const pur = String(it.occasion || '').trim();
+    if (!pur) e.occasion = 'ใส่ Purpose of visiting — ไปทำอะไร เพื่ออะไร';
+    else if (pur.length < VISIT.minLen) e.occasion = `อธิบายให้ละเอียดกว่านี้ (อย่างน้อย ${VISIT.minLen} ตัวอักษร) เช่น ไปเสนอราคา เพื่อเพิ่มโอกาสขาย`;
+    if (!String(it.customer || '').trim()) e.customer = 'ใส่ชื่อลูกค้า (Customer name)';
+    if (!String(it.customerContact || '').trim()) e.customerContact = 'ใส่ Contact name — ชื่อผู้ที่ไปพบ';
+  }
   if (f.rcpt === 'YES' && !rcptCount) e.receipts = 'หมวดนี้ต้องแนบใบเสร็จอย่างน้อย 1 ไฟล์';
   return e;
 }
@@ -168,8 +195,9 @@ export async function render(ctx) {
   const { el, profile } = ctx;
   const email = String(profile?.email || state.session?.email || '').toLowerCase();
   const draftKey = 'exion_draft_' + email;
-  const [cats, allow] = await Promise.all([
+  const [cats, , allow] = await Promise.all([
     loadCategories(),
+    loadVisitRules(),
     api.rpc('get_my_allowance', {}, { ttl: 600 }).catch(() => ({ auto: false })),
   ]);
   if (!ctx.alive()) return;
@@ -478,10 +506,10 @@ function payloadItem(it) {
   const o = {
     category: f.code, expenseDate: it.expenseDate,
     venue: f.fuel ? '' : t('venue'),
-    occasion: f.ent ? t('occasion') : '', attendees: f.ent ? t('attendees') : '',
+    occasion: f.ent || f.visit ? t('occasion') : '', attendees: f.ent ? t('attendees') : '',
     origin: f.travel ? t('origin') : '', destination: f.travel ? t('destination') : '',
-    customer: f.travel || f.ent ? t('customer') : '',
-    customerContact: (f.travel && !f.fuel) || f.ent ? t('customerContact') : '',
+    customer: f.travel || f.ent || f.visit ? t('customer') : '',
+    customerContact: (f.travel && !f.fuel) || f.ent || f.visit ? t('customerContact') : '',
     jobNo: f.job ? t('jobNo') : '',
     receiptPaths: it.paths || [],
   };

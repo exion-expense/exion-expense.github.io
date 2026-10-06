@@ -49,7 +49,7 @@ export async function render(ctx) {
         <dl class="kv tight">
           ${pre.venue ? `<dt>สถานที่</dt><dd>${esc(pre.venue)}</dd>` : ''}
           ${pre.customer ? `<dt>ลูกค้า</dt><dd>${custHtml(pre.customer)}</dd>` : ''}
-          ${pre.occasion ? `<dt>โอกาส</dt><dd>${esc(pre.occasion)}</dd>` : ''}
+          ${pre.occasion ? `<dt>Purpose of visiting</dt><dd>${esc(pre.occasion)}</dd>` : ''}
           ${pre.attendees ? `<dt>ผู้ร่วม</dt><dd>${esc(pre.attendees)}</dd>` : ''}
           ${pre.preapprove_by ? `<dt>อนุมัติโดย</dt><dd>${esc(who(pre.preapprove_by))}${pre.preapprove_at ? ` · ${fmtDateTime(pre.preapprove_at)}` : ''}</dd>` : ''}
         </dl>

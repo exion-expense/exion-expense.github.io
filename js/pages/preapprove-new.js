@@ -1,13 +1,16 @@
 // ขออนุมัติงบล่วงหน้า (ค่ารับรอง / กอล์ฟ) — ส่งก่อนใช้จ่าย แล้วค่อยส่งบิลจริงทีหลัง
 import { api, money, esc, catName, todayYMD, addDays, loadCategories } from '../core.js';
 import { icon, catIcon, toast, toastError, withBtn, on, $, $$ } from '../ui.js';
+import { VISIT, loadVisitRules } from './submit.js';
 
 const CUST_TYPES = [['Customer', 'ลูกค้า'], ['Principle', 'Principle'], ['Other Customer', 'ลูกค้าอื่น'], ['Other Principle', 'Principle อื่น']];
 const ENT_CATS = ['ENT', 'GOLF'];
 
 export async function render(ctx) {
   const { el, profile } = ctx;
-  const cats = ((await loadCategories()) || []).filter((c) => ENT_CATS.includes(c.code) && c.active !== false);
+  const [allCats] = await Promise.all([loadCategories(), loadVisitRules()]);
+  const cats = (allCats || []).filter((c) => ENT_CATS.includes(c.code) && c.active !== false);
+  const need = VISIT.required;
   if (!ctx.alive()) return;
   const F = { category: cats.length === 1 ? cats[0].code : '', custType: '' };
 
@@ -33,9 +36,10 @@ export async function render(ctx) {
             <div class="seg" role="group" aria-label="ประเภทลูกค้า">${CUST_TYPES.map(([v, l]) => `<button type="button" data-act="ctype" data-v="${esc(v)}" aria-pressed="false">${esc(l)}</button>`).join('')}</div>${err('custType')}</div>
           <div class="form-grid two">
             <div class="field"><label class="req">ชื่อลูกค้า / Principle</label><input class="input" data-f="customer" list="preCustList" placeholder="ชื่อบริษัท" autocomplete="off" maxlength="200">${err('customer')}</div>
-            <div class="field"><label>ผู้ติดต่อ <span class="opt">ไม่บังคับ</span></label><input class="input" data-f="customerContact" placeholder="ชื่อ / ตำแหน่ง" maxlength="200"></div>
-            <div class="field span-2"><label class="req">โอกาส / วัตถุประสงค์</label><textarea class="input" data-f="occasion" placeholder="เช่น พบเพื่อ Demo โครงการ Q4" maxlength="500"></textarea>${err('occasion')}</div>
-            <div class="field span-2"><label>ผู้ร่วม (คาดการณ์) <span class="opt">ไม่บังคับ</span></label><textarea class="input" data-f="attendees" placeholder="ชื่อ + บริษัท" maxlength="500"></textarea></div>
+            <div class="field"><label>Contact name <span class="opt">ไม่บังคับ</span></label><input class="input" data-f="customerContact" placeholder="ชื่อ / ตำแหน่ง" maxlength="200"></div>
+            <div class="field span-2"><label class="req">โอกาส / วัตถุประสงค์ (Purpose of visiting)</label><textarea class="input" data-f="occasion" placeholder="เช่น เลี้ยงขอบคุณทีมจัดซื้อ SCG หลังปิดงาน เพื่อเพิ่มโอกาส Bidding โครงการปีหน้า" maxlength="500"></textarea>
+              <div class="hint">อธิบายให้ละเอียด${need ? ` อย่างน้อย ${VISIT.minLen} ตัวอักษร` : ''} — พบใคร เพื่ออะไร คาดหวังอะไร (เช่น เพิ่มโอกาสขาย / Bidding งาน)</div>${err('occasion')}</div>
+            <div class="field span-2"><label ${need ? 'class="req"' : ''}>ผู้ร่วม (คาดการณ์)${need ? '' : ' <span class="opt">ไม่บังคับ</span>'}</label><textarea class="input" data-f="attendees" placeholder="ชื่อ + บริษัท เช่น คุณสมชาย (SCG), คุณเอ (EXION)" maxlength="500"></textarea>${err('attendees')}</div>
             <div class="field"><label>เลข Job <span class="opt">ไม่บังคับ</span></label><input class="input" data-f="jobNo" placeholder="เช่น J2026-0142" maxlength="60"></div>
           </div>
         </div></div>
@@ -89,7 +93,9 @@ export async function render(ctx) {
       venue: !val('venue') && 'ใส่สถานที่',
       custType: !F.custType && 'เลือกประเภทลูกค้า',
       customer: !val('customer') && 'ใส่ชื่อลูกค้า / Principle',
-      occasion: !val('occasion') && 'ใส่โอกาส / วัตถุประสงค์',
+      occasion: !val('occasion') ? 'ใส่โอกาส / วัตถุประสงค์ (Purpose of visiting)'
+        : need && val('occasion').length < VISIT.minLen && `อธิบายให้ละเอียดกว่านี้ (อย่างน้อย ${VISIT.minLen} ตัวอักษร) — พบใคร เพื่ออะไร`,
+      attendees: need && !val('attendees') && 'ใส่ผู้ร่วม (คาดการณ์) — ชื่อ + บริษัท',
       budget: budget <= 0 ? 'ใส่งบประมาณ' : budget > 500000 && 'งบประมาณเกิน 500,000 บาท',
     };
     Object.entries(errs).forEach(([k, m]) => showErr(k, m || ''));

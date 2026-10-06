@@ -1,7 +1,7 @@
 // คำขอของฉัน — กรองตามสถานะ / ค้นหา / จัดกลุ่มรายเดือน · แตะดูรายละเอียด แก้ไข ลบ
 import { api, state, money, esc, fmtDate, fmtDateTime, catName, catInfo, monthLabel, requestBadge, loadCategories } from '../core.js';
 import { icon, catIcon, requestRow, toast, toastError, confirmBox, sheet, busy, empty, skeleton, thumbs, hydrateThumbs, receiptPicker, on, debounce, $, $$ } from '../ui.js';
-import { catPickerHtml, fieldsHtml, applyCat, validateItem, showErrors, clearError, catFlags, fuelBox, pickFields } from './submit.js';
+import { catPickerHtml, fieldsHtml, applyCat, validateItem, showErrors, clearError, catFlags, fuelBox, pickFields, loadVisitRules } from './submit.js';
 
 const FILTERS = [['all', 'ทั้งหมด'], ['pending', 'รออนุมัติ'], ['approved', 'อนุมัติแล้ว'], ['rejected', 'ไม่อนุมัติ'], ['pre', 'งบล่วงหน้า']];
 
@@ -27,6 +27,7 @@ export async function render(ctx) {
   const { el } = ctx;
   const S = { rows: [], filter: FILTERS.some(([k]) => k === ctx.query.f) ? ctx.query.f : 'all', q: '', settled: null, names: null, sheet: null };
   loadCategories().catch(() => {});
+  loadVisitRules();
   // วันที่ปิดรอบล่าสุด (ส่งบัญชีแล้ว) → รายการก่อนหน้านั้นแก้/ลบไม่ได้
   const now = new Date();
   const periodP = api.rpc('get_period_info', { p_year: now.getFullYear(), p_month: now.getMonth() + 1 }, { ttl: 300 })
@@ -136,8 +137,8 @@ export async function render(ctx) {
       r.origin || r.destination ? ['เส้นทาง', esc([r.origin, r.destination].filter(Boolean).join(' → '))] : null,
       r.venue ? [f.ent ? 'สถานที่' : 'รายละเอียด', esc(r.venue)] : null,
       r.customer ? ['ลูกค้า', custHtml(r.customer)] : null,
-      r.customer_contact ? ['ผู้ติดต่อ', esc(r.customer_contact)] : null,
-      r.occasion ? ['โอกาส', esc(r.occasion)] : null,
+      r.customer_contact ? ['Contact name', esc(r.customer_contact)] : null,
+      r.occasion ? ['Purpose of visiting', esc(r.occasion)] : null,
       r.attendees ? ['ผู้ร่วม', esc(r.attendees)] : null,
       r.job_no ? ['เลข Job', esc(r.job_no)] : null,
       fromPre && preBudget != null ? ['งบที่อนุมัติ', `฿${money(preBudget)}${sibs.length > 1 ? ` · ยอดจริงรวม ${sibs.length} บิล ฿${money(billTotal)}` : ''}${over ? ` <span class="badge b-bad">เกินงบ ฿${money(billTotal - preBudget)}</span>` : ''}`] : null,
@@ -294,9 +295,10 @@ export async function render(ctx) {
       if (f.fuel) u.mileage_km = String(Number(it.mileageKm) || 0);
       else { u.amount = String(Number(it.amount) || 0); u.mileage_km = ''; u.venue = t('venue'); }
       if (f.travel) { u.origin = t('origin'); u.destination = t('destination'); }
-      if (f.travel || f.ent) u.customer = t('customer');
-      if ((f.travel && !f.fuel) || f.ent) u.customer_contact = t('customerContact');
-      if (f.ent) { u.occasion = t('occasion'); u.attendees = t('attendees'); }
+      if (f.travel || f.ent || f.visit) u.customer = t('customer');
+      if ((f.travel && !f.fuel) || f.ent || f.visit) u.customer_contact = t('customerContact');
+      if (f.ent || f.visit) u.occasion = t('occasion');
+      if (f.ent) u.attendees = t('attendees');
       if (f.job) u.job_no = t('jobNo');
       btn.disabled = true;
       try {
