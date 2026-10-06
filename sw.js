@@ -1,5 +1,5 @@
 // Service worker — แคชเฉพาะไฟล์หน้าเว็บ · ไม่แตะข้อมูล Supabase (ข้อมูลสดเสมอ)
-const VERSION = 'exion-v10.0.6';
+const VERSION = 'exion-v10.0.7';
 const SHELL = ['./', './index.html', './css/app.css', './config.js', './manifest.webmanifest', './icons/favicon-64.png', './icons/icon-192.png', './brand/logo.png', './brand/mark.png', './brand/plant.svg',
   './js/main.js', './js/core.js', './js/ui.js', './js/shell.js', './js/icons.js', './js/csp.js', './vendor/supabase-2.117.2.js'];
 self.addEventListener('install', (e) => {

@@ -120,8 +120,8 @@ export function render({ el, onLoggedIn }) {
   function stepSetup(msg = '') {
     af.innerHTML = `
       <img class="auth-logo" src="brand/logo.png" alt="EXION Thailand">
-      <h1>ตั้งรหัสผ่านครั้งแรก</h1>
-      <p class="sub">บัญชี <b>${esc(email)}</b> ยังไม่มีรหัสผ่าน — ตั้งรหัสของคุณได้เลย</p>
+      <h1>ตั้งรหัสผ่านของคุณ</h1>
+      <p class="sub">บัญชี <b>${esc(email)}</b> ตั้งรหัสผ่านใหม่ได้เลย<br>(ถ้าเคยมีรหัสจากระบบเก่า รหัสเก่าจะใช้ไม่ได้อีก)</p>
       ${alertBox(msg)}
       <form class="stack" id="f" novalidate>
         <input type="email" autocomplete="username" value="${esc(email)}" hidden>
