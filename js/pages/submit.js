@@ -1,9 +1,9 @@
 // ขอเบิกค่าใช้จ่าย — กรอกได้หลายรายการในครั้งเดียว · เซฟร่างอัตโนมัติ · กันส่งซ้ำด้วย batchId
 // ส่วนช่องกรอกตามหมวด (export ด้านล่าง) ใช้ร่วมกับหน้าแก้ไขใน requests.js
-import { api, state, money, esc, fmtDate, catName, catInfo, todayYMD, addDays, loadCategories, timeAgo } from '../core.js?v=10.0.13';
-import { html, icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, on, debounce, $, $$ } from '../ui.js?v=10.0.13';
+import { api, state, money, esc, fmtDate, catName, catInfo, todayYMD, addDays, loadCategories, timeAgo } from '../core.js?v=10.0.14';
+import { html, icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, on, debounce, $, $$ } from '../ui.js?v=10.0.14';
 
-const NO_JOB = ['FUEL', 'TOLL', 'PARK', 'MILE'];        // หมวดเดินทาง ไม่ต้องมีเลข Job
+const NO_JOB = [];                                      // ทุกหมวดใส่เลข Job ได้ (ไม่บังคับ · ค่ารับรอง/กอล์ฟบังคับ) → ลงช่อง Job ใน Excel
 const ENT_CATS = ['ENT', 'GOLF'];
 const ALLOW_CATS = ['CAR', 'MOBILE', 'APT'];             // ค่าเหมาจ่ายอัตโนมัติ
 export const FIELDS = ['category', 'expenseDate', 'mileageKm', 'amount', 'venue', 'occasion', 'attendees', 'origin', 'destination', 'customer', 'customerContact', 'jobNo'];
@@ -13,7 +13,7 @@ const DRAFT_DAYS = 7;
 // ════════════════════ ตัวช่วยช่องกรอก (ใช้ร่วมกับ requests.js) ════════════════════
 
 /** กติกา Purpose of visiting / ชื่อลูกค้า / Contact name (ตรงกับ app.check_visit_info) */
-export const VISIT = { required: true, minLen: 10 };
+export const VISIT = { required: true, minLen: 10, purposeRequired: false, entJobRequired: true };
 export async function loadVisitRules() {
   try { Object.assign(VISIT, await api.rpc('get_visit_rules', {}, { ttl: 3600 })); } catch { /* ยังไม่ได้ติดตั้ง SQL → ใช้ค่าเริ่มต้น */ }
   return VISIT;
@@ -67,7 +67,7 @@ export function fieldsHtml(it, { listId = 'exCustList' } = {}) {
     <div class="field" data-g="amt"><label class="req">จำนวนเงิน</label>
       <div class="input-group has-pre has-suf"><span class="pre">฿</span><input class="input" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" data-f="amount" value="${v('amount')}"><span class="suf">บาท</span></div>${err('amount')}</div>
     <div class="span-2 hidden" data-g="fuelcalc"></div>
-    <div class="field span-2" data-g="occasion"><label class="req" data-lbl="occasion">Purpose of visiting</label>
+    <div class="field span-2" data-g="occasion"><label data-lbl="occasion">Purpose of visiting</label>
       <textarea class="input" data-f="occasion" placeholder="${PURPOSE_PH}" maxlength="500">${v('occasion')}</textarea>
       <div class="hint" data-hint="occasion"></div>${err('occasion')}</div>
     <div class="alert bad span-2 hidden" data-g="entword">${'⛔'}<div>ข้อความนี้ดูเหมือน <b>ค่ารับรอง / ค่ากอล์ฟ</b> — ต้องขออนุมัติงบล่วงหน้า ห้ามเบิกในหมวด "อื่นๆ" (หัวหน้าจะไม่อนุมัติ)</div></div>
@@ -81,8 +81,8 @@ export function fieldsHtml(it, { listId = 'exCustList' } = {}) {
     <div class="field" data-g="destination"><label>ปลายทาง</label><input class="input" data-f="destination" value="${v('destination')}" placeholder="เช่น นิคมฯ มาบตาพุด" maxlength="200"></div>
     <div class="field span-2" data-g="attendees"><label class="req">ผู้ร่วม</label>
       <textarea class="input" data-f="attendees" placeholder="ชื่อ + บริษัท เช่น คุณสมชาย (SCG), คุณเอ (EXION)" maxlength="500">${v('attendees')}</textarea>${err('attendees')}</div>
-    <div class="field" data-g="jobNo"><label>เลข Job <span class="opt">ไม่บังคับ</span></label>
-      <input class="input" data-f="jobNo" value="${v('jobNo')}" placeholder="เช่น J2026-0142" maxlength="60"></div>
+    <div class="field" data-g="jobNo"><label data-lbl="jobNo">เลข Job <span class="opt">ไม่บังคับ</span></label>
+      <input class="input" data-f="jobNo" value="${v('jobNo')}" placeholder="เช่น J2026-0142" maxlength="60">${err('jobNo')}</div>
   </div>
   <div class="field mt-16" data-g="rcpt"><label data-lbl="rcpt">ใบเสร็จ</label><div data-rslot></div>
     <div class="hint" data-hint="rcpt"></div>${err('receipts')}</div>`);
@@ -131,9 +131,13 @@ export function applyCat(root, it, fuel) {
   if (lv) { lv.innerHTML = f.ent ? 'สถานที่' : 'รายละเอียดเพิ่มเติม <span class="opt">ไม่บังคับ</span>'; lv.classList.toggle('req', f.ent); }
   const need = f.visit;   // บิลทั่วไป = บังคับ · ค่ารับรอง: Contact name ไม่บังคับ (ใช้ "ผู้ร่วม" แทน)
   const lo = $('[data-lbl="occasion"]', root);
-  if (lo) lo.textContent = f.ent ? 'Purpose of entertainment (โอกาส / วัตถุประสงค์)' : 'Purpose of visiting';
+  const pReq = f.ent || (f.visit && VISIT.purposeRequired);
+  if (lo) { lo.innerHTML = f.ent ? 'Purpose of entertainment (โอกาส / วัตถุประสงค์)' : `Purpose of visiting${pReq ? '' : ' <span class="opt">ไม่บังคับ</span>'}`; lo.classList.toggle('req', pReq); }
   const ho = $('[data-hint="occasion"]', root);
-  if (ho) ho.textContent = `อธิบายให้ละเอียด อย่างน้อย ${VISIT.minLen} ตัวอักษร — ไปพบใคร ทำอะไร เพื่ออะไร (เช่น เพิ่มโอกาสขาย / Bidding งาน)`;
+  if (ho) ho.textContent = pReq ? `อธิบายให้ละเอียด อย่างน้อย ${VISIT.minLen} ตัวอักษร — ไปพบใคร ทำอะไร เพื่ออะไร (เช่น เพิ่มโอกาสขาย / Bidding งาน)` : 'แนะนำให้ใส่ — ไปพบใคร ทำอะไร เพื่ออะไร (เช่น เพิ่มโอกาสขาย / Bidding งาน)';
+  const lj = $('[data-lbl="jobNo"]', root);
+  const jReq = f.ent && VISIT.entJobRequired;
+  if (lj) { lj.innerHTML = jReq ? 'เลข Job' : 'เลข Job <span class="opt">ไม่บังคับ</span>'; lj.classList.toggle('req', jReq); }
   const lc = $('[data-lbl="customer"]', root);
   if (lc) { lc.textContent = 'ชื่อลูกค้า (Customer name)'; lc.classList.toggle('req', need); }
   const lk = $('[data-lbl="contact"]', root);
@@ -173,11 +177,14 @@ export function validateItem(it, rcptCount = 0) {
     if (!String(it.venue || '').trim()) e.venue = 'ใส่สถานที่';
     if (!String(it.occasion || '').trim()) e.occasion = 'ใส่โอกาส / วัตถุประสงค์';
     if (!String(it.attendees || '').trim()) e.attendees = 'ใส่ชื่อผู้ร่วม';
+    if (VISIT.entJobRequired && !String(it.jobNo || '').trim()) e.jobNo = 'ใส่เลข Job (บังคับสำหรับค่ารับรอง / กอล์ฟ)';
   }
   if (f.visit) {
     const pur = String(it.occasion || '').trim();
-    if (!pur) e.occasion = 'ใส่ Purpose of visiting — ไปทำอะไร เพื่ออะไร';
-    else if (pur.length < VISIT.minLen) e.occasion = `อธิบายให้ละเอียดกว่านี้ (อย่างน้อย ${VISIT.minLen} ตัวอักษร) เช่น ไปเสนอราคา เพื่อเพิ่มโอกาสขาย`;
+    if (VISIT.purposeRequired) {
+      if (!pur) e.occasion = 'ใส่ Purpose of visiting — ไปทำอะไร เพื่ออะไร';
+      else if (pur.length < VISIT.minLen) e.occasion = `อธิบายให้ละเอียดกว่านี้ (อย่างน้อย ${VISIT.minLen} ตัวอักษร)`;
+    }
     if (!String(it.customer || '').trim()) e.customer = 'ใส่ชื่อลูกค้า (Customer name)';
     if (!String(it.customerContact || '').trim()) e.customerContact = 'ใส่ Contact name — ชื่อผู้ที่ไปพบ';
   }

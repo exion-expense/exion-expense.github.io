@@ -2,8 +2,8 @@
 //  shell.js — โครงหน้าแอป (เมนูข้าง / แถบล่าง / กระดิ่ง) + ตัวเปลี่ยนหน้า (hash router)
 //  เพิ่มหน้าใหม่: ใส่ใน ROUTES แล้วสร้างไฟล์ js/pages/<ชื่อ>.js ที่ export render(ctx)
 // ════════════════════════════════════════════════════════════════════
-import { api, auth, state, loadProfile, loadCategories, esc, initials, roleLabel, timeAgo, cfg, MOCK_MODE } from './core.js?v=10.0.13';
-import { icon, sheet, toast, errorBox, skeleton, $ } from './ui.js?v=10.0.13';
+import { api, auth, state, loadProfile, loadCategories, esc, initials, roleLabel, timeAgo, cfg, MOCK_MODE } from './core.js?v=10.0.14';
+import { icon, sheet, toast, errorBox, skeleton, $ } from './ui.js?v=10.0.14';
 
 const r = (p) => p || {};
 const isApprover = (p) => r(p.role).isManager || r(p.role).isSenior || r(p.role).isGM;
@@ -25,6 +25,7 @@ const ROUTES = [
   { path: '/ceo', page: 'ceo', title: 'อนุมัติสรุปรายเดือน', app: 'expense', nav: 'ceo', icon: 'crown', show: (p) => r(p.role).isCEO },
   { path: '/set-password', page: 'set-password', title: 'ตั้งรหัสผ่านใหม่', app: 'expense', nav: 'profile' },
   { path: '/profile', page: 'profile', title: 'โปรไฟล์ & ขอเบิกรายเดือน', app: 'expense', nav: 'profile', icon: 'user' },
+  { path: '/admin', page: 'admin', title: 'ผู้ดูแลระบบ', app: 'expense', nav: 'admin', icon: 'key', show: (p) => !!p.isAdmin },
   // ── เงินสดย่อย ──
   { path: '/petty', page: 'petty-home', title: 'เงินสดย่อย', app: 'petty', nav: 'p-home', icon: 'home' },
   { path: '/petty/request', page: 'petty-request', title: 'ขอเบิกเงินสดย่อย', app: 'petty', nav: 'p-request', icon: 'plus-circle' },
@@ -95,7 +96,7 @@ async function route() {
   const app = document.getElementById('app');
   if (!auth.user) {
     closeBell();
-    const m = await import('./pages/login.js?v=10.0.13');
+    const m = await import('./pages/login.js?v=10.0.14');
     if (seq !== renderSeq) return;
     document.title = 'เข้าสู่ระบบ · EXION Expense';
     return m.render({ el: app, query, go, onLoggedIn: () => { const back = sessionStorage.getItem('exion_after_login'); sessionStorage.removeItem('exion_after_login'); go(back && back !== '/login' ? back : '/'); } });
@@ -144,7 +145,7 @@ async function route() {
 
 // ─────────────── เวอร์ชันแอป ───────────────
 // เปลี่ยนพร้อม sw.js / index.html ทุกครั้งที่อัปเว็บ (ใช้ต่อท้ายไฟล์ทุกไฟล์ที่ import → ได้ไฟล์ชุดเดียวกันเสมอ)
-const APP_V = '10.0.13';
+const APP_V = '10.0.14';
 let verAt = 0, verNew = false;
 async function newerVersion() {
   if (verNew) return true;

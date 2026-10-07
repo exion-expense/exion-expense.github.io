@@ -1,6 +1,6 @@
 // หน้าแรกเงินสดย่อย — เงินในกล่อง / ทางลัด / คำขอล่าสุด / งานที่รอ (ผู้อนุมัติ, คนถือกล่อง)
-import { api, money, fmtDate, esc, catName, statusBadge, loadPettyCategories } from '../core.js?v=10.0.13';
-import { icon, catIcon, empty, errorBox, skeleton, on } from '../ui.js?v=10.0.13';
+import { api, money, fmtDate, esc, catName, statusBadge, loadPettyCategories } from '../core.js?v=10.0.14';
+import { icon, catIcon, empty, errorBox, skeleton, on } from '../ui.js?v=10.0.14';
 
 // กล่องเงินที่เลือกไว้ (ใช้ร่วมทุกหน้าเงินสดย่อย) · ว่าง = กล่องหลัก
 const FUND_KEY = 'exion_petty_fund';

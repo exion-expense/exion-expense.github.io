@@ -1,6 +1,6 @@
 // หน้าแรก (เบิกค่าใช้จ่าย) — แดชบอร์ดตามบทบาท: พนักงาน / หัวหน้า / GM / บัญชี / CEO
-import { api, money, compact, fmtDate, timeAgo, esc, initials, roleLabel, monthLabel, exportStage, catName } from '../core.js?v=10.0.13';
-import { icon, catIcon, requestRow, toast, toastError, confirmBox, withBtn, bars, empty, on } from '../ui.js?v=10.0.13';
+import { api, money, compact, fmtDate, timeAgo, esc, initials, roleLabel, monthLabel, exportStage, catName } from '../core.js?v=10.0.14';
+import { icon, catIcon, requestRow, toast, toastError, confirmBox, withBtn, bars, empty, on } from '../ui.js?v=10.0.14';
 
 export async function render(ctx) {
   const { el } = ctx;
@@ -145,7 +145,7 @@ async function act(ctx, t) {
       await withBtn(t, () => api.rpc('decide_many', { p_ids: [id], p_decision: 'Approved', p_mode: 'auto' }));
       toast('อนุมัติแล้ว');
     } else if (t.dataset.act === 'reject') {
-      const { promptBox } = await import('../ui.js?v=10.0.13');
+      const { promptBox } = await import('../ui.js?v=10.0.14');
       const why = await promptBox({ title: 'ไม่อนุมัติรายการนี้', label: 'เหตุผล (พนักงานจะเห็น)', required: true, ok: 'ไม่อนุมัติ', danger: true });
       if (why == null) return;
       await api.rpc('decide_many', { p_ids: [id], p_decision: 'Rejected', p_remark: why, p_mode: 'auto' });

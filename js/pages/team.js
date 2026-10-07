@@ -1,6 +1,6 @@
 // ทีมของฉัน (หัวหน้า / GM) — ยอดรายคนต่อเดือน · ดูบิลรายคน · ขอเบิกแทน · ออกรหัสชั่วคราวให้ลูกทีม
-import { api, auth, money, compact, fmtDate, fmtDateTime, esc, initials, monthLabel, catName, todayYMD } from '../core.js?v=10.0.13';
-import { icon, catIcon, toast, toastError, sheet, confirmBox, withBtn, busy, empty, skeleton, requestRow, thumbs, hydrateThumbs, monthNav, shiftMonth, bars, debounce, on } from '../ui.js?v=10.0.13';
+import { api, auth, money, compact, fmtDate, fmtDateTime, esc, initials, monthLabel, catName, todayYMD } from '../core.js?v=10.0.14';
+import { icon, catIcon, toast, toastError, sheet, confirmBox, withBtn, busy, empty, skeleton, requestRow, thumbs, hydrateThumbs, monthNav, shiftMonth, bars, debounce, on } from '../ui.js?v=10.0.14';
 
 const STAGE = { waiting: ['รออนุมัติ', 'b-pending'], approved: ['อนุมัติแล้ว', 'b-approved'], paid: ['โอนแล้ว', 'b-paid'], rejected: ['ไม่อนุมัติ', 'b-rejected'] };
 const pad2 = (n) => String(n).padStart(2, '0');
@@ -269,7 +269,7 @@ async function requestFor(ctx, st, p, after) {
 }
 
 /** ออกรหัสชั่วคราว 6 หลัก — รหัสผ่านเดิมของพนักงานจะใช้ไม่ได้ทันที */
-async function issueCode(p, btn) {
+export async function issueCode(p, btn) {
   const ok = await confirmBox({
     title: 'ออกรหัสชั่วคราว',
     message: `ให้ ${p.fullName || p.name}\n\nรหัสผ่านเดิมของพนักงานจะใช้ไม่ได้ทันที — พนักงานต้องใช้รหัสนี้ตั้งรหัสผ่านใหม่ภายใน 24 ชม.`,
@@ -289,7 +289,7 @@ async function issueCode(p, btn) {
         <button class="btn btn-secondary btn-block mt-16" data-copy>${icon('copy', 'sm')} คัดลอกรหัส</button>
         <div class="alert neutral mt-16">${icon('info')}<div class="text-sm"><b>บอกพนักงานให้:</b><br>
           1. เปิดแอป EXION แล้วกรอกอีเมล ${esc(p.email)}<br>
-          2. กด “ลืมรหัสผ่าน / มีรหัสชั่วคราวจากหัวหน้า” (ถ้าเป็นครั้งแรกจะเข้าหน้าตั้งรหัสเลย)<br>
+          2. กด “ลืมรหัสผ่าน” → กรอกรหัสชั่วคราว (ถ้าเป็นครั้งแรกจะเข้าหน้าตั้งรหัสเลย)<br>
           3. กรอกรหัส 6 หลักนี้ แล้วตั้งรหัสผ่านใหม่ (อย่างน้อย 8 ตัว มีตัวเลข)</div></div>
         <p class="hint mt-12">ส่งรหัสให้พนักงานโดยตรงเท่านั้น — อย่าโพสต์ในกลุ่ม</p>`,
       foot: `<button class="btn btn-primary" data-x>เสร็จแล้ว</button>`,

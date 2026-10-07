@@ -2,8 +2,8 @@
 // ลืมรหัส → ลิงก์ทางอีเมล (ถ้าเปิดไว้) หรือ รหัสชั่วคราว 6 หลักจากหัวหน้า
 // ใช้ครั้งแรก (ยังไม่เคยมีรหัส · ช่วงเปิดระบบ SELF_SETUP_UNTIL) → ตั้งรหัสเองได้เลย
 // ข้อความทุกแบบไม่บอกว่าอีเมลไหนมีในระบบ (กันคนนอกสุ่มหารายชื่อพนักงาน)
-import { auth, esc, cfg, state, MOCK_MODE, passwordProblem } from '../core.js?v=10.0.13';
-import { icon, toast, withBtn } from '../ui.js?v=10.0.13';
+import { auth, esc, cfg, state, MOCK_MODE, passwordProblem } from '../core.js?v=10.0.14';
+import { icon, toast, withBtn } from '../ui.js?v=10.0.14';
 
 export function render({ el, onLoggedIn }) {
   let email = localStorage.getItem('exion_last_email') || '';
@@ -152,7 +152,7 @@ export function render({ el, onLoggedIn }) {
     af.innerHTML = `
       <img class="auth-logo" src="brand/logo.png" alt="EXION Thailand">
       <h1>ตั้งรหัสผ่านใหม่</h1>
-      <p class="sub">กรอก <b>รหัสชั่วคราว 6 หลัก</b> ที่ได้จากหัวหน้า แล้วตั้งรหัสผ่านของคุณ</p>
+      <p class="sub">กรอก <b>รหัสชั่วคราว 6 หลัก</b> ที่ได้จากหัวหน้าหรือผู้ดูแลระบบ แล้วตั้งรหัสผ่านของคุณ</p>
       ${alertBox(msg, kind)}
       <form class="stack" id="f" novalidate>
         <div class="field"><label for="em">อีเมล</label>

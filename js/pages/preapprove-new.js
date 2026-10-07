@@ -1,7 +1,7 @@
 // ขออนุมัติงบล่วงหน้า (ค่ารับรอง / กอล์ฟ) — ส่งก่อนใช้จ่าย แล้วค่อยส่งบิลจริงทีหลัง
-import { api, money, esc, catName, todayYMD, addDays, loadCategories } from '../core.js?v=10.0.13';
-import { icon, catIcon, toast, toastError, withBtn, on, $, $$ } from '../ui.js?v=10.0.13';
-import { VISIT, loadVisitRules } from './submit.js?v=10.0.13';
+import { api, money, esc, catName, todayYMD, addDays, loadCategories } from '../core.js?v=10.0.14';
+import { icon, catIcon, toast, toastError, withBtn, on, $, $$ } from '../ui.js?v=10.0.14';
+import { VISIT, loadVisitRules } from './submit.js?v=10.0.14';
 
 const CUST_TYPES = [['Customer', 'ลูกค้า'], ['Principle', 'Principle'], ['Other Customer', 'ลูกค้าอื่น'], ['Other Principle', 'Principle อื่น']];
 const ENT_CATS = ['ENT', 'GOLF'];
@@ -40,7 +40,7 @@ export async function render(ctx) {
             <div class="field span-2"><label class="req">Purpose of entertainment (โอกาส / วัตถุประสงค์)</label><textarea class="input" data-f="occasion" placeholder="เช่น เลี้ยงขอบคุณทีมจัดซื้อ SCG หลังปิดงาน เพื่อเพิ่มโอกาส Bidding โครงการปีหน้า" maxlength="500"></textarea>
               <div class="hint">อธิบายให้ละเอียด${need ? ` อย่างน้อย ${VISIT.minLen} ตัวอักษร` : ''} — พบใคร เพื่ออะไร คาดหวังอะไร (เช่น เพิ่มโอกาสขาย / Bidding งาน)</div>${err('occasion')}</div>
             <div class="field span-2"><label ${need ? 'class="req"' : ''}>ผู้ร่วม (คาดการณ์)${need ? '' : ' <span class="opt">ไม่บังคับ</span>'}</label><textarea class="input" data-f="attendees" placeholder="ชื่อ + บริษัท เช่น คุณสมชาย (SCG), คุณเอ (EXION)" maxlength="500"></textarea>${err('attendees')}</div>
-            <div class="field"><label>เลข Job <span class="opt">ไม่บังคับ</span></label><input class="input" data-f="jobNo" placeholder="เช่น J2026-0142" maxlength="60"></div>
+            <div class="field"><label ${VISIT.entJobRequired ? 'class="req">เลข Job' : '>เลข Job <span class="opt">ไม่บังคับ</span>'}</label><input class="input" data-f="jobNo" placeholder="เช่น J2026-0142" maxlength="60">${err('jobNo')}</div>
           </div>
         </div></div>
 
@@ -96,6 +96,7 @@ export async function render(ctx) {
       occasion: !val('occasion') ? 'ใส่ Purpose of entertainment — เลี้ยง/พบใคร เพื่ออะไร'
         : need && val('occasion').length < VISIT.minLen && `อธิบายให้ละเอียดกว่านี้ (อย่างน้อย ${VISIT.minLen} ตัวอักษร) — พบใคร เพื่ออะไร`,
       attendees: need && !val('attendees') && 'ใส่ผู้ร่วม (คาดการณ์) — ชื่อ + บริษัท',
+      jobNo: VISIT.entJobRequired && !val('jobNo') && 'ใส่เลข Job (บังคับสำหรับค่ารับรอง / กอล์ฟ)',
       budget: budget <= 0 ? 'ใส่งบประมาณ' : budget > 500000 && 'งบประมาณเกิน 500,000 บาท',
     };
     Object.entries(errs).forEach(([k, m]) => showErr(k, m || ''));
