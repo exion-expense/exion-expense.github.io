@@ -2,8 +2,8 @@
 //  shell.js — โครงหน้าแอป (เมนูข้าง / แถบล่าง / กระดิ่ง) + ตัวเปลี่ยนหน้า (hash router)
 //  เพิ่มหน้าใหม่: ใส่ใน ROUTES แล้วสร้างไฟล์ js/pages/<ชื่อ>.js ที่ export render(ctx)
 // ════════════════════════════════════════════════════════════════════
-import { api, auth, state, loadProfile, loadCategories, esc, initials, roleLabel, timeAgo, cfg, MOCK_MODE } from './core.js';
-import { icon, sheet, toast, errorBox, skeleton, $ } from './ui.js';
+import { api, auth, state, loadProfile, loadCategories, esc, initials, roleLabel, timeAgo, cfg, MOCK_MODE } from './core.js?v=10.0.13';
+import { icon, sheet, toast, errorBox, skeleton, $ } from './ui.js?v=10.0.13';
 
 const r = (p) => p || {};
 const isApprover = (p) => r(p.role).isManager || r(p.role).isSenior || r(p.role).isGM;
@@ -95,7 +95,7 @@ async function route() {
   const app = document.getElementById('app');
   if (!auth.user) {
     closeBell();
-    const m = await import('./pages/login.js');
+    const m = await import('./pages/login.js?v=10.0.13');
     if (seq !== renderSeq) return;
     document.title = 'เข้าสู่ระบบ · EXION Expense';
     return m.render({ el: app, query, go, onLoggedIn: () => { const back = sessionStorage.getItem('exion_after_login'); sessionStorage.removeItem('exion_after_login'); go(back && back !== '/login' ? back : '/'); } });
@@ -126,7 +126,9 @@ async function route() {
   if (typeof current?.cleanup === 'function') { try { current.cleanup(); } catch {} }
   current = null;
   try {
-    const mod = await import(`./pages/${rt.page}.js`);
+    // มีเวอร์ชันใหม่ขึ้นเว็บระหว่างเปิดแอปค้าง → โหลดใหม่ทั้งหน้าก่อน (กันไฟล์ใหม่-เก่าปนกัน) · ร่างที่กรอกค้างถูกบันทึกตอน cleanup แล้ว
+    if (await newerVersion()) { reloadOnce('v'); return; }
+    const mod = await import(`./pages/${rt.page}.js?v=${APP_V}`);
     if (seq !== renderSeq) return;
     main.innerHTML = '';
     const ctx = { el: main, params, query, profile, go, setTitle, refreshBadges, alive: () => seq === renderSeq, app: rt.app };
@@ -134,8 +136,33 @@ async function route() {
     if (seq === renderSeq) current = { cleanup };
   } catch (e) {
     console.error(e);
+    // โหลดไฟล์หน้าไม่ได้ / ไฟล์ไม่เข้ากัน (เพิ่งอัปเวอร์ชัน) → โหลดใหม่ทั้งหน้า 1 ครั้งอัตโนมัติ
+    if (/does not provide an export|dynamically imported module|Importing a module script failed|error loading dynamically/i.test(String(e?.message)) && reloadOnce('e')) return;
     if (seq === renderSeq) errorBox(main, e, () => route());
   }
+}
+
+// ─────────────── เวอร์ชันแอป ───────────────
+// เปลี่ยนพร้อม sw.js / index.html ทุกครั้งที่อัปเว็บ (ใช้ต่อท้ายไฟล์ทุกไฟล์ที่ import → ได้ไฟล์ชุดเดียวกันเสมอ)
+const APP_V = '10.0.13';
+let verAt = 0, verNew = false;
+async function newerVersion() {
+  if (verNew) return true;
+  if (Date.now() - verAt < 60000) return false;       // เช็กไม่เกินนาทีละครั้ง
+  verAt = Date.now();
+  try {
+    const t = await (await fetch('sw.js?vc=' + Date.now(), { cache: 'no-store' })).text();
+    const m = /exion-v([\d.]+)/.exec(t);
+    verNew = !!m && m[1] !== APP_V;
+  } catch { /* ออฟไลน์ → ใช้ต่อ */ }
+  return verNew;
+}
+/** โหลดใหม่ได้ครั้งเดียวต่อเหตุ (กันวนถ้าเครื่องยังได้ไฟล์เก่าจากแคช) · คืน true ถ้าโหลดใหม่ */
+function reloadOnce(why) {
+  const k = 'exion_reload_' + why + '_' + APP_V;
+  try { if (sessionStorage.getItem(k)) return false; sessionStorage.setItem(k, '1'); } catch { return false; }
+  location.reload();
+  return true;
 }
 
 function setTitle(t) { const el = document.getElementById('top-title'); if (el) el.textContent = t; }

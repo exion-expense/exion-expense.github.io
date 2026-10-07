@@ -1,6 +1,6 @@
 // ตาราง MSBC (บัญชี) — บิลเงินสดย่อยตามช่วงวันที่ เรียงคอลัมน์ตรงไฟล์ MSBC · ก๊อปไปวาง หรือโหลด Excel
-import { api, money, fmtDate, esc, ymd, todayYMD } from '../core.js';
-import { icon, toast, toastError, withBtn, errorBox, empty, skeleton, on, $ } from '../ui.js';
+import { api, money, fmtDate, esc, ymd, todayYMD } from '../core.js?v=10.0.13';
+import { icon, toast, toastError, withBtn, errorBox, empty, skeleton, on, $ } from '../ui.js?v=10.0.13';
 
 const FUND_KEY = 'exion_petty_fund';
 function fundId() { try { return localStorage.getItem(FUND_KEY) || null; } catch { return null; } }

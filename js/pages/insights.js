@@ -1,6 +1,6 @@
 // แดชบอร์ดลูกค้า — ใช้เงินกับลูกค้ารายไหนเท่าไร ไปกี่ครั้ง ไปเพื่ออะไร (ฝั่งเซิร์ฟเวอร์ตัดสินขอบเขต: ทั้งบริษัท / ทีมของฉัน)
-import { api, money, compact, fmtDate, esc, catName, ymd } from '../core.js';
-import { icon, catIcon, toast, toastError, withBtn, bars, donut, PALETTE, sheet, errorBox, skeleton, on, debounce } from '../ui.js';
+import { api, money, compact, fmtDate, esc, catName, ymd } from '../core.js?v=10.0.13';
+import { icon, catIcon, toast, toastError, withBtn, bars, donut, PALETTE, sheet, errorBox, skeleton, on, debounce } from '../ui.js?v=10.0.13';
 
 const SCOPE_TH = { all: 'ทั้งบริษัท', team: 'ทีมของฉัน', self: 'ข้อมูลของฉัน' };
 const PRESETS = [['month', 'เดือนนี้'], ['last', 'เดือนก่อน'], ['3m', '3 เดือน'], ['6m', '6 เดือน'], ['ytd', 'ปีนี้'], ['custom', 'กำหนดเอง']];
