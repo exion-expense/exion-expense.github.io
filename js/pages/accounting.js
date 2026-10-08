@@ -1,6 +1,7 @@
 // บัญชี · โอนเงิน — บอร์ดรายคนต่อเดือน: ยังไม่ขอ → รออนุมัติ → รอโอน → โอนแล้ว + ส่งสรุปให้ CEO
-import { api, money, compact, fmtDate, fmtDateTime, esc, initials, monthLabel, catName, statusBadge } from '../core.js?v=10.0.14';
-import { icon, catIcon, requestRow, toast, toastError, confirmBox, sheet, withBtn, monthNav, shiftMonth, empty, errorBox, lightbox, on, debounce } from '../ui.js?v=10.0.14';
+// แถบแผนก (ซ้าย/บน) เลือกแผนกแล้วดูยอด · ส่ง CEO ทีละแผนก · VIEWER เปิดได้แบบดูอย่างเดียว (canAct = false)
+import { api, money, compact, fmtDate, fmtDateTime, esc, initials, monthLabel, catName, statusBadge } from '../core.js?v=10.0.15';
+import { icon, catIcon, requestRow, toast, toastError, confirmBox, sheet, withBtn, monthNav, shiftMonth, empty, errorBox, lightbox, on, debounce } from '../ui.js?v=10.0.15';
 
 const STAGE = {
   ready: ['รอโอน', 'b-approved'], export: ['รออนุมัติ', 'b-pending'], bills: ['บิลรออนุมัติ', 'b-violet'],
@@ -11,12 +12,16 @@ const FILTERS = [['all', 'ทั้งหมด', null], ['ready', 'รอโอ
   ['todo', 'ยังไม่ขอ', ['unrequested', 'bills']], ['paid', 'โอนแล้ว', ['paid']], ['none', 'ไม่มีรายการ', ['none']]];
 const ymOf = (y, m) => `${y}-${String(m).padStart(2, '0')}`;
 const deptLabel = (d) => (!d || d === '*' ? 'ทุกแผนก' : d);
+const DEPT_KEY = 'exion_ac_dept';
+const loadDept = () => { try { return localStorage.getItem(DEPT_KEY) || '*'; } catch { return '*'; } };
+const saveDept = (d) => { try { localStorage.setItem(DEPT_KEY, d); } catch { /* ไม่จำก็ได้ */ } };
 const SUM_ST = { Pending: ['รอ CEO อนุมัติ', 'b-pending'], Approved: ['CEO อนุมัติแล้ว', 'b-approved'], Rejected: ['CEO ไม่อนุมัติ', 'b-rejected'] };
 
 export async function render(ctx) {
   const { el } = ctx;
   const now = new Date();
-  const st = { y: now.getFullYear(), m: now.getMonth() + 1, board: null, unpaid: [], filter: null, dept: '*', q: '' };
+  const st = { y: now.getFullYear(), m: now.getMonth() + 1, board: null, unpaid: [], filter: null, dept: loadDept(), q: '' };
+  const canAct = () => st.board?.canAct !== false;
   // ค่าเริ่มต้น: เดือนก่อน ถ้าวันนี้ยังต้นเดือน (บัญชีมักโอนของรอบที่แล้ว)
   if (now.getDate() <= 10) [st.y, st.m] = shiftMonth(st.y, st.m, -1);
 
@@ -30,6 +35,7 @@ export async function render(ctx) {
       await api.load('get_accounting_board', { p_ym: ymOf(y, m) }, (b) => {
         if (!ctx.alive() || y !== st.y || m !== st.m) return;
         st.board = b;
+        if (st.dept !== '*' && !(b.departments || []).includes(st.dept)) st.dept = '*';
         if (!st.filter) st.filter = b.counts?.ready ? 'ready' : 'all';
         paint();
       });
@@ -40,7 +46,7 @@ export async function render(ctx) {
 
   function paintHero() {
     const b = st.board, c = b.counts || {};
-    $('ac-hero').innerHTML = `<div class="page-head compact"><div><h1>บัญชี · โอนเงิน</h1><div class="sub">สถานะการเบิกรายคน เดือน${esc(monthLabel(b.year, b.month, true))}</div></div>
+    $('ac-hero').innerHTML = `<div class="page-head compact"><div><h1>บัญชี · โอนเงิน</h1><div class="sub">สถานะการเบิกรายคน เดือน${esc(monthLabel(b.year, b.month, true))}${canAct() ? '' : ' · <span class="badge b-info plain">ดูอย่างเดียว</span>'}</div></div>
       <div class="actions">${monthNav(st.y, st.m)}</div></div>
     <section class="hero green">
       <div style="position:relative;z-index:1"><div class="eyebrow">ยอดรอโอน · ${esc(monthLabel(b.year, b.month, true))}</div><div class="big">${money(b.readyTotal)}</div></div>
@@ -51,7 +57,7 @@ export async function render(ctx) {
       </div>
       <div class="flex wrap mt-16">
         <button class="btn btn-white" data-act="sum" data-mode="print">${icon('sheet')} พิมพ์สรุป (เลือกแผนก)</button>
-        <button class="btn btn-glass" data-act="sum" data-mode="ceo">${icon('crown')} ส่งสรุปให้ CEO</button>
+        ${canAct() ? `<button class="btn btn-glass" data-act="sum" data-mode="ceo">${icon('crown')} ส่งสรุปให้ CEO</button>` : ''}
       </div>
     </section>`;
   }
@@ -67,7 +73,7 @@ export async function render(ctx) {
           <div class="row-main"><div class="row-title">${esc(deptLabel(s.department))} · ${money(s.staff_count, 0)} คน</div>
             <div class="row-sub">ส่งเมื่อ ${fmtDateTime(s.requested_at)}${s.ceo_at ? ` · ตัดสิน ${fmtDateTime(s.ceo_at)}` : ''}${s.ceo_remark ? ` · ${esc(s.ceo_remark)}` : ''}</div></div>
           <div class="row-end"><span class="amount">${money(s.total)}</span><span class="badge ${c}">${esc(t)}</span></div></div>`;
-      }).join('')}</div>` : b.ceoConfigured ? `<div class="pad"><p class="hint">เมื่อโอนครบหรือพร้อมแล้ว กด “ส่งสรุปให้ CEO” (เลือกแผนกได้) เพื่อให้ CEO อนุมัติยอดรวมของเดือน</p></div>` : ''}
+      }).join('')}</div>` : b.ceoConfigured ? `<div class="pad"><p class="hint">เลือกแผนก แล้วกด “ส่ง … ให้ CEO” เพื่อให้ CEO อนุมัติยอดของแผนกนั้น (หรือส่งรวมทุกแผนกทีเดียว)</p></div>` : ''}
     </div>`;
   }
 
@@ -78,21 +84,48 @@ export async function render(ctx) {
       && (!q || [c.name, c.fullName, c.staffEmail, c.team].some((x) => String(x || '').toLowerCase().includes(q))));
   }
 
+  // แถบแผนก: ทุกแผนก + รายแผนก — ยอดอนุมัติ (รอโอน + โอนแล้ว) · จำนวนคน · สถานะ CEO
+  function deptNav(b) {
+    return deptRows(b).map((r) => {
+      const cs = ceoState(b, r.d);
+      const tag = cs.tag ? `<span class="badge ${cs.cls}">${esc(cs.tag)}</span>`
+        : b.ceoConfigured && r.d !== '*' && r.n > 0 ? '<span class="badge b-neutral">ยังไม่ส่ง CEO</span>' : '';
+      const sub = [`${money(r.people, 0)} คน`, r.ready ? `รอโอน ${money(r.ready, 0)}` : '', r.waiting ? `รออนุมัติ ${money(r.waiting, 0)}` : ''].filter(Boolean).join(' · ');
+      return `<button type="button" class="dept-item ${r.d === st.dept ? 'on' : ''}" data-pick-dept="${esc(r.d)}" aria-pressed="${r.d === st.dept}">
+        <span class="grow"><span class="dn">${esc(deptLabel(r.d))}</span><span class="ds">${sub}</span></span>
+        <span class="de">${r.total > 0 ? `<span class="amount">${money(r.total, 0)}</span>` : '<span class="muted">–</span>'}${tag}</span></button>`;
+    }).join('');
+  }
+  // แถบหัวของแผนกที่เลือก: ยอด + ปุ่ม Excel / ส่ง CEO ของแผนกนั้น
+  function deptBar(b) {
+    const r = deptRows(b).find((x) => x.d === st.dept) || { n: 0, total: 0, waiting: 0 };
+    const cs = ceoState(b, st.dept), lbl = deptLabel(st.dept);
+    const why = !b.ceoConfigured ? 'ยังไม่ได้ตั้งค่าอีเมล CEO' : cs.block || (r.n === 0 ? 'ยังไม่มีใบขอเบิกที่อนุมัติแล้วในเดือนนี้' : '');
+    return `<div class="card dept-bar">
+      <div class="grow"><div class="bold">${esc(lbl)} ${cs.tag ? `<span class="badge ${cs.cls}">${esc(cs.tag)}</span>` : ''}</div>
+        <div class="text-sm muted">ยอดอนุมัติ ${money(r.total)} บาท · ${money(r.n, 0)} คน${r.waiting ? ` · <span class="amber-text">รออนุมัติ Export ${money(r.waiting, 0)} คน</span>` : ''}${canAct() && why ? ` · ${esc(why)}` : ''}</div></div>
+      <div class="flex wrap gap-8">
+        <button class="btn btn-secondary btn-sm" data-act="dept-xls" ${r.n === 0 ? 'disabled' : ''} data-busy="กำลังสร้างไฟล์…">${icon('download', 'sm')} Excel ${esc(lbl)}</button>
+        ${canAct() ? `<button class="btn btn-primary btn-sm" data-act="dept-ceo" ${why ? 'disabled' : ''} data-busy="กำลังส่ง…">${icon('crown', 'sm')} ส่ง ${esc(lbl)} ให้ CEO</button>` : ''}
+      </div></div>`;
+  }
+
   function paintList() {
     const b = st.board;
     const cards = (b.cards || []).filter((c) => st.dept === '*' || c.department === st.dept);
     const cnt = (k) => { const f = FILTERS.find((x) => x[0] === k)[2]; return f ? cards.filter((c) => f.includes(c.stage)).length : cards.length; };
     const rows = visibleCards();
-    $('ac-list').innerHTML = `<div class="stack-sm">
+    $('ac-list').innerHTML = `<div class="ac-layout">
+      <nav class="card dept-nav" aria-label="แผนก">${deptNav(b)}</nav>
+      <div class="stack-sm">
+      ${deptBar(b)}
       <div class="chips">${FILTERS.map(([k, l]) => `<button class="chip ${st.filter === k ? 'on' : ''}" data-filter="${k}">${l} <span class="n">${cnt(k)}</span></button>`).join('')}</div>
       <div class="toolbar">
         <div class="search">${icon('search')}<input class="input" id="ac-q" placeholder="ค้นหาชื่อ / ทีม" value="${esc(st.q)}" aria-label="ค้นหา"></div>
-        ${(b.departments || []).length > 1 ? `<select class="input" id="ac-dept" aria-label="แผนก" style="width:auto;min-width:150px"><option value="*">ทุกแผนก</option>
-          ${b.departments.map((d) => `<option value="${esc(d)}" ${st.dept === d ? 'selected' : ''}>${esc(d)}</option>`).join('')}</select>` : ''}
       </div>
-      <div class="card">${rows.length ? `<div class="list">${rows.map(cardRow).join('')}</div>`
+      <div class="card">${rows.length ? `<div class="list">${rows.map((c) => cardRow(c, canAct())).join('')}</div>`
         : empty({ ic: st.filter === 'ready' ? 'check-circle' : 'users', title: st.filter === 'ready' ? 'ไม่มีรายการรอโอน' : 'ไม่มีพนักงานในกลุ่มนี้', sub: 'ลองเลือกชิปอื่นหรือเดือนอื่น' })}</div>
-    </div>`;
+    </div></div>`;
   }
 
   function paintOld() {
@@ -107,7 +140,7 @@ export async function render(ctx) {
           <div class="row-sub">รอบ ${esc(monthLabel(e.year, e.month))} · ${money(e.item_count, 0)} รายการ · อนุมัติ ${fmtDate(e.decided_at)}</div></div>
         <div class="row-end"><span class="amount">${money(e.total_amount)}</span>
           <div class="flex gap-4"><button class="btn btn-secondary btn-sm" data-act="xls" data-id="${esc(e.id)}" aria-label="ดาวน์โหลดฟอร์ม">${icon('download', 'sm')}</button>
-          <button class="btn btn-success btn-sm" data-act="paid" data-id="${esc(e.id)}" data-name="${esc(e.staff_name)}" data-amt="${e.total_amount}" data-dept="">${icon('check', 'sm')} โอนแล้ว</button></div></div></div>`).join('')}</div></div>`;
+          ${canAct() ? `<button class="btn btn-success btn-sm" data-act="paid" data-id="${esc(e.id)}" data-name="${esc(e.staff_name)}" data-amt="${e.total_amount}" data-dept="">${icon('check', 'sm')} โอนแล้ว</button>` : ''}</div></div></div>`).join('')}</div></div>`;
   }
 
   // ─────────── หน้าต่าง ───────────
@@ -150,12 +183,15 @@ export async function render(ctx) {
     const by = {};
     for (const c of b.cards || []) {
       const d = c.department || '-';
-      const o = by[d] || (by[d] = { n: 0, total: 0, waiting: 0 });
+      const o = by[d] || (by[d] = { n: 0, total: 0, waiting: 0, ready: 0, people: 0 });
       if (c.stage === 'ready' || c.stage === 'paid') { o.n++; o.total += Number(c.export?.total_amount || 0); }
       if (c.stage === 'export') o.waiting++;
+      if (c.stage === 'ready') o.ready++;
+      if (c.stage !== 'none') o.people++;
     }
-    const all = Object.values(by).reduce((a, o) => ({ n: a.n + o.n, total: a.total + o.total, waiting: a.waiting + o.waiting }), { n: 0, total: 0, waiting: 0 });
-    return [{ d: '*', ...all }, ...(b.departments || []).slice().sort().map((d) => ({ d, ...(by[d] || { n: 0, total: 0, waiting: 0 }) }))];
+    const zero = { n: 0, total: 0, waiting: 0, ready: 0, people: 0 };
+    const all = Object.values(by).reduce((a, o) => Object.fromEntries(Object.keys(zero).map((k) => [k, a[k] + o[k]])), zero);
+    return [{ d: '*', ...all }, ...(b.departments || []).slice().sort().map((d) => ({ d, ...(by[d] || zero) }))];
   }
   function ceoState(b, d) {
     const live = (b.summaries || []).filter((x) => x.status === 'Pending' || x.status === 'Approved');
@@ -165,8 +201,31 @@ export async function render(ctx) {
     if (d !== '*' && live.some((x) => x.department === '*')) return { tag: 'รวมในใบทุกแผนก', cls: 'b-neutral', block: 'เดือนนี้ส่งแบบรวมทุกแผนกไปแล้ว' };
     return { tag: '', cls: '', block: '' };
   }
+  async function downloadSummary(pick, btn) {
+    const b = st.board;
+    try { const meta = await withBtn(btn, () => api.excel({ type: 'staff_summary', ym: ymOf(b.year, b.month), dept: pick })); if (meta) toast(`ดาวน์โหลดแล้ว · ${meta.filename}`); }
+    catch (err) { toastError(err); }
+  }
+  async function sendCeo(pick, btn, close) {
+    const b = st.board, label = pick === '*' ? 'ทุกแผนก' : `แผนก ${pick}`;
+    try {
+      const r = await withBtn(btn, () => api.rpc('submit_summary_for_ceo', { p_ym: ymOf(b.year, b.month), p_dept: pick }));
+      if (close) close(true);
+      toast(`ส่งให้ CEO แล้ว · ${label} · ${r.count} คน · ${money(r.total)} บาท`);
+      ctx.refreshBadges(); load();
+    } catch (err) { toastError(err); }
+  }
+  async function deptAct(a, btn) {
+    const b = st.board, pick = st.dept;
+    if (a === 'dept-xls') return downloadSummary(pick, btn);
+    const r = deptRows(b).find((x) => x.d === pick) || { n: 0, total: 0, waiting: 0 };
+    const msg = `${deptLabel(pick)} · ${money(r.n, 0)} คน · ${money(r.total)} บาท\nCEO จะได้รับแจ้งให้ตรวจยอดของ${pick === '*' ? 'ทุกแผนก' : 'แผนกนี้'}`
+      + (r.waiting ? `\n\n⚠️ ยังมี ${r.waiting} คนรออนุมัติใบขอเบิก — ไม่รวมในสรุปนี้` : '');
+    if (!(await confirmBox({ title: 'ส่งสรุปให้ CEO', message: msg, ok: 'ส่งให้ CEO' }))) return;
+    return sendCeo(pick, btn);
+  }
   function openSummarySheet(mode) {
-    const b = st.board, ym = ymOf(b.year, b.month), rows = deptRows(b);
+    const b = st.board, rows = deptRows(b);
     let pick = rows.some((r) => r.d === st.dept) ? st.dept : '*';
     const rowHtml = (r) => {
       const cs = ceoState(b, r.d);
@@ -184,14 +243,14 @@ export async function render(ctx) {
         ${!b.ceoConfigured ? `<div class="alert warn">${icon('alert')}<div>ยังไม่ได้ตั้งค่าอีเมล CEO (CEO_EMAIL) — ส่งให้ CEO ไม่ได้</div></div>` : ''}
       </div>`,
       foot: `<button class="btn ${mode === 'print' ? 'btn-primary' : 'btn-secondary'}" data-xls data-busy="กำลังสร้างไฟล์…">${icon('download')} ดาวน์โหลด Excel</button>
-        <button class="btn ${mode === 'ceo' ? 'btn-primary' : 'btn-secondary'}" data-ceo data-busy="กำลังส่ง…">${icon('crown')} ส่งให้ CEO ตรวจ</button>`,
+        ${canAct() ? `<button class="btn ${mode === 'ceo' ? 'btn-primary' : 'btn-secondary'}" data-ceo data-busy="กำลังส่ง…">${icon('crown')} ส่งให้ CEO ตรวจ</button>` : ''}`,
       onMount: (box, close) => {
         const sync = () => {
           box.querySelectorAll('.opt-row').forEach((l) => l.classList.toggle('on', l.querySelector('input').checked));
           const r = rows.find((x) => x.d === pick), cs = ceoState(b, pick);
-          const why = !b.ceoConfigured ? 'ยังไม่ได้ตั้งค่าอีเมล CEO' : cs.block || (r && r.n === 0 ? 'แผนกนี้ยังไม่มีใบขอเบิกที่อนุมัติแล้วในเดือนนี้' : '');
-          box.querySelector('[data-ceo]').disabled = !!why;
-          box.querySelector('[data-ceo]').innerHTML = `${icon('crown')} ส่ง${pick === '*' ? 'ทุกแผนก' : esc(pick)}ให้ CEO ตรวจ`;
+          const why = !canAct() ? '' : !b.ceoConfigured ? 'ยังไม่ได้ตั้งค่าอีเมล CEO' : cs.block || (r && r.n === 0 ? 'แผนกนี้ยังไม่มีใบขอเบิกที่อนุมัติแล้วในเดือนนี้' : '');
+          const ceoBtn = box.querySelector('[data-ceo]');
+          if (ceoBtn) { ceoBtn.disabled = !!why; ceoBtn.innerHTML = `${icon('crown')} ส่ง ${pick === '*' ? 'ทุกแผนก' : esc(pick)} ให้ CEO ตรวจ`; }
           box.querySelector('[data-xls]').innerHTML = `${icon('download')} Excel ${pick === '*' ? 'ทุกแผนก' : esc(pick)}`;
           box.querySelector('[data-xls]').disabled = !!(r && r.n === 0);
           box.querySelector('[data-why]').classList.toggle('hidden', !why || why === 'ยังไม่ได้ตั้งค่าอีเมล CEO');
@@ -199,20 +258,9 @@ export async function render(ctx) {
         };
         box.addEventListener('change', (e) => { if (e.target.name === 'sum-dept') { pick = e.target.value; sync(); } });
         sync();
-        box.querySelector('[data-xls]').onclick = async (e) => {
-          const btn = e.currentTarget;
-          try { const meta = await withBtn(btn, () => api.excel({ type: 'staff_summary', ym, dept: pick })); if (meta) toast(`ดาวน์โหลดแล้ว · ${meta.filename}`); }
-          catch (err) { toastError(err); }
-        };
-        box.querySelector('[data-ceo]').onclick = async (e) => {
-          const btn = e.currentTarget, label = pick === '*' ? 'ทุกแผนก' : `แผนก ${pick}`;
-          try {
-            const r = await withBtn(btn, () => api.rpc('submit_summary_for_ceo', { p_ym: ym, p_dept: pick }));
-            close(true);
-            toast(`ส่งให้ CEO แล้ว · ${label} · ${r.count} คน · ${money(r.total)} บาท`);
-            ctx.refreshBadges(); load();
-          } catch (err) { toastError(err); }
-        };
+        box.querySelector('[data-xls]').onclick = (e) => downloadSummary(pick, e.currentTarget);
+        const ceoBtn = box.querySelector('[data-ceo]');
+        if (ceoBtn) ceoBtn.onclick = (e) => sendCeo(pick, e.currentTarget, close);
       },
     });
   }
@@ -220,6 +268,7 @@ export async function render(ctx) {
   async function act(t) {
     const a = t.dataset.act;
     try {
+      if (a === 'dept-xls' || a === 'dept-ceo') return deptAct(a, t);
       if (a === 'items') return openItems(t.dataset.email, t.dataset.ym || ymOf(st.y, st.m), t.dataset.name);
       if (a === 'sum') { if (!st.board.ceoConfigured && t.dataset.mode === 'ceo') { toast('ยังไม่ได้ตั้งค่าอีเมล CEO (CEO_EMAIL)', 'bad'); return; } return openSummarySheet(t.dataset.mode); }
       if (a === 'xls') {
@@ -227,7 +276,7 @@ export async function render(ctx) {
         if (meta) toast(`ดาวน์โหลดแล้ว · ${meta.filename}`);
         return;
       }
-      if (a === 'paid') {
+      if (a === 'paid' && canAct()) {
         // เตือนถ้า CEO ยังไม่อนุมัติสรุปของเดือนนี้ (ไม่บล็อก)
         const sums = st.board?.summaries || [];
         const dept = t.dataset.dept;
@@ -255,13 +304,13 @@ export async function render(ctx) {
       load();
     }),
     on(el, 'input', '#ac-q', (e, t) => search(t.value)),
-    on(el, 'change', '#ac-dept', (e, t) => { st.dept = t.value; paintList(); }),
+    on(el, 'click', '[data-pick-dept]', (e, t) => { st.dept = t.dataset.pickDept; saveDept(st.dept); paintList(); }),
   ];
   return () => offs.forEach((f) => f());
 }
 
 // แถวพนักงาน 1 คน
-function cardRow(c) {
+function cardRow(c, canAct = true) {
   const e = c.export || {};
   const [stl, stc] = STAGE[c.stage] || [c.stage, 'b-neutral'];
   let detail = '', amt = null, actions = '';
@@ -269,7 +318,7 @@ function cardRow(c) {
     detail = `อนุมัติโดย ${e.approver_name || '-'} · ${c.days ? `รอโอน ${c.days} วัน` : 'อนุมัติวันนี้'} · ${money(e.item_count, 0)} รายการ`;
     amt = e.total_amount;
     actions = `<button class="btn btn-secondary btn-sm" data-act="xls" data-id="${esc(e.id)}" aria-label="ดาวน์โหลดฟอร์ม">${icon('download', 'sm')}</button>
-      <button class="btn btn-success btn-sm" data-act="paid" data-id="${esc(e.id)}" data-name="${esc(c.fullName || c.name)}" data-amt="${e.total_amount}" data-dept="${esc(c.department || '')}">${icon('check', 'sm')} ยืนยันโอนแล้ว</button>`;
+      ${canAct ? `<button class="btn btn-success btn-sm" data-act="paid" data-id="${esc(e.id)}" data-name="${esc(c.fullName || c.name)}" data-amt="${e.total_amount}" data-dept="${esc(c.department || '')}">${icon('check', 'sm')} ยืนยันโอนแล้ว</button>` : ''}`;
   } else if (c.stage === 'export') {
     detail = `รอ ${e.approver_name || 'ผู้อนุมัติ'} อนุมัติ${c.days ? ` · ${c.days} วันแล้ว` : ''} · ${money(e.item_count, 0)} รายการ`;
     amt = e.total_amount;

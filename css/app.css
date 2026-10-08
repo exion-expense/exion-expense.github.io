@@ -478,3 +478,28 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
 @media (max-width: 759px) { .grid-2.collapse-m { grid-template-columns: 1fr; } }
 .team-group { padding: 10px 16px 6px; font-size: 12.5px; font-weight: 600; color: var(--muted); background: var(--surface-2); border-top: 1px solid var(--line-2); }
 .team-group:first-child { border-top: 0; }
+
+/* ═══════════ บัญชี · แถบแผนก (มือถือ = ปุ่มเลื่อนแนวนอน · จอกว้าง = คอลัมน์ซ้าย) ═══════════ */
+.ac-layout { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+.ac-layout > * { min-width: 0; }
+.dept-nav { display: flex; gap: 6px; overflow-x: auto; padding: 6px; scrollbar-width: none; }
+.dept-nav::-webkit-scrollbar { display: none; }
+.dept-item { flex: none; display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--surface); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.dept-item .grow { min-width: 0; }
+.dept-item .dn { display: block; font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dept-item .ds { display: block; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dept-item .de { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: none; }
+.dept-item .de .badge { height: 20px; font-size: 11px; padding: 0 7px; }
+.dept-item.on { border-color: var(--brand); background: var(--brand-50); }
+.dept-item.on .dn { color: var(--brand); }
+.dept-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 12px 16px; }
+@media (max-width: 1099px) { .dept-item .ds, .dept-item .de .badge { display: none; } .dept-item .de .amount { font-size: 12.5px; color: var(--muted); } }
+@media (min-width: 1100px) {
+  .ac-layout { grid-template-columns: 260px minmax(0, 1fr); align-items: start; }
+  .dept-nav { flex-direction: column; padding: 8px; position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-x: hidden; overflow-y: auto; }
+  .dept-item { border-color: transparent; padding: 10px 12px; }
+  .dept-item .ds { white-space: normal; }
+  .dept-item:hover { background: var(--line-2); }
+  .dept-item.on, .dept-item.on:hover { border-color: var(--brand); background: var(--brand-50); }
+}

@@ -2,8 +2,8 @@
 // ลืมรหัส → ลิงก์ทางอีเมล (ถ้าเปิดไว้) หรือ รหัสชั่วคราว 6 หลักจากหัวหน้า
 // ใช้ครั้งแรก (ยังไม่เคยมีรหัส · ช่วงเปิดระบบ SELF_SETUP_UNTIL) → ตั้งรหัสเองได้เลย
 // ข้อความทุกแบบไม่บอกว่าอีเมลไหนมีในระบบ (กันคนนอกสุ่มหารายชื่อพนักงาน)
-import { auth, esc, cfg, state, MOCK_MODE, passwordProblem } from '../core.js?v=10.0.14';
-import { icon, toast, withBtn } from '../ui.js?v=10.0.14';
+import { auth, esc, cfg, state, MOCK_MODE, passwordProblem } from '../core.js?v=10.0.15';
+import { icon, toast, withBtn } from '../ui.js?v=10.0.15';
 
 export function render({ el, onLoggedIn }) {
   let email = localStorage.getItem('exion_last_email') || '';

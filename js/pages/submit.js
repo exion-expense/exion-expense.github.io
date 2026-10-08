@@ -1,7 +1,7 @@
 // ขอเบิกค่าใช้จ่าย — กรอกได้หลายรายการในครั้งเดียว · เซฟร่างอัตโนมัติ · กันส่งซ้ำด้วย batchId
 // ส่วนช่องกรอกตามหมวด (export ด้านล่าง) ใช้ร่วมกับหน้าแก้ไขใน requests.js
-import { api, state, money, esc, fmtDate, catName, catInfo, todayYMD, addDays, loadCategories, timeAgo } from '../core.js?v=10.0.14';
-import { html, icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, on, debounce, $, $$ } from '../ui.js?v=10.0.14';
+import { api, state, money, esc, fmtDate, catName, catInfo, todayYMD, addDays, loadCategories, timeAgo } from '../core.js?v=10.0.15';
+import { html, icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, on, debounce, $, $$ } from '../ui.js?v=10.0.15';
 
 const NO_JOB = [];                                      // ทุกหมวดใส่เลข Job ได้ (ไม่บังคับ · ค่ารับรอง/กอล์ฟบังคับ) → ลงช่อง Job ใน Excel
 const ENT_CATS = ['ENT', 'GOLF'];
