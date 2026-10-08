@@ -1,7 +1,7 @@
 // บัญชี · โอนเงิน — บอร์ดรายคนต่อเดือน: ยังไม่ขอ → รออนุมัติ → รอโอน → โอนแล้ว + ส่งสรุปให้ CEO
 // แถบแผนก (ซ้าย/บน) เลือกแผนกแล้วดูยอด · ส่ง CEO ทีละแผนก · VIEWER เปิดได้แบบดูอย่างเดียว (canAct = false)
-import { api, money, compact, fmtDate, fmtDateTime, esc, initials, monthLabel, catName, statusBadge } from '../core.js?v=10.0.15';
-import { icon, catIcon, requestRow, toast, toastError, confirmBox, sheet, withBtn, monthNav, shiftMonth, empty, errorBox, lightbox, on, debounce } from '../ui.js?v=10.0.15';
+import { api, money, compact, fmtDate, fmtDateTime, esc, initials, monthLabel, catName, statusBadge } from '../core.js?v=10.0.16';
+import { icon, catIcon, requestRow, toast, toastError, confirmBox, sheet, withBtn, monthNav, shiftMonth, empty, errorBox, lightbox, on, debounce } from '../ui.js?v=10.0.16';
 
 const STAGE = {
   ready: ['รอโอน', 'b-approved'], export: ['รออนุมัติ', 'b-pending'], bills: ['บิลรออนุมัติ', 'b-violet'],

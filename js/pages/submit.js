@@ -1,7 +1,7 @@
 // ขอเบิกค่าใช้จ่าย — กรอกได้หลายรายการในครั้งเดียว · เซฟร่างอัตโนมัติ · กันส่งซ้ำด้วย batchId
 // ส่วนช่องกรอกตามหมวด (export ด้านล่าง) ใช้ร่วมกับหน้าแก้ไขใน requests.js
-import { api, state, money, esc, fmtDate, catName, catInfo, todayYMD, addDays, loadCategories, timeAgo } from '../core.js?v=10.0.15';
-import { html, icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, on, debounce, $, $$ } from '../ui.js?v=10.0.15';
+import { api, state, money, esc, fmtDate, catName, catInfo, todayYMD, addDays, loadCategories, timeAgo } from '../core.js?v=10.0.16';
+import { html, icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, on, debounce, $, $$ } from '../ui.js?v=10.0.16';
 
 const NO_JOB = [];                                      // ทุกหมวดใส่เลข Job ได้ (ไม่บังคับ · ค่ารับรอง/กอล์ฟบังคับ) → ลงช่อง Job ใน Excel
 const ENT_CATS = ['ENT', 'GOLF'];
@@ -231,14 +231,12 @@ export async function render(ctx) {
 
   el.innerHTML = `<div style="max-width:780px;margin:0 auto">
     <div class="page-head"><div><h1>ขอเบิกค่าใช้จ่าย</h1>
-      <div class="sub">ส่งได้หลายรายการในครั้งเดียว${profile?.managerFullName ? ` · ผู้อนุมัติ ${esc(profile.managerFullName)}` : ''}</div></div>
-      <div class="actions"><a class="btn btn-secondary btn-sm" href="#/preapprovals/new">${icon('shield', 'sm')} ขออนุมัติงบล่วงหน้า</a></div></div>
+      <div class="sub">ส่งได้หลายรายการในครั้งเดียว${profile?.managerFullName ? ` · ผู้อนุมัติ ${esc(profile.managerFullName)}` : ''}</div></div></div>
     <div class="stack">
       <div data-draft class="hidden"></div>
-      <div class="alert neutral">${icon('shield')}<div class="grow">ค่ารับรอง / ค่ากอล์ฟ ต้อง<b>ขออนุมัติงบล่วงหน้า</b>ก่อน แล้วส่งบิลจริงจากงบนั้น
-        <div class="mt-8"><a class="btn btn-secondary btn-sm" href="#/preapprovals/new">${icon('shield', 'sm')} ขออนุมัติงบล่วงหน้า</a></div></div></div>
-      ${hideCodes.length ? `<div class="alert neutral">${icon('info')}<span>${hideCodes.map((c) => `${esc(catName(c))} ${money(allow[c], 0)}`).join(' · ')} บาท
-        <b>ใส่ให้อัตโนมัติทุกรอบ</b> ไม่ต้องส่งเอง</span></div>` : ''}
+      <a class="note-line" href="#/preapprovals/new">${icon('shield', 'sm')}<span class="grow">ค่ารับรอง / ค่ากอล์ฟ → <b>ขออนุมัติงบล่วงหน้า</b></span>${icon('chevron-right', 'sm')}</a>
+      ${hideCodes.length ? `<div class="note-line">${icon('info', 'sm')}<span class="grow">${hideCodes.map((c) => `${esc(catName(c))} ${money(allow[c], 0)}`).join(' · ')} บาท
+        <b>ใส่ให้อัตโนมัติทุกรอบ</b></span></div>` : ''}
       <div class="stack" data-items></div>
       <button type="button" class="add-item" data-act="add">${icon('plus')} เพิ่มรายการ</button>
     </div>

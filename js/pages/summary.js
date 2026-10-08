@@ -1,6 +1,6 @@
 // สรุป & Excel — วิเคราะห์ยอดเบิกตามสิทธิ์ (ตัวเอง / ทีม / ทั้งบริษัท ฝั่งเซิร์ฟเวอร์ตัดสิน) + ดาวน์โหลด Excel
-import { api, money, compact, fmtDate, esc, monthLabel, catName, ymd } from '../core.js?v=10.0.15';
-import { icon, requestRow, toast, toastError, withBtn, bars, donut, PALETTE, monthNav, shiftMonth, empty, errorBox, on } from '../ui.js?v=10.0.15';
+import { api, money, compact, fmtDate, esc, monthLabel, catName, ymd } from '../core.js?v=10.0.16';
+import { icon, requestRow, toast, toastError, withBtn, bars, donut, PALETTE, monthNav, shiftMonth, empty, errorBox, on } from '../ui.js?v=10.0.16';
 
 const SCOPE_TH = { self: 'ของฉัน', team: 'ทีมของฉัน', all: 'ทั้งบริษัท' };
 const PAGE = 30;

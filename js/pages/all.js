@@ -1,6 +1,6 @@
 // คำขอทั้งบริษัท (GM / บัญชี / CEO / ผู้ดูรายงาน) — เลือกช่วงวัน · กรองสถานะ/แผนก/หมวด/คน · ค้นหา · Excel
-import { api, money, compact, fmtDate, fmtDateTime, esc, catName, requestBadge, ymd } from '../core.js?v=10.0.15';
-import { html, raw, icon, catIcon, toast, toastError, sheet, withBtn, empty, skeleton, errorBox, requestRow, thumbs, hydrateThumbs, debounce, on } from '../ui.js?v=10.0.15';
+import { api, money, compact, fmtDate, fmtDateTime, esc, catName, requestBadge, ymd } from '../core.js?v=10.0.16';
+import { html, raw, icon, catIcon, toast, toastError, sheet, withBtn, empty, skeleton, errorBox, requestRow, thumbs, hydrateThumbs, debounce, on } from '../ui.js?v=10.0.16';
 
 const PRESETS = [['period', 'รอบนี้'], ['month', 'เดือนนี้'], ['last', 'เดือนก่อน'], ['custom', 'กำหนดเอง']];
 const STATUSES = [['all', 'ทั้งหมด'], ['Pending', 'รออนุมัติ'], ['Approved', 'อนุมัติแล้ว'], ['Rejected', 'ไม่อนุมัติ'], ['PreApprove', 'ขออนุมัติงบ'], ['Finalized', 'ส่งบิลแล้ว']];

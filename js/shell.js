@@ -2,8 +2,8 @@
 //  shell.js — โครงหน้าแอป (เมนูข้าง / แถบล่าง / กระดิ่ง) + ตัวเปลี่ยนหน้า (hash router)
 //  เพิ่มหน้าใหม่: ใส่ใน ROUTES แล้วสร้างไฟล์ js/pages/<ชื่อ>.js ที่ export render(ctx)
 // ════════════════════════════════════════════════════════════════════
-import { api, auth, state, loadProfile, loadCategories, esc, initials, roleLabel, timeAgo, cfg, MOCK_MODE } from './core.js?v=10.0.15';
-import { icon, sheet, toast, errorBox, skeleton, $ } from './ui.js?v=10.0.15';
+import { api, auth, state, loadProfile, loadCategories, esc, initials, roleLabel, timeAgo, fmtDate, cfg, MOCK_MODE } from './core.js?v=10.0.16';
+import { icon, sheet, toast, errorBox, skeleton, $ } from './ui.js?v=10.0.16';
 
 const r = (p) => p || {};
 const isApprover = (p) => r(p.role).isManager || r(p.role).isSenior || r(p.role).isGM;
@@ -24,7 +24,7 @@ const ROUTES = [
   { path: '/accounting', page: 'accounting', title: 'บัญชี · โอนเงิน', app: 'expense', nav: 'accounting', icon: 'banknote', show: (p) => r(p.role).isAccountant || r(p.role).isGM || r(p.role).isViewer },
   { path: '/ceo', page: 'ceo', title: 'อนุมัติสรุปรายเดือน', app: 'expense', nav: 'ceo', icon: 'crown', show: (p) => r(p.role).isCEO },
   { path: '/set-password', page: 'set-password', title: 'ตั้งรหัสผ่านใหม่', app: 'expense', nav: 'profile' },
-  { path: '/profile', page: 'profile', title: 'โปรไฟล์ & ขอเบิกรายเดือน', app: 'expense', nav: 'profile', icon: 'user' },
+  { path: '/profile', page: 'profile', title: 'ขอเบิกรายเดือน & โปรไฟล์', app: 'expense', nav: 'profile', icon: 'user' },
   { path: '/admin', page: 'admin', title: 'ผู้ดูแลระบบ', app: 'expense', nav: 'admin', icon: 'key', show: (p) => !!p.isAdmin },
   // ── เงินสดย่อย ──
   { path: '/petty', page: 'petty-home', title: 'เงินสดย่อย', app: 'petty', nav: 'p-home', icon: 'home' },
@@ -96,7 +96,7 @@ async function route() {
   const app = document.getElementById('app');
   if (!auth.user) {
     closeBell();
-    const m = await import('./pages/login.js?v=10.0.15');
+    const m = await import('./pages/login.js?v=10.0.16');
     if (seq !== renderSeq) return;
     document.title = 'เข้าสู่ระบบ · EXION Expense';
     return m.render({ el: app, query, go, onLoggedIn: () => { const back = sessionStorage.getItem('exion_after_login'); sessionStorage.removeItem('exion_after_login'); go(back && back !== '/login' ? back : '/'); } });
@@ -134,7 +134,7 @@ async function route() {
     main.innerHTML = '';
     const ctx = { el: main, params, query, profile, go, setTitle, refreshBadges, alive: () => seq === renderSeq, app: rt.app };
     const cleanup = await mod.render(ctx);
-    if (seq === renderSeq) current = { cleanup };
+    if (seq === renderSeq) { current = { cleanup }; watchDates(main); }
   } catch (e) {
     console.error(e);
     // โหลดไฟล์หน้าไม่ได้ / ไฟล์ไม่เข้ากัน (เพิ่งอัปเวอร์ชัน) → โหลดใหม่ทั้งหน้า 1 ครั้งอัตโนมัติ
@@ -145,7 +145,7 @@ async function route() {
 
 // ─────────────── เวอร์ชันแอป ───────────────
 // เปลี่ยนพร้อม sw.js / index.html ทุกครั้งที่อัปเว็บ (ใช้ต่อท้ายไฟล์ทุกไฟล์ที่ import → ได้ไฟล์ชุดเดียวกันเสมอ)
-const APP_V = '10.0.15';
+const APP_V = '10.0.16';
 let verAt = 0, verNew = false;
 async function newerVersion() {
   if (verNew) return true;
@@ -228,7 +228,7 @@ function bottomNav(rt, profile) {
   }
   const appr = isApprover(profile) || badges.approvals > 0;
   return `<nav class="bottom-nav">${a('home', '/', 'home', 'หน้าแรก')}${a('requests', '/requests', 'receipt', 'คำขอ')}${fab('/submit', 'submit')}
-    ${appr ? a('approvals', '/approvals', 'inbox', 'อนุมัติ', badges.approvals) : a('profile', '/profile', 'user', 'โปรไฟล์')}${more}</nav>`;
+    ${appr ? a('approvals', '/approvals', 'inbox', 'อนุมัติ', badges.approvals) : a('profile', '/profile', 'calendar', 'เบิกรายเดือน')}${more}</nav>`;
 }
 function moreMenu(rt, profile) {
   const items = navItems(rt.app, profile);
@@ -275,9 +275,49 @@ function startBackground(profile) {
   stopRealtime = api.onNotification((n) => {
     toast(n.title || 'มีการแจ้งเตือนใหม่', 'info');
     refreshBadges();
+    newItemsBar(n);
   });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshBadges(); });
 }
+// แถบ "มีอัปเดตใหม่ · แตะเพื่อโหลด" — ไม่วาดรายการใหม่เอง (กันแถวเลื่อนตอนกำลังกดอนุมัติ) · ไม่โผล่ในหน้าฟอร์ม
+const FORM_PAGES = ['submit', 'preapprove-new', 'finalize', 'set-password', 'petty-request'];
+function newItemsBar(n) {
+  const cur = match(parseHash().path), main = document.getElementById('main');
+  if (!cur || !main || FORM_PAGES.includes(cur.rt.page)) return;
+  const seg = (p) => String(p || '').replace(/^#/, '').split(/[?/]/).filter(Boolean)[0] || '';
+  const here = seg(parseHash().path), there = seg(n.link);
+  const related = here === '' || here === there || (here === 'approvals' && there === 'export') || (here === 'profile' && there === 'export');
+  if (!related) return;
+  let bar = document.getElementById('new-bar');
+  if (!bar) {
+    bar = document.createElement('button'); bar.type = 'button'; bar.id = 'new-bar'; bar.className = 'new-bar';
+    bar.onclick = () => { bar.remove(); route(); };
+    main.prepend(bar);
+  }
+  bar.dataset.n = String((Number(bar.dataset.n) || 0) + 1);
+  bar.innerHTML = `${icon('refresh', 'sm')} มีอัปเดตใหม่ ${bar.dataset.n} รายการ · แตะเพื่อโหลด`;
+}
+
+// ─────────────── วันที่ พ.ศ. ใต้ช่องเลือกวันที่ (บางเครื่องแสดงเป็น ค.ศ.) ───────────────
+const WD = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
+function dateHint(inp) {
+  if (!inp.closest('.field')) return;           // เฉพาะช่องในฟอร์ม (ไม่ใช่ตัวกรองบนแถบเครื่องมือ)
+  let h = inp.nextElementSibling;
+  if (!h || !h.classList.contains('date-th')) { h = document.createElement('div'); h.className = 'date-th'; inp.after(h); }
+  const ok = /^\d{4}-\d{2}-\d{2}$/.test(inp.value);
+  h.textContent = ok ? `${WD[new Date(inp.value + 'T00:00:00').getDay()]} ${fmtDate(inp.value, { full: true })}` : '';
+}
+let dateObs = null;
+function watchDates(main) {
+  main.querySelectorAll('input[type="date"]').forEach(dateHint);
+  dateObs?.disconnect();
+  dateObs = new MutationObserver(() => main.querySelectorAll('input[type="date"]').forEach((i) => { if (!i.nextElementSibling?.classList.contains('date-th')) dateHint(i); }));
+  dateObs.observe(main, { childList: true, subtree: true });
+}
+['input', 'change'].forEach((ev) => document.addEventListener(ev, (e) => { if (e.target.matches?.('input[type="date"]')) dateHint(e.target); }));
+// ปุ่มที่ตั้งค่าวันที่ด้วยโค้ด (เช่น "ใช้ค่าแนะนำ") → อัปเดตข้อความหลังคลิก
+document.addEventListener('click', () => requestAnimationFrame(() => document.querySelectorAll('#main .field input[type="date"]').forEach(dateHint)));
+
 export async function refreshBadges() {
   const p = state.profile; if (!p) return;
   const before = JSON.stringify(badges);

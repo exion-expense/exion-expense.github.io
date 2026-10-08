@@ -1,6 +1,6 @@
 // โปรไฟล์ · ลายเซ็น · ขอเบิกรายเดือน (ใช้ทั้ง /profile และ /petty/profile — ฝั่งเงินสดย่อยไม่มีส่วนขอเบิกรายเดือน)
-import { api, auth, loadProfile, money, fmtDate, fmtDateTime, esc, initials, roleLabel, monthLabel, catName, exportStage, statusBadge } from '../core.js?v=10.0.15';
-import { icon, catIcon, toast, toastError, confirmBox, sheet, busy, withBtn, signaturePad, monthNav, shiftMonth, empty, on, debounce } from '../ui.js?v=10.0.15';
+import { api, auth, loadProfile, money, fmtDate, fmtDateTime, esc, initials, roleLabel, monthLabel, catName, exportStage, statusBadge } from '../core.js?v=10.0.16';
+import { icon, catIcon, toast, toastError, confirmBox, sheet, busy, withBtn, signaturePad, monthNav, shiftMonth, empty, on, debounce } from '../ui.js?v=10.0.16';
 
 export async function render(ctx) {
   const { el } = ctx;
@@ -11,12 +11,12 @@ export async function render(ctx) {
   const st = { y: curY, m: curM, info: null, infoErr: null, exports: null, start: '', end: '', pv: null, pvErr: '', pvLoading: false, pvSeq: 0, allowance: null };
   const me = () => ctx.profile.email;
 
+  // ฝั่งเบิกค่าใช้จ่าย: ขอเบิกรายเดือนอยู่บนสุด (งานหลักของหน้านี้) · ข้อมูลส่วนตัวไว้ข้างขวา
   el.innerHTML = `<div class="stack">
-    <div id="pf-prof"></div>
-    ${petty ? `<div class="split"><div class="stack"><div id="pf-sig"></div></div><div class="stack"><div id="pf-acc"></div></div></div>`
+    ${petty ? `<div id="pf-prof"></div><div class="split"><div class="stack"><div id="pf-sig"></div></div><div class="stack"><div id="pf-acc"></div></div></div>`
       : `<div class="split">
         <div class="stack"><div id="pf-claim"></div><div id="pf-hist"></div></div>
-        <div class="stack"><div id="pf-sig"></div><div id="pf-acc"></div></div>
+        <div class="stack"><div id="pf-prof"></div><div id="pf-sig"></div><div id="pf-acc"></div></div>
       </div>`}
   </div>`;
   const $ = (id) => el.querySelector('#' + id);

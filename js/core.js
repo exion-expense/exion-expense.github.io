@@ -261,7 +261,8 @@ export const api = {
 
   /** แจ้งเตือนเด้งทันที (Realtime) · คืนฟังก์ชันยกเลิก */
   onNotification(cb) {
-    if (MOCK || !sb || !state.session) return () => {};
+    if (MOCK) { window.__mockNotify = cb; return () => { window.__mockNotify = null; }; }   // โหมดทดสอบ: ยิงแจ้งเตือนเองได้
+    if (!sb || !state.session) return () => {};
     const ch = sb.channel('notif-' + state.session.uid)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (p) => cb(p.new))
       .subscribe();

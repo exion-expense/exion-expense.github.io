@@ -503,3 +503,18 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
   .dept-item:hover { background: var(--line-2); }
   .dept-item.on, .dept-item.on:hover { border-color: var(--brand); background: var(--brand-50); }
 }
+
+/* ═══════════ แถบอัปเดตใหม่ + วันที่ พ.ศ. ใต้ช่องวันที่ ═══════════ */
+.new-bar { position: sticky; top: calc(var(--top-h) + 8px); z-index: 20; display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
+  margin: 0 0 12px; padding: 10px 14px; border: 0; border-radius: 999px; background: var(--ink); color: #fff; font: inherit; font-size: 14px; font-weight: 600;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .18); cursor: pointer; animation: newbar .25s ease-out; }
+@keyframes newbar { from { transform: translateY(-8px); opacity: 0; } to { transform: none; opacity: 1; } }
+.date-th { margin-top: 4px; font-size: 12.5px; color: var(--muted); min-height: 0; }
+.date-th:empty { display: none; }
+/* ═══════════ หน้าแรก: การ์ดสิ่งที่ต้องทำ ═══════════ */
+.todo-card { border-color: var(--brand-100); background: linear-gradient(0deg, var(--surface), var(--surface)) padding-box; }
+.todo-card .card-head h3 { color: var(--brand); }
+.todo-big { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.note-line { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line);
+  color: var(--ink-2); font-size: 13.5px; }
+a.note-line:hover { border-color: var(--brand-100); background: var(--brand-50); }

@@ -1,6 +1,6 @@
 // หน้าแรก (เบิกค่าใช้จ่าย) — แดชบอร์ดตามบทบาท: พนักงาน / หัวหน้า / GM / บัญชี / CEO
-import { api, money, compact, fmtDate, timeAgo, esc, initials, roleLabel, monthLabel, exportStage, catName } from '../core.js?v=10.0.15';
-import { icon, catIcon, requestRow, toast, toastError, confirmBox, withBtn, bars, empty, on } from '../ui.js?v=10.0.15';
+import { api, money, compact, fmtDate, timeAgo, esc, initials, roleLabel, monthLabel, exportStage, catName } from '../core.js?v=10.0.16';
+import { icon, catIcon, requestRow, toast, toastError, confirmBox, withBtn, bars, empty, on } from '../ui.js?v=10.0.16';
 
 export async function render(ctx) {
   const { el } = ctx;
@@ -45,6 +45,8 @@ function paint(ctx, d) {
 
     <div class="split">
       <div class="stack">
+        ${claimCard(d)}
+        ${budgetCard(my.budgets || [])}
         ${inbox.count ? inboxCard(inbox) : ''}
         ${kind === 'acct' || kind === 'gm' ? unpaidCard(acc, kind) : ''}
         ${kind === 'gm' ? deptCard(co) : ''}
@@ -57,7 +59,9 @@ function paint(ctx, d) {
           <div class="pad tiles">
             <a class="tile" href="#/submit"><span class="row-icon c-red">${icon('plus')}</span>ขอเบิก</a>
             <a class="tile" href="#/requests"><span class="row-icon c-blue">${icon('receipt')}</span>คำขอของฉัน</a>
+            <a class="tile" href="#/profile"><span class="row-icon c-amber">${icon('calendar')}</span>ขอเบิกรายเดือน</a>
             <a class="tile" href="#/preapprovals"><span class="row-icon c-violet">${icon('shield')}</span>ขออนุมัติงบ</a>
+            <a class="tile" href="#/insights"><span class="row-icon c-teal">${icon('trending')}</span>แดชบอร์ดลูกค้า</a>
             <a class="tile" href="#/summary"><span class="row-icon c-teal">${icon('chart')}</span>สรุป & Excel</a>
             ${role.isManager || role.isGM ? `<a class="tile" href="#/team"><span class="row-icon c-amber">${icon('users')}</span>ทีมของฉัน</a>` : ''}
             <a class="tile" href="#/petty"><span class="row-icon c-green">${icon('wallet')}</span>เงินสดย่อย</a>
@@ -65,6 +69,30 @@ function paint(ctx, d) {
       </div>
     </div>
   </div>`;
+}
+
+// ถึงรอบขอเบิกรายเดือน: มีบิลอนุมัติแล้วที่ยังไม่อยู่ในใบไหน และ (ใกล้ตัดรอบ ≤ 3 วัน หรือค้างจากรอบก่อน) · ส่งไปแล้วรออนุมัติ = ไม่ต้องเตือน
+function claimCard(d) {
+  const c = d.my?.claim || {}, p = d.period || {};
+  if (!c.count || d.my?.exportPending) return '';
+  const overdue = c.oldest && p.rangeStart && c.oldest < p.rangeStart;
+  if (!overdue && !(d.daysLeft != null && d.daysLeft <= 3)) return '';
+  return `<div class="card todo-card"><div class="card-head"><h3>${icon('send')} ${overdue ? 'มีบิลรอขอเบิกรายเดือน' : `ใกล้ตัดรอบ · อีก ${d.daysLeft} วัน`}</h3></div>
+    <div class="pad todo-big"><div><div class="amount text-lg">${money(c.total)} บาท</div>
+      <div class="text-sm muted">${money(c.count, 0)} รายการที่อนุมัติแล้ว${overdue ? ` · ค้างตั้งแต่ ${fmtDate(c.oldest)}` : ''}</div></div>
+      <a class="btn btn-primary" href="#/profile">${icon('calendar')} ขอเบิกรายเดือน</a></div></div>`;
+}
+
+// งบรับรอง/กอล์ฟที่อนุมัติแล้ว แต่ยังไม่ส่งบิลจริง (ลืมส่ง = ไม่ได้เงิน)
+function budgetCard(list) {
+  if (!list.length) return '';
+  return `<div class="card todo-card"><div class="card-head"><h3>${icon('receipt')} งบรอส่งบิลจริง <span class="badge b-pending plain">${list.length}</span></h3>
+      <a class="link" href="#/preapprovals">ทั้งหมด ${icon('chevron-right', 'sm')}</a></div>
+    <div class="list">${list.slice(0, 4).map((b) => `<a class="row" href="#/preapprovals/${encodeURIComponent(b.id)}/finalize">${catIcon(b.category)}
+      <div class="row-main"><div class="row-title">${esc(catName(b.category))}${b.place ? ' · ' + esc(b.place) : ''}</div>
+        <div class="row-sub ${b.past ? 'warn-text' : ''}">นัด ${fmtDate(b.date)}${b.past ? ' · เลยวันนัดแล้ว ส่งบิลได้เลย' : ''}</div></div>
+      <div class="row-end"><span class="amount">${money(b.budget)}</span><span class="btn btn-secondary btn-sm">ส่งบิล</span></div></a>`).join('')}</div>
+    <div class="card-foot text-sm muted">หลังใช้จ่ายแล้ว กด “ส่งบิล” พร้อมใบเสร็จ — ไม่ส่ง = ไม่ได้เบิก</div></div>`;
 }
 
 function inboxCard(inbox) {
@@ -145,7 +173,7 @@ async function act(ctx, t) {
       await withBtn(t, () => api.rpc('decide_many', { p_ids: [id], p_decision: 'Approved', p_mode: 'auto' }));
       toast('อนุมัติแล้ว');
     } else if (t.dataset.act === 'reject') {
-      const { promptBox } = await import('../ui.js?v=10.0.15');
+      const { promptBox } = await import('../ui.js?v=10.0.16');
       const why = await promptBox({ title: 'ไม่อนุมัติรายการนี้', label: 'เหตุผล (พนักงานจะเห็น)', required: true, ok: 'ไม่อนุมัติ', danger: true });
       if (why == null) return;
       await api.rpc('decide_many', { p_ids: [id], p_decision: 'Rejected', p_remark: why, p_mode: 'auto' });
