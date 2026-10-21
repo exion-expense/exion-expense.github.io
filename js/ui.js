@@ -1,8 +1,8 @@
 // ════════════════════════════════════════════════════════════════════
 //  ui.js — ชิ้นส่วนหน้าจอที่ใช้ร่วมกัน (dialog / toast / รูปใบเสร็จ / ลายเซ็น / ช่องว่าง)
 // ════════════════════════════════════════════════════════════════════
-import { icon, catIcon } from './icons.js?v=10.0.16';
-import { api, esc, money, fmtDate, catName, requestBadge } from './core.js?v=10.0.16';
+import { icon, catIcon } from './icons.js?v=10.0.17';
+import { api, esc, money, fmtDate, catName, requestBadge } from './core.js?v=10.0.17';
 export { icon, catIcon, esc };
 
 /** html`...` — ค่าที่แทรกถูก escape อัตโนมัติ · array ต่อกันให้ · raw(x) = ไม่ escape */
@@ -177,7 +177,11 @@ export async function lightbox(paths, idx = 0) {
   let i = Math.max(0, idx);
   const el = document.createElement('div');
   el.className = 'lightbox';
+  // รูปย่อพอดีจอเสมอ (เห็นทั้งใบ) · ซูม: ปุ่ม − / + / พอดีจอ, ลูกกลิ้ง, ดับเบิลคลิก, ถ่างนิ้ว · ซูมแล้วลากเพื่อเลื่อนดู
   el.innerHTML = `<div class="lb-top"><span class="text-sm" data-n></span><div class="flex">
+    <span class="lb-zoom" data-zoombar><button class="btn-icon" data-zoom="-1" aria-label="ซูมออก" title="ซูมออก"><b>−</b></button>
+      <button class="btn-icon lb-pct" data-zoom="0" title="พอดีจอ" aria-label="พอดีจอ">100%</button>
+      <button class="btn-icon" data-zoom="1" aria-label="ซูมเข้า" title="ซูมเข้า"><b>+</b></button></span>
     <a class="btn-icon" data-open target="_blank" rel="noopener" title="เปิดในแท็บใหม่">${icon('external')}</a>
     <button class="btn-icon" data-close aria-label="ปิด">${icon('x')}</button></div></div>
     <div class="lb-stage"></div>
@@ -185,7 +189,12 @@ export async function lightbox(paths, idx = 0) {
   document.body.appendChild(el);
   const stage = el.querySelector('.lb-stage');
   let scale = 1, tx = 0, ty = 0, img = null;
-  const apply = () => { if (img) img.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`; };
+  const apply = () => {
+    if (img) img.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+    el.querySelector('.lb-pct').textContent = `${Math.round(scale * 100)}%`;
+    el.querySelector('[data-zoombar]').classList.toggle('hidden', !img);
+  };
+  const zoomBy = (f) => { if (!img) return; scale = Math.min(6, Math.max(1, scale * f)); if (scale === 1) tx = ty = 0; apply(); };
   async function show() {
     el.querySelector('[data-n]').textContent = paths.length > 1 ? `${i + 1} / ${paths.length}` : '';
     stage.innerHTML = '<span class="spin"></span>';
@@ -195,18 +204,24 @@ export async function lightbox(paths, idx = 0) {
       el.querySelector('[data-open]').href = u;
       if (/^https?:/.test(paths[i])) { img = null; stage.innerHTML = u ? `<div style="color:#fff;text-align:center;padding:24px">ไฟล์นี้อยู่ใน Google Drive ของระบบเดิม<br><br><a class="btn btn-glass" href="${esc(u)}" target="_blank" rel="noopener noreferrer">เปิดใน Google Drive</a></div>` : '<div style="color:#fff">ลิงก์ไฟล์ไม่ถูกต้อง</div>'; return; }
       if (/\.pdf($|\?)/i.test(paths[i])) { stage.innerHTML = `<iframe src="${esc(u)}"></iframe>`; img = null; }
-      else { stage.innerHTML = `<img src="${esc(u)}" alt="ใบเสร็จ">`; img = stage.querySelector('img'); }
+      else { stage.innerHTML = `<img src="${esc(u)}" alt="ใบเสร็จ" draggable="false">`; img = stage.querySelector('img'); }
     } catch (e) { stage.innerHTML = `<div style="color:#fff">${esc(e.message)}</div>`; }
+    apply();
   }
   const close = () => { el.remove(); document.removeEventListener('keydown', key); };
-  const key = (e) => { if (e.key === 'Escape') close(); if (e.key === 'ArrowRight') nav(1); if (e.key === 'ArrowLeft') nav(-1); };
+  const key = (e) => { if (e.key === 'Escape') close(); if (e.key === 'ArrowRight') nav(1); if (e.key === 'ArrowLeft') nav(-1);
+    if (e.key === '+' || e.key === '=') zoomBy(1.5); if (e.key === '-') zoomBy(1 / 1.5); if (e.key === '0') { scale = 1; tx = ty = 0; apply(); } };
   const nav = (d) => { if (paths.length < 2) return; i = (i + d + paths.length) % paths.length; show(); };
   document.addEventListener('keydown', key);
   el.querySelector('[data-close]').onclick = close;
+  el.querySelectorAll('[data-zoom]').forEach((b) => (b.onclick = () => {
+    const d = Number(b.dataset.zoom);
+    if (d === 0) { scale = 1; tx = ty = 0; apply(); } else zoomBy(d > 0 ? 1.5 : 1 / 1.5);
+  }));
   el.querySelector('[data-prev]')?.addEventListener('click', () => nav(-1));
   el.querySelector('[data-next]')?.addEventListener('click', () => nav(1));
   stage.addEventListener('click', (e) => { if (e.target === stage) close(); });
-  stage.addEventListener('wheel', (e) => { if (!img) return; e.preventDefault(); scale = Math.min(6, Math.max(1, scale * (e.deltaY < 0 ? 1.15 : 0.87))); if (scale === 1) tx = ty = 0; apply(); }, { passive: false });
+  stage.addEventListener('wheel', (e) => { if (!img) return; e.preventDefault(); zoomBy(e.deltaY < 0 ? 1.15 : 1 / 1.15); }, { passive: false });
   stage.addEventListener('dblclick', () => { scale = scale > 1 ? 1 : 2.5; tx = ty = 0; apply(); });
   const pts = new Map(); let startDist = 0, startScale = 1, last = null;
   stage.addEventListener('pointerdown', (e) => { pts.set(e.pointerId, e); stage.setPointerCapture(e.pointerId); last = { x: e.clientX, y: e.clientY };

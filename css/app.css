@@ -355,9 +355,13 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
 .lightbox { position: fixed; inset: 0; z-index: 130; background: rgba(0, 0, 0, .92); display: flex; flex-direction: column; animation: fade .15s; }
 .lightbox .lb-top { display: flex; align-items: center; justify-content: space-between; color: #fff; padding: 10px 12px; }
 .lightbox .lb-top .btn-icon { color: #fff; } .lightbox .lb-top .btn-icon:hover { background: rgba(255, 255, 255, .12); }
-.lightbox .lb-stage { flex: 1; overflow: hidden; display: grid; place-items: center; touch-action: none; }
-.lightbox img { max-width: 100%; max-height: 100%; transform-origin: center; user-select: none; -webkit-user-drag: none; }
-.lightbox iframe { width: 100%; height: 100%; border: 0; background: #fff; }
+.lightbox .lb-stage { flex: 1; min-height: 0; position: relative; overflow: hidden; display: grid; place-items: center; touch-action: none; }
+/* วางรูปแบบ absolute → max-width/height อิงขนาดพื้นที่จริง = ย่อพอดีจอเสมอ (เดิม grid ทำให้รูปยาวล้นจอ) */
+.lightbox img { position: absolute; inset: 0; margin: auto; max-width: 100%; max-height: 100%; transform-origin: center; user-select: none; -webkit-user-drag: none; cursor: zoom-in; }
+.lightbox .lb-zoom { display: inline-flex; align-items: center; gap: 2px; margin-right: 6px; }
+.lightbox .lb-zoom b { font-size: 20px; line-height: 1; }
+.lightbox .lb-pct { width: auto; min-width: 52px; padding: 0 6px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.lightbox iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; }
 
 /* ═══════════ Notifications ═══════════ */
 .notif-panel { position: fixed; z-index: 90; top: calc(var(--top-h) + 6px); right: 12px; width: min(400px, calc(100vw - 24px)); max-height: 70vh; display: flex; flex-direction: column;
