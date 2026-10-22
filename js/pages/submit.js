@@ -212,6 +212,14 @@ export const pickFields = (it) => Object.fromEntries(FIELDS.map((k) => [k, it[k]
 
 // ════════════════════ หน้าเพจ ════════════════════
 
+// คนที่มีค่าเหมาจ่ายอัตโนมัติ: บอกว่าลงให้แล้ว + ลิงก์ไปบิลของเดือนนี้ (ดู / แก้ยอด) แทนการให้กรอกเอง
+function autoNote(codes, allow) {
+  const bill = codes.map((c) => allow?.bills?.[c]).find(Boolean);
+  const text = `${codes.map((c) => `${esc(catName(c))} ${money(allow[c], 0)}`).join(' · ')} บาท <b>${allow?.billsMode ? 'ลงให้อัตโนมัติทุกเดือน' : 'ใส่ให้อัตโนมัติทุกรอบ'}</b>${bill ? ' · ดู / แก้ยอด' : ''}`;
+  return bill ? `<a class="note-line" href="#/requests?id=${encodeURIComponent(bill.id)}">${icon('info', 'sm')}<span class="grow">${text}</span>${icon('chevron-right', 'sm')}</a>`
+    : `<div class="note-line">${icon('info', 'sm')}<span class="grow">${text}</span></div>`;
+}
+
 export async function render(ctx) {
   const { el, profile } = ctx;
   const email = String(profile?.email || state.session?.email || '').toLowerCase();
@@ -235,8 +243,7 @@ export async function render(ctx) {
     <div class="stack">
       <div data-draft class="hidden"></div>
       <a class="note-line" href="#/preapprovals/new">${icon('shield', 'sm')}<span class="grow">ค่ารับรอง / ค่ากอล์ฟ → <b>ขออนุมัติงบล่วงหน้า</b></span>${icon('chevron-right', 'sm')}</a>
-      ${hideCodes.length ? `<div class="note-line">${icon('info', 'sm')}<span class="grow">${hideCodes.map((c) => `${esc(catName(c))} ${money(allow[c], 0)}`).join(' · ')} บาท
-        <b>ใส่ให้อัตโนมัติทุกรอบ</b></span></div>` : ''}
+      ${hideCodes.length ? autoNote(hideCodes, allow) : ''}
       <div class="stack" data-items></div>
       <button type="button" class="add-item" data-act="add">${icon('plus')} เพิ่มรายการ</button>
     </div>

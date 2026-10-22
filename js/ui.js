@@ -141,7 +141,7 @@ export function requestRow(r, { who = false, href = '', select = false, checked 
       <div class="row-title">${who ? `${esc(r.staff_name)} · ` : ''}${esc(catName(r.category))}</div>
       <div class="row-sub">${fmtDate(r.expense_date)}${desc ? ' · ' + esc(desc) : ''}${km}${files}</div>
     </div>
-    <div class="row-end"><span class="amount">${money(r.status === 'PreApprove' && r.preapprove_budget ? r.preapprove_budget : r.amount)}</span>${requestBadge(r)}</div>
+    <div class="row-end"><span class="amount">${money(r.status === 'PreApprove' && r.preapprove_budget ? r.preapprove_budget : r.amount)}</span>${requestBadge(r)}${String(r.batch_id || '').startsWith('AUTO-') ? '<span class="badge b-info plain">อัตโนมัติ</span>' : ''}</div>
   </${tag}>`;
 }
 

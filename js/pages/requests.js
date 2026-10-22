@@ -1,12 +1,14 @@
 // คำขอของฉัน — กรองตามสถานะ / ค้นหา / จัดกลุ่มรายเดือน · แตะดูรายละเอียด แก้ไข ลบ
 import { api, state, money, esc, fmtDate, fmtDateTime, catName, catInfo, monthLabel, requestBadge, loadCategories } from '../core.js?v=10.0.17';
-import { icon, catIcon, requestRow, toast, toastError, confirmBox, sheet, busy, empty, skeleton, thumbs, hydrateThumbs, receiptPicker, on, debounce, $, $$ } from '../ui.js?v=10.0.17';
+import { icon, catIcon, requestRow, toast, toastError, confirmBox, promptBox, sheet, busy, empty, skeleton, thumbs, hydrateThumbs, receiptPicker, on, debounce, $, $$ } from '../ui.js?v=10.0.17';
 import { catPickerHtml, fieldsHtml, applyCat, validateItem, showErrors, clearError, catFlags, fuelBox, pickFields, loadVisitRules, entWarn } from './submit.js?v=10.0.17';
 
 const FILTERS = [['all', 'ทั้งหมด'], ['pending', 'รออนุมัติ'], ['approved', 'อนุมัติแล้ว'], ['rejected', 'ไม่อนุมัติ'], ['pre', 'งบล่วงหน้า']];
 
 const isFinalBill = (r) => String(r.batch_id || '').startsWith('FINALIZE-');
 /** แถว "ขออนุมัติงบ" (ยังไม่ใช่บิลจริง) */
+// ค่าเหมาจ่ายรายเดือนที่ระบบลงให้ (0030) — แก้ได้เฉพาะยอด ผ่านปุ่ม "แก้ยอด"
+const isAuto = (r) => String(r.batch_id || '').startsWith('AUTO-');
 const isBudget = (r) => r.status === 'PreApprove' || r.status === 'Finalized' || (!!r.preapprove_status && !isFinalBill(r));
 const cleanRemark = (s) => String(s || '').split(' sig:')[0].trim();
 const reqDate = (r) => r.expense_date || String(r.created_at || '').slice(0, 10);
@@ -182,8 +184,9 @@ export async function render(ctx) {
       if (!fromPre) return T;
     }
     const ms = r.manager_status || '';
-    const auto = r.status === 'Approved' && (r.approved_by === 'auto' || !ms);
-    if (auto) T.push({ ic: 'check', cls: 'c-green', title: 'อนุมัติอัตโนมัติ', sub: `หมวดนี้ไม่ต้องรออนุมัติ${r.approved_at ? ' · ' + fmtDateTime(r.approved_at) : ''}` });
+    const auto = r.status === 'Approved' && (r.approved_by === 'auto' || r.approved_by === 'system' || !ms);
+    if (auto && isAuto(r)) T.push({ ic: 'check', cls: 'c-green', title: 'ลงให้อัตโนมัติ · ค่าเหมาจ่ายรายเดือน', sub: r.manager_remark || 'ตามยอดที่บริษัทตั้งไว้' });
+    else if (auto) T.push({ ic: 'check', cls: 'c-green', title: 'อนุมัติอัตโนมัติ', sub: `หมวดนี้ไม่ต้องรออนุมัติ${r.approved_at ? ' · ' + fmtDateTime(r.approved_at) : ''}` });
     else if (ms === 'Pending' || (!ms && r.status === 'Pending')) T.push({ ic: 'clock', cls: 'c-amber', title: `รอ ${who(r.manager_email)} อนุมัติ`, sub: 'แจ้งผู้อนุมัติแล้ว' });
     else if (ms === 'Approved' || ms === 'Rejected') T.push({ ic: ms === 'Approved' ? 'check' : 'x', cls: ms === 'Approved' ? 'c-green' : 'c-red',
       title: `${ms === 'Approved' ? 'อนุมัติ' : 'ไม่อนุมัติ'} · ${who(r.manager_email)}`, sub: fmtDateTime(r.manager_at), note: cleanRemark(r.manager_remark) });
@@ -203,6 +206,7 @@ export async function render(ctx) {
     const b = [];
     const lock = locked(r);
     const budget = isBudget(r);
+    if (isAuto(r)) return lock ? '' : `<button type="button" class="btn btn-secondary" data-dact="autoedit">${icon('edit')} แก้ยอด</button>`;
     if (r.status === 'PreApprove' && r.preapprove_status === 'Approved') b.push(`<button type="button" class="btn btn-primary" data-dact="finalize">${icon('receipt')} ส่งบิลจริง</button>`);
     if (!lock && !budget && r.status !== 'Rejected' && r.status !== 'Finalized') b.push(`<button type="button" class="btn btn-secondary" data-dact="edit">${icon('edit')} แก้ไข</button>`);
     if (!budget && r.status === 'Rejected') b.push(`<button type="button" class="btn btn-secondary" data-dact="resubmit">${icon('copy')} ส่งใหม่</button>`);
@@ -216,6 +220,21 @@ export async function render(ctx) {
   async function detailAct(a, r, s, btn) {
     if (a === 'finalize') { s.close(); ctx.go(`/preapprovals/${encodeURIComponent(r.id)}/finalize`); return; }
     if (a === 'edit') { s.close(); openEdit(r); return; }
+    if (a === 'autoedit') {
+      const v = await promptBox({ title: `แก้ยอด${catName(r.category)}`, label: 'ยอด (บาท)', value: String(r.amount ?? ''), multiline: false, required: true, ok: 'บันทึก',
+        hint: 'ลดยอดได้ทันที (เช่น ทำงานไม่ครบเดือน) · ถ้าเกินยอดที่บริษัทตั้งไว้ จะส่งให้หัวหน้าอนุมัติก่อน' });
+      if (v == null) return;
+      const n = Number(String(v).replace(/[,\s]/g, ''));
+      if (!(n > 0)) { toast('ยอดไม่ถูกต้อง', 'bad'); return; }
+      try {
+        const res = await busy('กำลังบันทึก…', () => api.rpc('update_auto_allowance', { p_id: r.id, p_amount: n }));
+        s.close();
+        toast(res?.status === 'Pending' ? `ส่งให้หัวหน้าอนุมัติแล้ว (เกินยอดที่ตั้งไว้ ${money(res.base, 0)} บาท)` : 'บันทึกยอดแล้ว');
+        ctx.refreshBadges?.();
+        await reload();
+      } catch (e) { toastError(e); }
+      return;
+    }
     if (a === 'resubmit') {
       const src = { category: r.category, expenseDate: r.expense_date, mileageKm: r.mileage_km ?? '', amount: r.amount || '', venue: r.venue, occasion: r.occasion,
         attendees: r.attendees, origin: r.origin, destination: r.destination, customer: r.customer, customerContact: r.customer_contact, jobNo: r.job_no };
