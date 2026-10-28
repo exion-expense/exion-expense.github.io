@@ -2,8 +2,8 @@
 //  shell.js — โครงหน้าแอป (เมนูข้าง / แถบล่าง / กระดิ่ง) + ตัวเปลี่ยนหน้า (hash router)
 //  เพิ่มหน้าใหม่: ใส่ใน ROUTES แล้วสร้างไฟล์ js/pages/<ชื่อ>.js ที่ export render(ctx)
 // ════════════════════════════════════════════════════════════════════
-import { api, auth, state, loadProfile, loadCategories, esc, initials, roleLabel, timeAgo, fmtDate, cfg, MOCK_MODE } from './core.js?v=10.0.17';
-import { icon, sheet, toast, errorBox, skeleton, $ } from './ui.js?v=10.0.17';
+import { api, auth, state, loadProfile, loadCategories, esc, initials, roleLabel, timeAgo, fmtDate, cfg, MOCK_MODE } from './core.js?v=10.1.0';
+import { icon, sheet, toast, errorBox, skeleton, $ } from './ui.js?v=10.1.0';
 
 const r = (p) => p || {};
 const isApprover = (p) => r(p.role).isManager || r(p.role).isSenior || r(p.role).isGM;
@@ -28,10 +28,15 @@ const ROUTES = [
   { path: '/admin', page: 'admin', title: 'ผู้ดูแลระบบ', app: 'expense', nav: 'admin', icon: 'key', show: (p) => !!p.isAdmin },
   // ── เงินสดย่อย ──
   { path: '/petty', page: 'petty-home', title: 'เงินสดย่อย', app: 'petty', nav: 'p-home', icon: 'home' },
-  { path: '/petty/request', page: 'petty-request', title: 'ขอเบิกเงินสดย่อย', app: 'petty', nav: 'p-request', icon: 'plus-circle' },
-  { path: '/petty/list', page: 'petty-list', title: 'รายการเงินสดย่อย', app: 'petty', nav: 'p-list', icon: 'list' },
-  { path: '/petty/approve', page: 'petty-approve', title: 'รออนุมัติ / รอจ่าย', app: 'petty', nav: 'p-approve', icon: 'inbox',
-    show: (p, b) => p.isPettyHolder || r(p.role).isGM || r(p.role).isAccountant || r(p.role).isManager || b.petty > 0 },
+  { path: '/petty/request', page: 'pv-new', title: 'ขอเบิก (ใบสำคัญจ่าย)', app: 'petty', nav: 'p-request', icon: 'plus-circle' },
+  { path: '/pv', page: 'pv-list', title: 'ใบสำคัญจ่าย', app: 'petty', nav: 'p-pv', icon: 'receipt' },
+  { path: '/pv/view', page: 'pv-view', title: 'ใบสำคัญจ่าย', app: 'petty', nav: 'p-pv', back: '/pv' },
+  { path: '/pv/new', page: 'pv-new', title: 'แก้ไขใบสำคัญจ่าย', app: 'petty', nav: 'p-pv', back: '/pv' },
+  { path: '/pv/dashboard', page: 'pv-dash', title: 'Dashboard ใบสำคัญจ่าย', app: 'petty', nav: 'p-dash', icon: 'chart',
+    show: (p) => r(p.role).isAccountant || r(p.role).isGM || r(p.role).isCEO || r(p.role).canViewAll || r(p.role).isViewer },
+  { path: '/petty/list', page: 'petty-list', title: 'สมุดเงินสดย่อย', app: 'petty', nav: 'p-list', icon: 'list' },
+  { path: '/petty/approve', page: 'petty-approve', title: 'เติมเงิน / รายการแบบเดิม', app: 'petty', nav: 'p-approve', icon: 'inbox',
+    show: (p, b) => p.isPettyHolder || r(p.role).isGM || r(p.role).isAccountant || b.petty > 0 },
   { path: '/petty/fund', page: 'petty-fund', title: 'กล่องเงินสด', app: 'petty', nav: 'p-fund', icon: 'wallet',
     show: (p) => p.isPettyHolder || r(p.role).isAccountant || r(p.role).isGM || r(p.role).canViewAll },
   { path: '/petty/msbc', page: 'petty-msbc', title: 'ตาราง MSBC', app: 'petty', nav: 'p-msbc', icon: 'sheet', show: (p) => r(p.role).isAccountant || r(p.role).isGM || p.isPettyHolder },
@@ -44,7 +49,7 @@ const LEGACY = { 'index.html': '/', 'submit.html': '/submit', 'status.html': '/r
   'ceo-approve.html': '/ceo', 'pc-home.html': '/petty', 'pc-request.html': '/petty/request', 'pc-list.html': '/petty/list', 'pc-approve.html': '/petty/approve',
   'pc-fund.html': '/petty/fund', 'pc-msbc.html': '/petty/msbc', 'reset-password.html': '/login' };
 
-const badges = { approvals: 0, petty: 0, notif: 0 };
+const badges = { approvals: 0, petty: 0, pv: 0, notif: 0 };
 let current = null, renderSeq = 0, stopRealtime = null;
 
 function parseHash() {
@@ -96,7 +101,7 @@ async function route() {
   const app = document.getElementById('app');
   if (!auth.user) {
     closeBell();
-    const m = await import('./pages/login.js?v=10.0.17');
+    const m = await import('./pages/login.js?v=10.1.0');
     if (seq !== renderSeq) return;
     document.title = 'เข้าสู่ระบบ · EXION Expense';
     return m.render({ el: app, query, go, onLoggedIn: () => { const back = sessionStorage.getItem('exion_after_login'); sessionStorage.removeItem('exion_after_login'); go(back && back !== '/login' ? back : '/'); } });
@@ -114,7 +119,8 @@ async function route() {
   const { rt, params } = hit;
   if (rt.show && !rt.show(profile, badges) && !rt.path.includes(':')) {
     // ไม่มีสิทธิ์หน้านี้ → กลับหน้าแรกของแอป
-    if (!(rt.nav === 'approvals' || rt.nav === 'p-approve')) return go(rt.app === 'petty' ? '/petty' : '/');
+    // หน้า Dashboard ใบสำคัญจ่าย: ผู้บริหารสายงานเข้าจากปุ่มในหน้ารายการได้ (ฐานข้อมูลตรวจสิทธิ์เอง)
+    if (!(rt.nav === 'approvals' || rt.nav === 'p-approve' || rt.nav === 'p-dash')) return go(rt.app === 'petty' ? '/petty' : '/');
   }
   state.app = rt.app;
   try { localStorage.setItem('exion_app', rt.app); } catch {}
@@ -145,7 +151,7 @@ async function route() {
 
 // ─────────────── เวอร์ชันแอป ───────────────
 // เปลี่ยนพร้อม sw.js / index.html ทุกครั้งที่อัปเว็บ (ใช้ต่อท้ายไฟล์ทุกไฟล์ที่ import → ได้ไฟล์ชุดเดียวกันเสมอ)
-const APP_V = '10.0.17';
+const APP_V = '10.1.0';
 let verAt = 0, verNew = false;
 async function newerVersion() {
   if (verNew) return true;
@@ -178,7 +184,7 @@ function renderShell(root, rt, profile) {
   if (shellKey !== key || !document.getElementById('main')) {
     shellKey = key;
     const items = navItems(rt.app, profile);
-    const cnt = (x) => (x.nav === 'approvals' ? badges.approvals : x.nav === 'p-approve' ? badges.petty : 0);
+    const cnt = (x) => (x.nav === 'approvals' ? badges.approvals : x.nav === 'p-approve' ? badges.petty : x.nav === 'p-pv' ? badges.pv : 0);
     const side = items.map((x) => `<a class="side-link" data-nav="${x.nav}" href="#${x.path}">${icon(x.icon)}<span>${esc(x.title)}</span>${cnt(x) ? `<span class="cnt">${cnt(x)}</span>` : ''}</a>`).join('');
     const company = esc(profile.company || cfg.COMPANY_NAME || 'Exion Thailand');
     root.innerHTML = `
@@ -223,7 +229,7 @@ function bottomNav(rt, profile) {
   const more = `<button data-more>${icon('grid')}<span>เมนู</span></button>`;
   if (rt.app === 'petty') {
     const showApprove = ROUTES.find((x) => x.nav === 'p-approve').show(profile, badges);
-    return `<nav class="bottom-nav">${a('p-home', '/petty', 'home', 'หน้าแรก')}${a('p-list', '/petty/list', 'list', 'รายการ')}${fab('/petty/request', 'p-request')}
+    return `<nav class="bottom-nav">${a('p-home', '/petty', 'home', 'หน้าแรก')}${a('p-pv', '/pv', 'receipt', 'ใบเบิก', badges.pv)}${fab('/petty/request', 'p-request')}
       ${showApprove ? a('p-approve', '/petty/approve', 'inbox', 'รออนุมัติ', badges.petty) : a('p-profile', '/petty/profile', 'user', 'โปรไฟล์')}${more}</nav>`;
   }
   const appr = isApprover(profile) || badges.approvals > 0;
@@ -280,7 +286,7 @@ function startBackground(profile) {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshBadges(); });
 }
 // แถบ "มีอัปเดตใหม่ · แตะเพื่อโหลด" — ไม่วาดรายการใหม่เอง (กันแถวเลื่อนตอนกำลังกดอนุมัติ) · ไม่โผล่ในหน้าฟอร์ม
-const FORM_PAGES = ['submit', 'preapprove-new', 'finalize', 'set-password', 'petty-request'];
+const FORM_PAGES = ['submit', 'preapprove-new', 'finalize', 'set-password', 'petty-request', 'pv-new'];
 function newItemsBar(n) {
   const cur = match(parseHash().path), main = document.getElementById('main');
   if (!cur || !main || FORM_PAGES.includes(cur.rt.page)) return;
@@ -329,14 +335,15 @@ export async function refreshBadges() {
   if (p.pettyEnabled !== false && (p.isPettyHolder || p.role?.isGM || p.role?.isAccountant || p.role?.isManager)) {
     jobs.push(api.rpc('get_petty_inbox', {}, { quiet: true }).then((x) => { badges.petty = (x?.toApprove?.length || 0) + (x?.toPay?.length || 0); }).catch(() => {}));
   }
+  if (p.pettyEnabled !== false) jobs.push(api.rpc('get_pv_todo_count', {}, { quiet: true }).then((n) => { badges.pv = Number(n) || 0; }).catch(() => {}));
   await Promise.allSettled(jobs);
   if (JSON.stringify(badges) !== before) {
     const dot = document.getElementById('bell-dot');
     if (dot) { dot.textContent = badges.notif > 99 ? '99+' : badges.notif; dot.classList.toggle('hidden', !badges.notif); }
     const cur = match(parseHash().path);
     if (cur && document.getElementById('main')) {   // อัปเดตตัวเลขบนเมนูโดยไม่วาดหน้าใหม่
-      document.querySelectorAll('[data-nav="approvals"],[data-nav="p-approve"]').forEach((a) => {
-        const n = a.dataset.nav === 'approvals' ? badges.approvals : badges.petty;
+      document.querySelectorAll('[data-nav="approvals"],[data-nav="p-approve"],[data-nav="p-pv"]').forEach((a) => {
+        const n = a.dataset.nav === 'approvals' ? badges.approvals : a.dataset.nav === 'p-pv' ? badges.pv : badges.petty;
         let b = a.querySelector('.cnt, .nav-badge');
         if (!n) { b?.remove(); return; }
         if (!b) { b = document.createElement('span'); b.className = a.classList.contains('side-link') ? 'cnt' : 'nav-badge'; a.appendChild(b); }

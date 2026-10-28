@@ -1,6 +1,6 @@
 // ขออนุมัติงบล่วงหน้า (ค่ารับรอง / กอล์ฟ) ของฉัน — ดูสถานะงบ แล้วส่งบิลจริงเมื่ออนุมัติแล้ว
-import { api, money, esc, fmtDate, catName, statusBadge } from '../core.js?v=10.0.17';
-import { icon, catIcon, toast, toastError, confirmBox, busy, empty, on } from '../ui.js?v=10.0.17';
+import { api, money, esc, fmtDate, catName, statusBadge } from '../core.js?v=10.1.0';
+import { icon, catIcon, toast, toastError, confirmBox, busy, empty, on } from '../ui.js?v=10.1.0';
 
 const isFinalBill = (r) => String(r.batch_id || '').startsWith('FINALIZE-');
 const cleanRemark = (s) => String(s || '').split(' sig:')[0].trim();

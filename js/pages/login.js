@@ -2,8 +2,8 @@
 // ลืมรหัส → ลิงก์ทางอีเมล (ถ้าเปิดไว้) หรือ รหัสชั่วคราว 6 หลักจากหัวหน้า
 // ใช้ครั้งแรก (ยังไม่เคยมีรหัส · ช่วงเปิดระบบ SELF_SETUP_UNTIL) → ตั้งรหัสเองได้เลย
 // ข้อความทุกแบบไม่บอกว่าอีเมลไหนมีในระบบ (กันคนนอกสุ่มหารายชื่อพนักงาน)
-import { auth, esc, cfg, state, MOCK_MODE, passwordProblem } from '../core.js?v=10.0.17';
-import { icon, toast, withBtn } from '../ui.js?v=10.0.17';
+import { auth, esc, cfg, state, MOCK_MODE, passwordProblem } from '../core.js?v=10.1.0';
+import { icon, toast, withBtn } from '../ui.js?v=10.1.0';
 
 export function render({ el, onLoggedIn }) {
   let email = localStorage.getItem('exion_last_email') || '';
@@ -50,7 +50,7 @@ export function render({ el, onLoggedIn }) {
         <button class="btn btn-secondary" type="button" data-forgot>ลืมรหัสผ่าน / ใช้ครั้งแรก</button>
         <button class="btn btn-ghost" type="button" data-code>มีรหัสชั่วคราวแล้ว</button>
       </div>
-      ${MOCK_MODE ? `<div class="alert neutral mt-24">${icon('info')}<div class="text-sm">โหมดทดสอบ: ใช้อีเมล เช่น <b>ann@exion.test</b>, <b>smgr@exion.test</b>, <b>gm@exion.test</b>, <b>acc@exion.test</b>, <b>ceo@exion.test</b>, <b>admin@exion.test</b> รหัสอะไรก็ได้ (ยกเว้นคำว่า wrong)</div></div>` : ''}`;
+      ${MOCK_MODE ? `<div class="alert neutral mt-24">${icon('info')}<div class="text-sm">โหมดทดสอบ: ใช้อีเมล เช่น <b>frank@exion.test</b> (เซลล์), <b>opal@exion.test</b> (หัวหน้าทีม), <b>air@exion.test</b> (พี่แอร์), <b>bo@exion.test</b> (CEO), <b>joy@exion.test</b> (บัญชี 1), <b>bee@exion.test</b> (บัญชี 2), <b>orn@exion.test</b> (บัญชี 3), <b>fai@exion.test</b> (HR) รหัสอะไรก็ได้</div></div>` : ''}`;
     af.querySelector('[data-eye]').onclick = () => { const p = af.querySelector('#pw'); p.type = p.type === 'password' ? 'text' : 'password'; };
     af.querySelector('[data-forgot]').onclick = () => { const v = af.querySelector('#em').value.trim().toLowerCase(); if (v) remember(v); stepForgot(); };
     af.querySelector('[data-code]').onclick = () => { const v = af.querySelector('#em').value.trim().toLowerCase(); if (v) remember(v); stepCode(); };
