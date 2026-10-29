@@ -1,6 +1,6 @@
 // ใช้ร่วมหน้าใบสำคัญจ่าย (ใบฟ้า): ป้ายสถานะ / แถวรายการ / ใบฟ้าสำหรับพิมพ์
-import { api, money, fmtDate, esc } from '../core.js?v=10.1.5';
-import { icon, catIcon } from '../ui.js?v=10.1.5';
+import { api, money, fmtDate, esc } from '../core.js?v=10.1.6';
+import { icon, catIcon } from '../ui.js?v=10.1.6';
 
 export const KIND = { PCJ: 'มี Job', PCN: 'ทั่วไป', ADV: 'Advance' };
 /** ใบทดลอง (ลบทิ้งทีหลัง) */
@@ -125,10 +125,10 @@ export function voucherHtml(v, { size = 'half', color = 'blue' } = {}) {
 /** โหลดรูปลายเซ็นจริงในใบ (ไม่มีสิทธิ์/ไม่มีรูป → ใช้ชื่อแทน) */
 export function hydrateSigs(root) {
   root.querySelectorAll('img[data-sig]').forEach(async (img) => {
-    const fallback = () => { img.remove(); img.parentElement?.querySelector('.nm-ink')?.classList.remove('hidden'); };
     const nm = img.parentElement?.querySelector('.nm-ink');
+    const fallback = () => { img.remove(); nm?.classList.remove('hidden'); };
     try {
-      img.onerror = () => { img.remove(); nm?.classList.remove('hidden'); };
+      img.onerror = fallback;
       img.src = await api.fileUrl(img.dataset.sig);
     } catch { fallback(); }
   });
@@ -153,6 +153,8 @@ export function printVoucher(v, { size = 'half', color = 'blue' } = {}) {
   document.body.classList.add('printing-pv');
   const done = () => { document.body.classList.remove('printing-pv'); root.remove(); window.removeEventListener('afterprint', done); };
   window.addEventListener('afterprint', done);
-  // รอรูปลายเซ็นโหลดสักครู่ก่อนเปิดหน้าพิมพ์
-  setTimeout(() => window.print(), 700);
+  // รอรูปลายเซ็นโหลด (หรือสูงสุด 4 วินาที) ก่อนเปิดหน้าพิมพ์
+  const wait = () => Promise.all([...root.querySelectorAll('img[data-sig]')].map((im) => (im.complete && im.src ? Promise.resolve()
+    : new Promise((ok) => { im.addEventListener('load', ok, { once: true }); im.addEventListener('error', ok, { once: true }); }))));
+  Promise.race([new Promise((ok) => setTimeout(ok, 600)).then(wait), new Promise((ok) => setTimeout(ok, 4000))]).then(() => window.print());
 }

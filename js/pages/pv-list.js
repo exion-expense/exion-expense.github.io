@@ -1,7 +1,7 @@
 // ใบสำคัญจ่าย — รอฉัน / ของฉัน / ทั้งหมด · ค้นหาเลขใบ, Job, PO, Cost sheet, ผู้รับเงิน · กรองตามขั้น · อนุมัติหลายใบพร้อมกัน (ยกเว้นบัญชี 1 ที่ต้องเลือก VAT ทีละใบ)
-import { api, money, esc } from '../core.js?v=10.1.5';
-import { icon, toast, confirmBox, promptBox, busy, empty, errorBox, skeleton, debounce, on, $ } from '../ui.js?v=10.1.5';
-import { STAGES, pvRow } from './pv-common.js?v=10.1.5';
+import { api, money, esc } from '../core.js?v=10.1.6';
+import { icon, toast, confirmBox, promptBox, busy, empty, errorBox, skeleton, debounce, on, $ } from '../ui.js?v=10.1.6';
+import { STAGES, pvRow } from './pv-common.js?v=10.1.6';
 
 export async function render(ctx) {
   const { el, query } = ctx;
@@ -24,19 +24,27 @@ export async function render(ctx) {
     <div data-list>${skeleton(5)}</div>
   </div>`;
 
+  // จำแท็บ / คำค้น / ขั้นไว้ในลิงก์ → กดเข้าใบแล้วย้อนกลับมาเจอหน้าเดิม
+  function keepUrl() {
+    const qs = new URLSearchParams(Object.entries({ scope: st.scope, q: st.q, stage: st.stage }).filter(([, v]) => v)).toString();
+    history.replaceState(null, '', location.pathname + location.search + '#/pv' + (qs ? '?' + qs : ''));
+  }
+  let seq = 0;
   async function load() {
+    const my = ++seq;   // ผลที่มาช้ากว่ารอบล่าสุด (เปลี่ยนแท็บ/พิมพ์ค้นเร็วๆ) ไม่ทับของใหม่
+    keepUrl();
     try {
       const [items, meta] = await Promise.all([
         api.rpc('get_pv_list', { p_scope: st.scope, p_q: st.q, p_stage: st.stage, p_limit: 300 }),
         st.meta ? st.meta : api.rpc('get_pv_form_meta', {}, { ttl: 60 }),
       ]);
-      if (!ctx.alive()) return;
+      if (!ctx.alive() || my !== seq) return;
       st.items = items || []; st.meta = meta;
       if (st.scope === 'todo' && !st.q && !st.stage) { const b = $('[data-todo]', el); if (b) b.textContent = st.items.length || ''; }
       const ids = new Set(st.items.filter(canBulk).map((x) => x.id));
       [...st.sel].forEach((id) => { if (!ids.has(id)) st.sel.delete(id); });
       paint();
-    } catch (e) { if (ctx.alive()) errorBox($('[data-list]', el), e, load); }
+    } catch (e) { if (ctx.alive() && my === seq) errorBox($('[data-list]', el), e, load); }
   }
   function paint() {
     el.querySelectorAll('[data-s]').forEach((b) => b.classList.toggle('on', b.dataset.s === st.scope));

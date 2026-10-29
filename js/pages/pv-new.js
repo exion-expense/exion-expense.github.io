@@ -1,7 +1,7 @@
 // ขอเบิก Petty Cash (ใบสำคัญจ่าย) — มี Job / ทั่วไป / Advance entertain · เลือกหมวดทุกบรรทัด · HR กรอกแทนได้ · แก้ใบที่ถูกตีกลับ (?id=)
-import { api, money, esc, todayYMD, loadPettyCategories } from '../core.js?v=10.1.5';
-import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.1.5';
-import { DOCS } from './pv-common.js?v=10.1.5';
+import { api, money, esc, todayYMD, loadPettyCategories } from '../core.js?v=10.1.6';
+import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.1.6';
+import { DOCS } from './pv-common.js?v=10.1.6';
 
 // คำอธิบายหมวด: อะไรเข้าหมวดนี้บ้าง (แสดงใต้ปุ่มหมวดที่เลือก)
 const CAT_HINT = {
@@ -21,6 +21,7 @@ const CAT_HINT = {
 };
 
 const DRAFT_KEY = 'exion_pv_draft', RECENT_KEY = 'exion_pv_recent_who';
+const pettyFund = () => { try { return localStorage.getItem('exion_petty_fund') || ''; } catch { return ''; } };   // กล่องที่เลือกไว้ในหน้าแรกเงินสดย่อย
 const loadJSON = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || 'null') ?? d; } catch { return d; } };
 const saveJSON = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch { /* */ } };
 
@@ -110,7 +111,7 @@ export async function render(ctx) {
   function addLine(desc = '', amt = '', cat = '') {
     const k = ++st.seq;
     const d = document.createElement('div');
-    d.className = 'pv-line-card' + (cat ? '' : ' picking'); d.dataset.line = k; d.dataset.cat = cat;
+    d.className = 'pv-line-card' + (cat ? '' : ' picking'); d.dataset.line = k; d.dataset.catval = cat;   // ไม่ใช้ data-cat บนการ์ด (ชนกับปุ่มหมวด)
     const c0 = catOf(cat);
     d.innerHTML = `<div data-catwrap>
       <div class="pv-cat-chosen" data-catchosen>${c0 ? `${catIcon(cat)}<div class="grow" style="min-width:0"><b>${esc(c0.name_th)}</b><div class="hint" data-cathint>${esc(CAT_HINT[cat] || '')}</div></div>` : ''}
@@ -119,7 +120,7 @@ export async function render(ctx) {
 </div>
       <div class="pv-line pv-line-lab"><span class="label">รายละเอียด</span><span class="label">จำนวนเงิน</span></div>
       <div class="pv-line"><input class="input" data-l="description" maxlength="300" aria-label="รายละเอียด" value="${esc(desc)}">
-      <div class="input-group has-suf"><input type="number" class="input" data-l="amount" inputmode="decimal" step="0.01" min="0" aria-label="จำนวนเงิน" value="${esc(amt)}"><span class="suf">บาท</span></div>
+      <div class="input-group has-suf"><input type="number" class="input" data-l="amount" inputmode="decimal" step="0.01" min="0" aria-label="จำนวนเงิน" value="${Number(amt) > 0 ? esc(amt) : ''}"><span class="suf">บาท</span></div>
       <button type="button" class="btn-icon sm" data-act="rm-line" aria-label="ลบบรรทัด">${icon('trash')}</button></div>`;
     linesBox.appendChild(d);
     renumber();
@@ -128,7 +129,7 @@ export async function render(ctx) {
   function renumber() { lineRows().forEach((r) => r.querySelector('[data-act=rm-line]').classList.toggle('hidden', lineRows().length < 2)); }
   function lines() {
     return lineRows().map((r) => ({ description: r.querySelector('[data-l=description]').value.trim(), amount: Math.round((Number(r.querySelector('[data-l=amount]').value) || 0) * 100) / 100,
-      category: st.type === 'ADV' ? 'ENT' : r.dataset.cat || '' }));
+      category: st.type === 'ADV' ? 'ENT' : r.dataset.catval || '' }));
   }
   // ใบนี้เป็นค่าใช้จ่ายสำนักงาน = ทุกบรรทัดเป็นหมวดสำนักงาน (ส่งไปผู้อนุมัติค่าใช้จ่ายสำนักงาน)
   const isOffice = () => st.type !== 'ADV' && lines().length > 0 && lines().every((l) => officeCats.includes(l.category));
@@ -190,13 +191,18 @@ export async function render(ctx) {
   }
 
   async function submit() {
+    if (st.sending) return;   // กันกดส่งซ้ำ (ระหว่างเช็คใบซ้ำ / อัปโหลด)
+    st.sending = true;
+    try { await doSubmit(); } finally { st.sending = false; }
+  }
+  async function doSubmit() {
     const err = validate();
     if (err) { toast(err, 'bad'); return; }
     // กันจ่ายซ้ำ: Job + PO เดียวกัน หรือผู้รับเงิน + ยอดเท่ากันใน 60 วัน
     try {
       const dup = await api.rpc('get_pv_dupes', { p_job: val('jobNo'), p_po: val('poNo'), p_payee: val('payee'), p_amount: total(), p_exclude: old?.id || '' });
       if (dup?.length && !(await confirmBox({ title: 'อาจซ้ำกับใบที่มีอยู่แล้ว',
-        message: dup.map((x) => `${x.id} · ${x.reason} · ${x.requesterName} · ${money(x.amount)} บาท`).join('\n') + '\n\nตรวจแล้วไม่ซ้ำ กดส่งต่อได้', ok: 'ส่งต่อ' }))) return;
+        message: dup.map((x) => `${x.id} · ${x.reason} · ${x.requesterName}${x.amount != null ? ` · ${money(x.amount)} บาท` : ''}`).join('\n') + '\n\nตรวจแล้วไม่ซ้ำ กดส่งต่อได้', ok: 'ส่งต่อ' }))) return;
     } catch { /* เช็คไม่ได้ ไม่ขวางการส่ง */ }
     try {
       const res = await busy('กำลังเตรียมข้อมูล…', async (set) => {
@@ -209,13 +215,13 @@ export async function render(ctx) {
         }
         set('กำลังส่ง…');
         return api.rpc('pv_submit', { p: {
-          id: old?.id || '', type: st.type, requesterEmail: st.who, fundId: meta.fund?.fundId || '',
+          id: old?.id || '', type: st.type, requesterEmail: st.who, fundId: pettyFund() || meta.fund?.fundId || '',
           payee: val('payee'), payBank: val('payBank'), payAccount: val('payAccount'), expenseDate: val('expenseDate'),
           jobNo: val('jobNo'), poNo: val('poNo'), costSheetNo: val('costSheetNo'), deliveryDate: val('deliveryDate'),
           note: val('note'), lines: lines(), docs,
         } });
       });
-      if (!old) saveJSON(DRAFT_KEY, null);
+      if (!old) { st.sent = true; saveJSON(DRAFT_KEY, null); }
       toast(`${old ? 'ส่งใหม่แล้ว' : 'ส่งแล้ว'} ${res.id}`);
       ctx.refreshBadges();
       ctx.go('/pv/view?id=' + encodeURIComponent(res.id));
@@ -234,9 +240,10 @@ export async function render(ctx) {
     const box = $('[data-whobox]', el); if (!box) return;
     const cur = staff.find((x) => x.email === st.who);
     const depts = [...new Set(staff.map(deptOf))].sort();
+    const q = $('[data-whoq]', el)?.value || '';
     box.innerHTML = `<button type="button" class="pv-who-cur" data-act="who-open" aria-expanded="${st.whoOpen}">${whoCard(cur)}<span class="text-sm brand-text nowrap">${st.whoOpen ? 'ปิด' : 'เปลี่ยน'}</span></button>
       ${st.whoOpen ? `<div class="pv-who-panel">
-        <div class="search">${icon('search')}<input class="input" type="search" data-whoq aria-label="ค้นหาพนักงาน" placeholder="ค้นหาชื่อเล่น / ชื่อจริง / แผนก"></div>
+        <div class="search">${icon('search')}<input class="input" type="search" data-whoq aria-label="ค้นหาพนักงาน" placeholder="ค้นหาชื่อเล่น / ชื่อจริง / แผนก" value="${esc(q)}"></div>
         <div class="chips"><button type="button" class="chip ${st.whoDept ? '' : 'on'}" data-whodept="">ทุกแผนก</button>${depts.map((d) => `<button type="button" class="chip ${st.whoDept === d ? 'on' : ''}" data-whodept="${esc(d)}">${esc(d)}</button>`).join('')}</div>
         <div class="list pv-who-list" data-wholist></div></div>` : ''}`;
     if (st.whoOpen) paintWhoList();
@@ -255,14 +262,15 @@ export async function render(ctx) {
       + (rows.length ? rows.slice(0, 80).map(row).join('') : `<p class="muted text-sm pad-x">ไม่พบชื่อที่ค้นหา</p>`);
   }
   // ── ร่างอัตโนมัติ (ใบใหม่เท่านั้น · ไม่รวมไฟล์แนบ) ──
-  const saveDraft = debounce(() => {
-    if (old || !ctx.alive()) return;
-    const L = lines();
+  function saveDraftNow() {
+    if (old || !linesBox.isConnected) return;   // ฟอร์มถูกแทนที่ไปแล้ว (เปลี่ยนหน้า) → ไม่ต้องบันทึกทับ
+    const L = lines().map((l, i) => ({ ...l, category: lineRows()[i]?.dataset.catval || '' }));
     const any = val('payee') || L.some((l) => l.description || l.amount) || val('jobNo') || val('note');
     saveJSON(DRAFT_KEY, any ? { type: st.type, who: st.who, payee: val('payee'), payBank: val('payBank'), payAccount: val('payAccount'),
       expenseDate: val('expenseDate'), jobNo: val('jobNo'), poNo: val('poNo'), costSheetNo: val('costSheetNo'), deliveryDate: val('deliveryDate'),
       note: val('note'), lines: L } : null);
-  }, 500);
+  }
+  const saveDraft = debounce(() => { if (ctx.alive()) saveDraftNow(); }, 500);
   // ── ผู้รับเงินที่เคยจ่าย ──
   let payees = [];
   api.rpc('get_pv_payees', {}, { ttl: 300, quiet: true }).then((list) => {
@@ -274,9 +282,9 @@ export async function render(ctx) {
   layout(); recalc(); preview();
   const offs = [
     on(el, 'click', '[data-t]', (e, t) => { st.type = t.dataset.t; $$('[data-t]', el).forEach((b) => b.classList.toggle('on', b === t)); layout(); preview(); saveDraft(); }),
-    on(el, 'click', '[data-cat]', (e, t) => {
+    on(el, 'click', '.cat-opt[data-cat]', (e, t) => {
       const card = t.closest('.pv-line-card'), code = t.dataset.cat, c = catOf(code);
-      card.dataset.cat = code; card.classList.remove('picking');
+      card.dataset.catval = code; card.classList.remove('picking');
       $$('.cat-opt', card).forEach((o) => o.classList.toggle('on', o === t));
       $('[data-catchosen]', card).innerHTML = `${catIcon(code)}<div class="grow" style="min-width:0"><b>${esc(c?.name_th || code)}</b><div class="hint" data-cathint>${esc(CAT_HINT[code] || '')}</div></div>
         <button type="button" class="btn btn-ghost btn-sm" data-act="cat-change">เปลี่ยนหมวด</button>`;
@@ -293,12 +301,14 @@ export async function render(ctx) {
     // ผู้รับเงินที่เคยจ่าย → เติมธนาคาร/เลขบัญชีให้ (เฉพาะช่องที่ยังว่าง)
     on(el, 'change', '[data-f=payee]', (e, t) => {
       const hit = payees.find((p) => p.payee.toLowerCase() === t.value.trim().toLowerCase());
-      if (!hit) return;
-      const b = $('[data-f=payBank]', el), a = $('[data-f=payAccount]', el);
+      const b = $('[data-f=payBank]', el), a = $('[data-f=payAccount]', el), h = $('[data-payeehint]', el);
+      // ช่องที่ยังเป็นค่าที่ระบบเติมให้ (ไม่ได้พิมพ์เอง) → แทนด้วยของผู้รับเงินคนใหม่ หรือล้างถ้าไม่รู้จัก
+      const mine = (inp) => !inp.value || inp.value === inp.dataset.auto;
       let filled = false;
-      if (!b.value && hit.bank) { b.value = hit.bank; filled = true; }
-      if (!a.value && hit.account) { a.value = hit.account; filled = true; }
-      const h = $('[data-payeehint]', el);
+      for (const [inp, v] of [[b, hit?.bank || ''], [a, hit?.account || '']]) {
+        if (!mine(inp)) continue;
+        inp.value = v; inp.dataset.auto = v; if (v) filled = true;
+      }
       h.textContent = filled ? 'เติมธนาคาร / เลขบัญชีจากใบก่อนหน้าให้แล้ว — ตรวจให้ถูกก่อนส่ง' : ''; h.classList.toggle('hidden', !filled);
       saveDraft();
     }),
@@ -314,5 +324,9 @@ export async function render(ctx) {
       else if (a === 'submit') submit();
     }),
   ];
-  return () => offs.forEach((f) => f());
+  // ปิดแท็บ / สลับแอปบนมือถือ → บันทึกร่างทันที (ไม่รอ 0.5 วินาที)
+  const onHide = () => { if (!st.sent) saveDraftNow(); };
+  window.addEventListener('pagehide', onHide);
+  document.addEventListener('visibilitychange', onHide);
+  return () => { offs.forEach((f) => f()); window.removeEventListener('pagehide', onHide); document.removeEventListener('visibilitychange', onHide); };
 }

@@ -1,7 +1,7 @@
 // ใบสำคัญจ่าย 1 ใบ — ขั้นอนุมัติ / กดอนุมัติ-ตีกลับ / บัญชี 1 เลือก VAT-WHT + จ่ายเงิน / เคลียร์ advance / พิมพ์ใบฟ้า
-import { api, money, fmtDate, fmtDateTime, esc, todayYMD, catName, loadPettyCategories } from '../core.js?v=10.1.5';
-import { icon, catIcon, toast, toastError, confirmBox, promptBox, busy, withBtn, sheet, thumbs, hydrateThumbs, receiptPicker, errorBox, skeleton, on, $ } from '../ui.js?v=10.1.5';
-import { DOCS, KIND, isTest, stageBadge, kindBadge, voucherHtml, hydrateSigs, printVoucher, PRINT_SIZES, PRINT_COLORS, printPrefs, savePrintPrefs } from './pv-common.js?v=10.1.5';
+import { api, money, fmtDate, fmtDateTime, esc, todayYMD, catName, loadPettyCategories } from '../core.js?v=10.1.6';
+import { icon, catIcon, toast, toastError, confirmBox, promptBox, busy, withBtn, sheet, thumbs, hydrateThumbs, receiptPicker, errorBox, skeleton, on, $ } from '../ui.js?v=10.1.6';
+import { DOCS, KIND, isTest, stageBadge, kindBadge, voucherHtml, hydrateSigs, printVoucher, PRINT_SIZES, PRINT_COLORS, printPrefs, savePrintPrefs } from './pv-common.js?v=10.1.6';
 
 const ACT = { submit: 'ส่งใบเบิก', resubmit: 'แก้แล้วส่งใหม่', approve: 'อนุมัติ', reject: 'ตีกลับ', pay: 'จ่ายเงิน', cancel: 'ยกเลิก',
   adv_clear: 'ส่งเคลียร์', adv_back: 'ตีกลับการเคลียร์', adv_ok: 'เคลียร์เรียบร้อย' };
@@ -24,6 +24,10 @@ export async function render(ctx) {
       [st.v] = await Promise.all([api.rpc('get_pv', { p_id: id }), loadPettyCategories().catch(() => [])]);
       if (!ctx.alive()) return;
       ctx.setTitle(st.v.id);
+      // บัญชี 1 เคยเลือก VAT / หัก ณ ที่จ่ายแล้ว (ใบถูกตีกลับมา) → ใช้ค่าเดิม ไม่ต้องเลือกใหม่
+      if (st.v.isFin1Step && st.vat == null && (st.v.history || []).some((h) => h.act === 'approve' && h.label === 'บัญชี 1')) {
+        st.vat = Number(st.v.vatRate) || 0; st.wht = Number(st.v.whtRate) || 0;
+      }
       paint();
     } catch (e) { if (ctx.alive()) errorBox(el, e, load); }
   }
@@ -82,17 +86,25 @@ export async function render(ctx) {
     const cp = $('[data-clrpick]', el); st.clr = cp ? receiptPicker(cp, { max: 10 }) : null;
   }
 
+  function vatCalc(v) {
+    const b = Number(v.base) || 0, va = st.vat ? Math.round(b * st.vat) / 100 : 0, wa = st.wht ? Math.round(b * st.wht) / 100 : 0;
+    return `${money(b)} ${st.vat ? `+ VAT ${money(va)}` : ''} ${st.wht ? `− WHT ${money(wa)}` : ''} = <b class="amount">${money(b + va - wa)}</b> บาท`;
+  }
+  function pickTax(k, val, t) {
+    st[k] = val;
+    t.parentElement.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b === t));
+    const c = $('[data-vatcalc]', el); if (c) c.innerHTML = vatCalc(st.v);
+  }
   function actionCard(v) {
     const parts = [];
     if (v.canAct && v.isFin1Step) {
-      const vat = st.vat ?? (Number(v.vatRate) || null), wht = st.wht ?? (Number(v.whtRate) || null);
-      const b = Number(v.base) || 0, va = vat ? Math.round(b * vat) / 100 : 0, wa = wht ? Math.round(b * wht) / 100 : 0;
+      const vat = st.vat, wht = st.wht;
       parts.push(`<div class="stack-sm"><b>บัญชี 1: เลือก VAT และหัก ณ ที่จ่าย</b>
         <div class="flex wrap gap-16">
           <div><div class="text-sm muted mb-8">VAT</div><div class="seg"><button type="button" data-vat="0" class="${vat === 0 ? 'on' : ''}">ไม่มี</button><button type="button" data-vat="7" class="${vat === 7 ? 'on' : ''}">7%</button></div></div>
           <div><div class="text-sm muted mb-8">หัก ณ ที่จ่าย</div><div class="seg"><button type="button" data-wht="0" class="${wht === 0 ? 'on' : ''}">ไม่หัก</button><button type="button" data-wht="3" class="${wht === 3 ? 'on' : ''}">3%</button></div></div>
         </div>
-        <div class="text-sm">${money(b)} ${vat ? `+ VAT ${money(va)}` : ''} ${wht ? `− WHT ${money(wa)}` : ''} = <b class="amount">${money(b + va - wa)}</b> บาท</div></div>`);
+        <div class="text-sm" data-vatcalc>${vatCalc(v)}</div></div>`);
     }
     if (v.canAct) {
       parts.push(`<div class="btn-row"><button type="button" class="btn btn-danger" data-act="reject">${icon('x')} ตีกลับ</button>
@@ -201,13 +213,15 @@ export async function render(ctx) {
         </div><div class="pv-preview" data-pvprev>${voucherHtml(v, pr)}</div>`,
       foot: `<button class="btn btn-secondary" data-x>ปิด</button><button class="btn btn-primary" data-print>${icon('file')} พิมพ์</button>`,
       onMount: (sh, close) => {
-        const redraw = () => { sh.querySelector('[data-pvprev]').innerHTML = voucherHtml(v, pr); hydrateSigs(sh); savePrintPrefs(pr); };
+        const fit = () => { const box = sh.querySelector('[data-pvprev]'), sheetEl = box.querySelector('.pv-sheet'); if (!sheetEl) return;
+          const z = Math.min(1, (box.clientWidth - 8) / 780); sheetEl.style.zoom = z < 1 ? String(Math.floor(z * 100) / 100) : ''; };
+        const redraw = () => { sh.querySelector('[data-pvprev]').innerHTML = voucherHtml(v, pr); hydrateSigs(sh); savePrintPrefs(pr); fit(); };
         sh.addEventListener('click', (e) => {
           const sz = e.target.closest('[data-size]'), co = e.target.closest('[data-color]');
           if (sz) { pr.size = sz.dataset.size; sh.querySelectorAll('[data-size]').forEach((b) => b.classList.toggle('on', b === sz)); redraw(); }
           if (co) { pr.color = co.dataset.color; sh.querySelectorAll('[data-color]').forEach((b) => b.classList.toggle('on', b === co)); redraw(); }
         });
-        hydrateSigs(sh);
+        hydrateSigs(sh); fit();
         sh.querySelector('[data-print]').onclick = () => { close(true); printVoucher(v, pr); };
       } });
   }
@@ -215,8 +229,8 @@ export async function render(ctx) {
   el.innerHTML = skeleton(4);
   await load();
   const offs = [
-    on(el, 'click', '[data-vat]', (e, t) => { st.vat = Number(t.dataset.vat); paint(); }),
-    on(el, 'click', '[data-wht]', (e, t) => { st.wht = Number(t.dataset.wht); paint(); }),
+    on(el, 'click', '[data-vat]', (e, t) => pickTax('vat', Number(t.dataset.vat), t)),
+    on(el, 'click', '[data-wht]', (e, t) => pickTax('wht', Number(t.dataset.wht), t)),
     on(el, 'click', '[data-act]', (e, t) => {
       const a = t.dataset.act;
       if (a === 'approve' || a === 'reject') decide(t, a);
