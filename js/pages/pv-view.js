@@ -1,7 +1,7 @@
 // ใบสำคัญจ่าย 1 ใบ — ขั้นอนุมัติ / กดอนุมัติ-ตีกลับ / บัญชี 1 เลือก VAT-WHT + จ่ายเงิน / เคลียร์ advance / พิมพ์ใบฟ้า
-import { api, money, fmtDate, fmtDateTime, esc, todayYMD, catName, loadPettyCategories } from '../core.js?v=10.1.4';
-import { icon, catIcon, toast, toastError, confirmBox, promptBox, busy, withBtn, sheet, thumbs, hydrateThumbs, receiptPicker, errorBox, skeleton, on, $ } from '../ui.js?v=10.1.4';
-import { DOCS, KIND, isTest, stageBadge, kindBadge, voucherHtml, hydrateSigs, printVoucher, PRINT_SIZES, PRINT_COLORS, printPrefs, savePrintPrefs } from './pv-common.js?v=10.1.4';
+import { api, money, fmtDate, fmtDateTime, esc, todayYMD, catName, loadPettyCategories } from '../core.js?v=10.1.5';
+import { icon, catIcon, toast, toastError, confirmBox, promptBox, busy, withBtn, sheet, thumbs, hydrateThumbs, receiptPicker, errorBox, skeleton, on, $ } from '../ui.js?v=10.1.5';
+import { DOCS, KIND, isTest, stageBadge, kindBadge, voucherHtml, hydrateSigs, printVoucher, PRINT_SIZES, PRINT_COLORS, printPrefs, savePrintPrefs } from './pv-common.js?v=10.1.5';
 
 const ACT = { submit: 'ส่งใบเบิก', resubmit: 'แก้แล้วส่งใหม่', approve: 'อนุมัติ', reject: 'ตีกลับ', pay: 'จ่ายเงิน', cancel: 'ยกเลิก',
   adv_clear: 'ส่งเคลียร์', adv_back: 'ตีกลับการเคลียร์', adv_ok: 'เคลียร์เรียบร้อย' };
@@ -45,9 +45,9 @@ export async function render(ctx) {
         </div>
         <div class="pv-progress">${steps.map((s, i) => `<div class="pv-ps ${done(s) ? 'done' : i === nowIdx ? 'now' : ''}">
             <span class="dot">${done(s) ? icon('check', 'sm') : ''}</span><span class="t">${esc(s.label)}</span>
-            <span class="n">${esc(done(s) ? s.byName : s.names)}</span>${done(s) && s.at ? `<span class="d">${fmtDate(s.at)}</span>` : ''}</div>`).join('')}
+            <span class="n">${done(s) ? esc(s.byName) : ''}</span>${done(s) && s.at ? `<span class="d">${fmtDate(s.at)}</span>` : ''}</div>`).join('')}
           <div class="pv-ps ${payDone ? 'done' : payNow ? 'now' : ''}"><span class="dot">${payDone ? icon('check', 'sm') : ''}</span><span class="t">จ่ายเงิน</span>
-            <span class="n">${payDone ? esc(v.paidBy || 'บัญชี 1') : 'บัญชี 1'}</span>${payDone ? `<span class="d">${fmtDate(v.paidAt)}</span>` : ''}</div>
+            <span class="n">${payDone ? esc(v.paidBy || '') : ''}</span>${payDone ? `<span class="d">${fmtDate(v.paidAt)}</span>` : ''}</div>
         </div>
         ${v.status === 'Returned' || (v.status === 'Pending' && v.remark) ? `<div class="alert ${v.status === 'Returned' ? 'bad' : 'warn'}">${icon('alert')}<div><b>${v.status === 'Returned' ? 'ถูกตีกลับให้แก้' : 'ถูกตีกลับมาที่ขั้นนี้'}:</b> ${esc(v.remark)}</div></div>` : ''}
         ${v.advOverdue ? `<div class="alert bad">${icon('clock')}<div>เลยกำหนดเคลียร์ advance (${fmtDate(v.advDue)}) — ส่งใบเสร็จด้านล่าง</div></div>` : v.kind === 'ADV' && v.advDue && v.advClear !== 'Cleared' ? `<div class="alert warn">${icon('clock')}<div>ต้องเคลียร์ advance ภายใน <b>${fmtDate(v.advDue)}</b></div></div>` : ''}

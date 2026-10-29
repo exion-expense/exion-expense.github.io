@@ -1,7 +1,7 @@
 // ขอเบิก Petty Cash (ใบสำคัญจ่าย) — มี Job / ทั่วไป / Advance entertain · เลือกหมวดทุกบรรทัด · HR กรอกแทนได้ · แก้ใบที่ถูกตีกลับ (?id=)
-import { api, money, esc, todayYMD, loadPettyCategories } from '../core.js?v=10.1.4';
-import { icon, catIcon, toast, toastError, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.1.4';
-import { DOCS } from './pv-common.js?v=10.1.4';
+import { api, money, esc, todayYMD, loadPettyCategories } from '../core.js?v=10.1.5';
+import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.1.5';
+import { DOCS } from './pv-common.js?v=10.1.5';
 
 // คำอธิบายหมวด: อะไรเข้าหมวดนี้บ้าง (แสดงใต้ปุ่มหมวดที่เลือก)
 const CAT_HINT = {
@@ -20,6 +20,10 @@ const CAT_HINT = {
   OTHER: 'ค่าใช้จ่ายที่ไม่เข้าหมวดไหน — อธิบายในช่องรายละเอียดให้ชัด',
 };
 
+const DRAFT_KEY = 'exion_pv_draft', RECENT_KEY = 'exion_pv_recent_who';
+const loadJSON = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || 'null') ?? d; } catch { return d; } };
+const saveJSON = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch { /* */ } };
+
 export async function render(ctx) {
   const { el, query } = ctx;
   let meta, old = null, cats = [];
@@ -30,35 +34,41 @@ export async function render(ctx) {
   if (old && !old.canEdit) { ctx.go('/pv/view?id=' + encodeURIComponent(old.id)); return; }
   if (old) ctx.setTitle('แก้ไข ' + old.id);
 
-  const st = { type: old?.kind === 'ADV' ? 'ADV' : 'EXP', who: '', needJob: false, seq: 0 };
+  // ใบใหม่: กู้ร่างที่กรอกค้างไว้ (ไม่รวมไฟล์แนบ)
+  const draft = old ? null : loadJSON(DRAFT_KEY, null);
+  const src = old || draft || {};
+  const st = { type: (old?.kind === 'ADV' || draft?.type === 'ADV') ? 'ADV' : 'EXP', who: draft?.who || '', needJob: false, seq: 0, whoDept: '', whoOpen: false };
+  const staff = (meta.staff || []).filter((x) => x.email !== meta.me.email);
+  const jobDepts = (meta.jobDepts || []).map((d) => String(d).toUpperCase());
+  if (st.who && !staff.some((x) => x.email === st.who)) st.who = '';
   const officeCats = (meta.officeCats || ['OFFICE']).map((c) => String(c).toUpperCase());
   const catOf = (code) => cats.find((c) => c.code === code);
   const pickers = {};
 
   el.innerHTML = `
   <div class="stack">
+    ${draft ? `<div class="alert" data-draftbar>${icon('info')}<div class="grow">กู้ข้อมูลที่กรอกค้างไว้แล้ว · ไฟล์แนบต้องแนบใหม่</div><button type="button" class="btn btn-ghost btn-sm" data-act="draft-clear">เริ่มใหม่</button></div>` : ''}
     ${old ? `<div class="alert bad">${icon('alert')}<div><b>ถูกตีกลับ:</b> ${esc(old.remark || '-')}<br><span class="text-sm">แก้ไขแล้วกดส่งใหม่ ใบจะเริ่มอนุมัติใหม่ตั้งแต่ขั้นแรก (เลขเดิม ${esc(old.id)})</span></div></div>` : ''}
     <div class="card pad stack-sm">
       ${!old ? `<div class="seg" role="tablist" data-type>
         <button type="button" data-t="EXP" class="${st.type === 'EXP' ? 'on' : ''}">${icon('receipt', 'sm')} ค่าใช้จ่าย</button>
         <button type="button" data-t="ADV" class="${st.type === 'ADV' ? 'on' : ''}">${icon('utensils', 'sm')} Advance entertain</button></div>` : ''}
-      ${meta.canBehalf && !old ? `<div class="field"><label for="pv-who">เบิกให้</label>
-        <select class="input" id="pv-who" data-who><option value="">ตัวเอง (${esc(meta.me.name)})</option>
-        ${(meta.staff || []).filter((s) => s.email !== meta.me.email).map((s) => `<option value="${esc(s.email)}">${esc(s.name)}${s.department ? ' · ' + esc(s.department) : ''}</option>`).join('')}
-        </select><div class="hint">HR / บัญชีกรอกแทนได้ — ใบเป็นของคนที่เลือก และขึ้นว่ากรอกโดยคุณ</div></div>` : ''}
+      ${meta.canBehalf && !old ? `<div class="field"><label>เบิกให้</label><div class="pv-who" data-whobox></div>
+        <div class="hint">HR / บัญชีกรอกแทนได้ — ใบเป็นของคนที่เลือก และขึ้นว่ากรอกโดยคุณ</div></div>` : ''}
       <p class="hint" data-typehint></p>
     </div>
 
     <div class="card pad stack-sm">
       <div class="form-grid two">
         <div class="field span-2"><label class="req" for="pv-payee">จ่ายให้</label>
-          <input class="input" id="pv-payee" data-f="payee" maxlength="150" value="${esc(old?.payee || '')}"></div>
+          <input class="input" id="pv-payee" data-f="payee" maxlength="150" list="pv-payees" autocomplete="off" value="${esc(src.payee || '')}">
+          <datalist id="pv-payees"></datalist><div class="hint hidden" data-payeehint></div></div>
         <div class="field"><label for="pv-bank">ธนาคาร <span class="opt">ไม่บังคับ</span></label>
-          <input class="input" id="pv-bank" data-f="payBank" maxlength="100" value="${esc(old?.payBank || '')}"></div>
+          <input class="input" id="pv-bank" data-f="payBank" maxlength="100" value="${esc(src.payBank || '')}"></div>
         <div class="field"><label for="pv-acc">เลขบัญชี <span class="opt">ไม่บังคับ</span></label>
-          <input class="input" id="pv-acc" data-f="payAccount" maxlength="50" inputmode="numeric" value="${esc(old?.payAccount || '')}"></div>
+          <input class="input" id="pv-acc" data-f="payAccount" maxlength="50" inputmode="numeric" value="${esc(src.payAccount || '')}"></div>
         <div class="field"><label class="req" for="pv-date" data-datelabel>วันที่</label>
-          <input type="date" class="input" id="pv-date" data-f="expenseDate" value="${esc(old?.expenseDate || todayYMD())}"></div>
+          <input type="date" class="input" id="pv-date" data-f="expenseDate" value="${esc(src.expenseDate || todayYMD())}"></div>
       </div>
     </div>
 
@@ -72,10 +82,10 @@ export async function render(ctx) {
     <div class="card pad stack-sm" data-jobbox>
       <b>ข้อมูล Job <span class="opt" data-jopt>ไม่บังคับ · กรอกแล้วขึ้นในใบฟ้า</span></b>
       <div class="form-grid two">
-        <div class="field"><label data-jreq for="pv-job">Job No.</label><input class="input" id="pv-job" data-f="jobNo" maxlength="50" value="${esc(old?.jobNo || '')}"></div>
-        <div class="field"><label data-jreq for="pv-po">PO No.</label><input class="input" id="pv-po" data-f="poNo" maxlength="50" value="${esc(old?.poNo || '')}"></div>
-        <div class="field"><label data-jreq for="pv-cs">Cost sheet No.</label><input class="input" id="pv-cs" data-f="costSheetNo" maxlength="50" value="${esc(old?.costSheetNo || '')}"></div>
-        <div class="field"><label for="pv-dd">วันที่จัดส่งสินค้า <span class="opt">ไม่บังคับ</span></label><input type="date" class="input" id="pv-dd" data-f="deliveryDate" value="${esc(old?.deliveryDate || '')}"></div>
+        <div class="field"><label data-jreq for="pv-job">Job No.</label><input class="input" id="pv-job" data-f="jobNo" maxlength="50" value="${esc(src.jobNo || '')}"></div>
+        <div class="field"><label data-jreq for="pv-po">PO No.</label><input class="input" id="pv-po" data-f="poNo" maxlength="50" value="${esc(src.poNo || '')}"></div>
+        <div class="field"><label data-jreq for="pv-cs">Cost sheet No.</label><input class="input" id="pv-cs" data-f="costSheetNo" maxlength="50" value="${esc(src.costSheetNo || '')}"></div>
+        <div class="field"><label for="pv-dd">วันที่จัดส่งสินค้า <span class="opt">ไม่บังคับ</span></label><input type="date" class="input" id="pv-dd" data-f="deliveryDate" value="${esc(src.deliveryDate || '')}"></div>
       </div>
     </div>
 
@@ -86,7 +96,7 @@ export async function render(ctx) {
 
     <div class="card pad stack-sm">
       <div class="field"><label for="pv-note">หมายเหตุ <span class="opt">ไม่บังคับ</span></label>
-        <input class="input" id="pv-note" data-f="note" maxlength="300" value="${esc(old?.note || '')}"></div>
+        <input class="input" id="pv-note" data-f="note" maxlength="300" value="${esc(src.note || '')}"></div>
     </div>
 
     <div class="submit-bar">
@@ -100,9 +110,13 @@ export async function render(ctx) {
   function addLine(desc = '', amt = '', cat = '') {
     const k = ++st.seq;
     const d = document.createElement('div');
-    d.className = 'pv-line-card'; d.dataset.line = k; d.dataset.cat = cat;
-    d.innerHTML = `<div class="cat-picker" data-cats>${cats.map((c) => `<button type="button" class="cat-opt ${c.code === cat ? 'on' : ''}" data-cat="${esc(c.code)}" title="${esc(CAT_HINT[c.code] || '')}">${catIcon(c.code)}<span>${esc(c.name_th)}</span></button>`).join('')}</div>
-      <div class="hint" data-cathint>${esc(CAT_HINT[cat] || '')}</div>
+    d.className = 'pv-line-card' + (cat ? '' : ' picking'); d.dataset.line = k; d.dataset.cat = cat;
+    const c0 = catOf(cat);
+    d.innerHTML = `<div data-catwrap>
+      <div class="pv-cat-chosen" data-catchosen>${c0 ? `${catIcon(cat)}<div class="grow" style="min-width:0"><b>${esc(c0.name_th)}</b><div class="hint" data-cathint>${esc(CAT_HINT[cat] || '')}</div></div>` : ''}
+        <button type="button" class="btn btn-ghost btn-sm" data-act="cat-change">เปลี่ยนหมวด</button></div>
+      <div class="cat-picker" data-cats>${cats.map((c) => `<button type="button" class="cat-opt ${c.code === cat ? 'on' : ''}" data-cat="${esc(c.code)}" title="${esc(CAT_HINT[c.code] || '')}">${catIcon(c.code)}<span>${esc(c.name_th)}</span></button>`).join('')}</div>
+</div>
       <div class="pv-line pv-line-lab"><span class="label">รายละเอียด</span><span class="label">จำนวนเงิน</span></div>
       <div class="pv-line"><input class="input" data-l="description" maxlength="300" aria-label="รายละเอียด" value="${esc(desc)}">
       <div class="input-group has-suf"><input type="number" class="input" data-l="amount" inputmode="decimal" step="0.01" min="0" aria-label="จำนวนเงิน" value="${esc(amt)}"><span class="suf">บาท</span></div>
@@ -120,7 +134,7 @@ export async function render(ctx) {
   const isOffice = () => st.type !== 'ADV' && lines().length > 0 && lines().every((l) => officeCats.includes(l.category));
   const mixedOffice = () => st.type !== 'ADV' && lines().some((l) => officeCats.includes(l.category)) && !isOffice();
   const total = () => Math.round(lines().reduce((s, l) => s + l.amount, 0) * 100) / 100;
-  (old?.lines?.length ? old.lines : [{ description: '', amount: '', category: '' }]).forEach((l) => addLine(l.description, l.amount, l.category || ''));
+  (src.lines?.length ? src.lines : [{ description: '', amount: '', category: '' }]).forEach((l) => addLine(l.description, l.amount, l.category || ''));
 
   const val = (f) => $(`[data-f="${f}"]`, el)?.value.trim() || '';
 
@@ -131,7 +145,7 @@ export async function render(ctx) {
       ? `ขอเงินล่วงหน้าไปเลี้ยงรับรอง · รับเงินแล้วต้องเคลียร์ใบเสร็จภายใน <b>${Number(meta.advDays) || 15} วัน</b>`
       : job ? 'แผนกนี้ต้องกรอก <b>Job No., PO No., Cost sheet No.</b> และแนบ <b>Cost sheet, PO, Invoice</b>' : 'แนบใบเสร็จอย่างน้อย 1 ไฟล์';
     $('[data-datelabel]', el).textContent = adv ? 'วันที่จะใช้' : 'วันที่';
-    $$('[data-cats]', el).forEach((c) => c.classList.toggle('hidden', adv));
+    $$('[data-catwrap]', el).forEach((c) => c.classList.toggle('hidden', adv));
     $('[data-officehint]', el).innerHTML = mixedOffice() ? '<span class="err-text">ค่าใช้จ่ายสำนักงานต้องแยกเป็นอีกใบ (ไม่ปนกับหมวดอื่น)</span>' : '';
     // ข้อมูล Job: แผนกเซลล์บังคับ · แผนกอื่นกรอกได้ (ไม่บังคับ) กรอกแล้วขึ้นในใบฟ้า
     $$('[data-jreq]', el).forEach((l) => l.classList.toggle('req', job && !adv));
@@ -178,6 +192,12 @@ export async function render(ctx) {
   async function submit() {
     const err = validate();
     if (err) { toast(err, 'bad'); return; }
+    // กันจ่ายซ้ำ: Job + PO เดียวกัน หรือผู้รับเงิน + ยอดเท่ากันใน 60 วัน
+    try {
+      const dup = await api.rpc('get_pv_dupes', { p_job: val('jobNo'), p_po: val('poNo'), p_payee: val('payee'), p_amount: total(), p_exclude: old?.id || '' });
+      if (dup?.length && !(await confirmBox({ title: 'อาจซ้ำกับใบที่มีอยู่แล้ว',
+        message: dup.map((x) => `${x.id} · ${x.reason} · ${x.requesterName} · ${money(x.amount)} บาท`).join('\n') + '\n\nตรวจแล้วไม่ซ้ำ กดส่งต่อได้', ok: 'ส่งต่อ' }))) return;
+    } catch { /* เช็คไม่ได้ ไม่ขวางการส่ง */ }
     try {
       const res = await busy('กำลังเตรียมข้อมูล…', async (set) => {
         const docs = {};
@@ -195,27 +215,102 @@ export async function render(ctx) {
           note: val('note'), lines: lines(), docs,
         } });
       });
-      toast(`${old ? 'ส่งใหม่แล้ว' : 'ส่งแล้ว'} ${res.id} · รอ ${res.waiting}`);
+      if (!old) saveJSON(DRAFT_KEY, null);
+      toast(`${old ? 'ส่งใหม่แล้ว' : 'ส่งแล้ว'} ${res.id}`);
       ctx.refreshBadges();
       ctx.go('/pv/view?id=' + encodeURIComponent(res.id));
     } catch (e) { toastError(e); }
   }
 
+  // ── เบิกให้ ──
+  const deptOf = (x) => x.department || '(ไม่ระบุ)';
+  function whoCard(x) {
+    if (!x) return `<span class="avatar sm brand">${esc((meta.me.name || '?').slice(0, 2))}</span><div class="grow"><b>ตัวเอง</b><div class="text-sm muted">${esc(meta.me.name)}${meta.me.department ? ' · ' + esc(meta.me.department) : ''}</div></div>`;
+    const job = jobDepts.includes(String(x.department || '').toUpperCase());
+    return `<span class="avatar sm">${esc((x.name || '?').slice(0, 2))}</span><div class="grow" style="min-width:0"><b>${esc(x.name)}</b>${x.fullName && x.fullName !== x.name ? ` <span class="muted">· ${esc(x.fullName)}</span>` : ''}
+      <div class="text-sm muted">${esc(deptOf(x))}${job ? ' · <span class="badge b-brand plain">ต้องกรอก Job</span>' : ''}</div></div>`;
+  }
+  function paintWho() {
+    const box = $('[data-whobox]', el); if (!box) return;
+    const cur = staff.find((x) => x.email === st.who);
+    const depts = [...new Set(staff.map(deptOf))].sort();
+    box.innerHTML = `<button type="button" class="pv-who-cur" data-act="who-open" aria-expanded="${st.whoOpen}">${whoCard(cur)}<span class="text-sm brand-text nowrap">${st.whoOpen ? 'ปิด' : 'เปลี่ยน'}</span></button>
+      ${st.whoOpen ? `<div class="pv-who-panel">
+        <div class="search">${icon('search')}<input class="input" type="search" data-whoq aria-label="ค้นหาพนักงาน" placeholder="ค้นหาชื่อเล่น / ชื่อจริง / แผนก"></div>
+        <div class="chips"><button type="button" class="chip ${st.whoDept ? '' : 'on'}" data-whodept="">ทุกแผนก</button>${depts.map((d) => `<button type="button" class="chip ${st.whoDept === d ? 'on' : ''}" data-whodept="${esc(d)}">${esc(d)}</button>`).join('')}</div>
+        <div class="list pv-who-list" data-wholist></div></div>` : ''}`;
+    if (st.whoOpen) paintWhoList();
+  }
+  function paintWhoList() {
+    const box = $('[data-wholist]', el); if (!box) return;
+    const q = ($('[data-whoq]', el)?.value || '').trim().toLowerCase();
+    const recent = loadJSON(RECENT_KEY, []).map((e) => staff.find((x) => x.email === e)).filter(Boolean);
+    let rows = staff.filter((x) => (!st.whoDept || deptOf(x) === st.whoDept)
+      && (!q || [x.name, x.fullName, x.department, x.email].some((v) => String(v || '').toLowerCase().includes(q))));
+    const row = (x) => `<button type="button" class="row click pv-who-row ${x?.email === st.who || (!x && !st.who) ? 'selected' : ''}" data-whopick="${esc(x?.email || '')}">${whoCard(x)}</button>`;
+    const showRecent = !q && !st.whoDept && recent.length;
+    if (showRecent) rows = rows.filter((x) => !recent.includes(x));
+    box.innerHTML = (!q && !st.whoDept ? row(null) : '')
+      + (showRecent ? `<div class="group-label">ล่าสุด</div>${recent.map(row).join('')}<div class="group-label">ทั้งหมด</div>` : '')
+      + (rows.length ? rows.slice(0, 80).map(row).join('') : `<p class="muted text-sm pad-x">ไม่พบชื่อที่ค้นหา</p>`);
+  }
+  // ── ร่างอัตโนมัติ (ใบใหม่เท่านั้น · ไม่รวมไฟล์แนบ) ──
+  const saveDraft = debounce(() => {
+    if (old || !ctx.alive()) return;
+    const L = lines();
+    const any = val('payee') || L.some((l) => l.description || l.amount) || val('jobNo') || val('note');
+    saveJSON(DRAFT_KEY, any ? { type: st.type, who: st.who, payee: val('payee'), payBank: val('payBank'), payAccount: val('payAccount'),
+      expenseDate: val('expenseDate'), jobNo: val('jobNo'), poNo: val('poNo'), costSheetNo: val('costSheetNo'), deliveryDate: val('deliveryDate'),
+      note: val('note'), lines: L } : null);
+  }, 500);
+  // ── ผู้รับเงินที่เคยจ่าย ──
+  let payees = [];
+  api.rpc('get_pv_payees', {}, { ttl: 300, quiet: true }).then((list) => {
+    payees = list || [];
+    const dl = $('#pv-payees', el); if (dl) dl.innerHTML = payees.map((p) => `<option value="${esc(p.payee)}"></option>`).join('');
+  }).catch(() => {});
+
+  paintWho();
   layout(); recalc(); preview();
   const offs = [
-    on(el, 'click', '[data-t]', (e, t) => { st.type = t.dataset.t; $$('[data-t]', el).forEach((b) => b.classList.toggle('on', b === t)); layout(); preview(); }),
-    on(el, 'change', '[data-who]', (e, t) => { st.who = t.value; preview(); }),
+    on(el, 'click', '[data-t]', (e, t) => { st.type = t.dataset.t; $$('[data-t]', el).forEach((b) => b.classList.toggle('on', b === t)); layout(); preview(); saveDraft(); }),
     on(el, 'click', '[data-cat]', (e, t) => {
-      const card = t.closest('.pv-line-card'); card.dataset.cat = t.dataset.cat;
+      const card = t.closest('.pv-line-card'), code = t.dataset.cat, c = catOf(code);
+      card.dataset.cat = code; card.classList.remove('picking');
       $$('.cat-opt', card).forEach((o) => o.classList.toggle('on', o === t));
-      $('[data-cathint]', card).textContent = CAT_HINT[t.dataset.cat] || '';
-      layout(); preview();
+      $('[data-catchosen]', card).innerHTML = `${catIcon(code)}<div class="grow" style="min-width:0"><b>${esc(c?.name_th || code)}</b><div class="hint" data-cathint>${esc(CAT_HINT[code] || '')}</div></div>
+        <button type="button" class="btn btn-ghost btn-sm" data-act="cat-change">เปลี่ยนหมวด</button>`;
+      layout(); preview(); saveDraft();
     }),
+    // เบิกให้: เปิด/ค้นหา/กรองแผนก/เลือก
+    on(el, 'input', '[data-whoq]', () => paintWhoList()),
+    on(el, 'click', '[data-whodept]', (e, t) => { st.whoDept = t.dataset.whodept; paintWho(); $('[data-whoq]', el)?.focus(); }),
+    on(el, 'click', '[data-whopick]', (e, t) => {
+      st.who = t.dataset.whopick; st.whoOpen = false;
+      if (st.who) saveJSON(RECENT_KEY, [st.who, ...loadJSON(RECENT_KEY, []).filter((x) => x !== st.who)].slice(0, 6));
+      paintWho(); preview(); saveDraft();
+    }),
+    // ผู้รับเงินที่เคยจ่าย → เติมธนาคาร/เลขบัญชีให้ (เฉพาะช่องที่ยังว่าง)
+    on(el, 'change', '[data-f=payee]', (e, t) => {
+      const hit = payees.find((p) => p.payee.toLowerCase() === t.value.trim().toLowerCase());
+      if (!hit) return;
+      const b = $('[data-f=payBank]', el), a = $('[data-f=payAccount]', el);
+      let filled = false;
+      if (!b.value && hit.bank) { b.value = hit.bank; filled = true; }
+      if (!a.value && hit.account) { a.value = hit.account; filled = true; }
+      const h = $('[data-payeehint]', el);
+      h.textContent = filled ? 'เติมธนาคาร / เลขบัญชีจากใบก่อนหน้าให้แล้ว — ตรวจให้ถูกก่อนส่ง' : ''; h.classList.toggle('hidden', !filled);
+      saveDraft();
+    }),
+    on(el, 'input', 'input, textarea', () => saveDraft()),
     on(el, 'input', '[data-l=amount]', () => { recalc(); preview(); }),
     on(el, 'click', '[data-act]', (e, t) => {
       const a = t.dataset.act;
       if (a === 'add-line') { addLine(); recalc(); layout(); lineRows().at(-1).scrollIntoView({ behavior: 'smooth', block: 'center' }); }
-      else if (a === 'rm-line') { t.closest('.pv-line-card').remove(); renumber(); recalc(); layout(); preview(); }
+      else if (a === 'cat-change') { t.closest('.pv-line-card').classList.add('picking'); }
+      else if (a === 'who-open') { st.whoOpen = !st.whoOpen; paintWho(); if (st.whoOpen) $('[data-whoq]', el)?.focus(); }
+      else if (a === 'draft-clear') { saveJSON(DRAFT_KEY, null); ctx.go('/petty/request?r=' + Date.now()); }
+      else if (a === 'rm-line') { t.closest('.pv-line-card').remove(); renumber(); recalc(); layout(); preview(); saveDraft(); }
       else if (a === 'submit') submit();
     }),
   ];
