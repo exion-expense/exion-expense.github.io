@@ -1,10 +1,17 @@
 // ใบสำคัญจ่าย 1 ใบ — ขั้นอนุมัติ / กดอนุมัติ-ตีกลับ / บัญชี 1 เลือก VAT-WHT + จ่ายเงิน / เคลียร์ advance / พิมพ์ใบฟ้า
-import { api, money, fmtDate, fmtDateTime, esc, todayYMD, catName, loadPettyCategories } from '../core.js?v=10.1.3';
-import { icon, catIcon, toast, toastError, confirmBox, promptBox, busy, withBtn, sheet, thumbs, hydrateThumbs, receiptPicker, errorBox, skeleton, on, $ } from '../ui.js?v=10.1.3';
-import { DOCS, KIND, stageBadge, kindBadge, voucherHtml, hydrateSigs, printVoucher, PRINT_SIZES, PRINT_COLORS, printPrefs, savePrintPrefs } from './pv-common.js?v=10.1.3';
+import { api, money, fmtDate, fmtDateTime, esc, todayYMD, catName, loadPettyCategories } from '../core.js?v=10.1.4';
+import { icon, catIcon, toast, toastError, confirmBox, promptBox, busy, withBtn, sheet, thumbs, hydrateThumbs, receiptPicker, errorBox, skeleton, on, $ } from '../ui.js?v=10.1.4';
+import { DOCS, KIND, isTest, stageBadge, kindBadge, voucherHtml, hydrateSigs, printVoucher, PRINT_SIZES, PRINT_COLORS, printPrefs, savePrintPrefs } from './pv-common.js?v=10.1.4';
 
 const ACT = { submit: 'ส่งใบเบิก', resubmit: 'แก้แล้วส่งใหม่', approve: 'อนุมัติ', reject: 'ตีกลับ', pay: 'จ่ายเงิน', cancel: 'ยกเลิก',
   adv_clear: 'ส่งเคลียร์', adv_back: 'ตีกลับการเคลียร์', adv_ok: 'เคลียร์เรียบร้อย' };
+
+// พิมพ์ใบฟ้าได้ตั้งแต่ถึงขั้นบัญชี 1 (ลายเซ็นเติมตามคนที่อนุมัติแล้ว)
+function canPrint(v) {
+  if (['Approved', 'Paid'].includes(v.status)) return true;
+  const f1 = (v.steps || []).findIndex((s) => s.k === 'fin1');
+  return v.status === 'Pending' && f1 >= 0 && v.step >= f1;
+}
 
 export async function render(ctx) {
   const { el, query } = ctx;
@@ -32,7 +39,7 @@ export async function render(ctx) {
     <div class="stack">
       <div class="card pad stack-sm">
         <div class="flex between wrap gap-8">
-          <div class="stack-sm" style="gap:4px"><div class="flex wrap gap-8"><b class="mono text-lg">${esc(v.id)}</b>${kindBadge(v.kind)}${v.isOffice ? '<span class="badge b-info plain">Office expenses</span>' : ''}</div>
+          <div class="stack-sm" style="gap:4px"><div class="flex wrap gap-8"><b class="mono text-lg">${esc(v.id)}</b>${isTest(v.id) ? '<span class="badge b-pending">ข้อมูลทดลอง</span>' : ''}${kindBadge(v.kind)}${v.isOffice ? '<span class="badge b-info plain">Office expenses</span>' : ''}</div>
             <div class="text-sm muted">${esc(v.requesterName)}${v.department ? ' · ' + esc(v.department) : ''}${v.onBehalfBy ? ` · <span class="badge b-info plain">กรอกโดย ${esc(v.onBehalfBy)}</span>` : ''} · ${fmtDateTime(v.createdAt)}</div></div>
           <div class="text-right"><div class="callout-amount"><span class="v amount">${money(v.amount)}</span><span class="muted">บาท</span></div>${stageBadge(v)}</div>
         </div>
@@ -49,7 +56,7 @@ export async function render(ctx) {
       ${actionCard(v)}
 
       <div class="card pad stack-sm">
-        <div class="flex between wrap"><b>รายละเอียด</b><button type="button" class="btn btn-secondary btn-sm" data-act="voucher">${icon('file', 'sm')} ใบฟ้า / พิมพ์</button></div>
+        <div class="flex between wrap"><b>รายละเอียด</b>${canPrint(v) ? `<button type="button" class="btn btn-secondary btn-sm" data-act="voucher">${icon('file', 'sm')} ใบฟ้า / พิมพ์</button>` : '<span class="text-xs muted">พิมพ์ใบฟ้าได้ตั้งแต่ขั้นบัญชี 1</span>'}</div>
         <dl class="kv">${[
           ['จ่ายให้', v.payee], ['ธนาคาร', v.payBank], ['เลขบัญชี', v.payAccount], ['Job No.', v.jobNo], ['PO No.', v.poNo], ['Cost sheet No.', v.costSheetNo],
           [v.kind === 'ADV' ? 'วันที่จะใช้' : 'วันที่', v.expenseDate ? fmtDate(v.expenseDate) : ''], ['วันที่จัดส่งสินค้า', v.deliveryDate ? fmtDate(v.deliveryDate) : ''], ['หมายเหตุ', v.note],

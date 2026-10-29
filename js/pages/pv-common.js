@@ -1,8 +1,10 @@
 // ใช้ร่วมหน้าใบสำคัญจ่าย (ใบฟ้า): ป้ายสถานะ / แถวรายการ / ใบฟ้าสำหรับพิมพ์
-import { api, money, fmtDate, esc } from '../core.js?v=10.1.3';
-import { icon, catIcon } from '../ui.js?v=10.1.3';
+import { api, money, fmtDate, esc } from '../core.js?v=10.1.4';
+import { icon, catIcon } from '../ui.js?v=10.1.4';
 
 export const KIND = { PCJ: 'มี Job', PCN: 'ทั่วไป', ADV: 'Advance' };
+/** ใบทดลอง (ลบทิ้งทีหลัง) */
+export const isTest = (id) => String(id || '').startsWith('TEST-');
 export const DOCS = [['costSheet', 'Cost sheet'], ['po', 'PO'], ['invoice', 'Invoice'], ['receipt', 'ใบเสร็จ']];
 export const STAGES = [
   ['', 'ทั้งหมด'], ['dept', 'รออนุมัติ'], ['fin1', 'บัญชี 1'], ['fin2', 'บัญชี 2'], ['fin3', 'บัญชี 3'],
@@ -34,7 +36,7 @@ export function pvRow(x, { select = false, checked = false } = {}) {
   return `<a class="row ${checked ? 'selected' : ''}" href="#/pv/view?id=${encodeURIComponent(x.id)}">
     ${select ? `<label class="check"><input type="checkbox" data-sel="${esc(x.id)}" ${checked ? 'checked' : ''} aria-label="เลือก ${esc(x.id)}"></label>` : ''}
     ${catIcon(x.category)}
-    <div class="row-main"><div class="row-title"><span class="mono">${esc(x.id)}</span> · ${esc(x.payee)}</div>
+    <div class="row-main"><div class="row-title"><span class="mono">${esc(x.id)}</span> · ${esc(x.payee)}${isTest(x.id) ? ' <span class="badge b-pending plain">ทดลอง</span>' : ''}</div>
       <div class="row-sub">${esc(x.requesterName)}${x.department ? ' · ' + esc(x.department) : ''}${x.jobNo ? ' · Job ' + esc(x.jobNo) : ''}${x.onBehalfBy ? ' · กรอกโดย ' + esc(x.onBehalfBy) : ''}</div></div>
     <div class="row-end"><span class="amount">${money(x.amount)}</span>${stageBadge(x)}<span class="text-xs muted">${wait}</span></div>
   </a>`;
@@ -84,6 +86,7 @@ export function voucherHtml(v, { size = 'half', color = 'blue' } = {}) {
     .map((s) => `${s.label}: ${esc(s.byName)} ${thd(s.at)}`);
   if (v.paidAt) others.push(`จ่ายแล้ว ${thd(v.paidAt)}`);
   return `<div class="pv-sheet pv-${size} pv-c-${color}">
+    ${isTest(v.id) ? '<div class="pv-watermark" aria-hidden="true">ตัวอย่าง · ไม่ใช่เอกสารจริง</div>' : ''}
     <div class="pv-hd">
       <img src="brand/logo.png" alt="EXION Thailand">
       <div class="pv-co"><b>บริษัท เอ็กซิออน (ประเทศไทย) จำกัด</b>EXION (THAILAND) CO., LTD.</div>

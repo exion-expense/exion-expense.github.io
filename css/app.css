@@ -564,6 +564,10 @@ a.stat { text-decoration: none; color: inherit; display: block; }
 
 /* ใบฟ้า: กระดาษสีฟ้าเหมือนใบจริง (A4 แนวตั้ง) */
 .pv-preview { overflow-x: auto; padding: 4px; background: var(--line-2); border-radius: var(--r); }
+/* ใบทดลอง: ลายน้ำทับทั้งใบ */
+.pv-sheet { position: relative; overflow: hidden; }
+.pv-watermark { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 2;
+  font-size: 54px; font-weight: 700; color: rgba(200, 32, 47, .16); transform: rotate(-24deg); white-space: nowrap; }
 /* สีกระดาษใบฟ้า (เลือกได้ตอนพิมพ์) */
 .pv-sheet { --pv-paper: #DCEFEF; --pv-head: #C4E2E3; --pv-line: #7FA8AE; --pv-ink: #16324A; --pv-pen: #1B3FA0; }
 .pv-sheet.pv-c-white { --pv-paper: #FFFFFF; --pv-head: #EEF0F3; --pv-line: #9AA0AE; --pv-ink: #17181C; --pv-pen: #1B3FA0; }
