@@ -1,19 +1,21 @@
-// ขอเบิก Petty Cash (ใบสำคัญจ่าย) — มี Job / ทั่วไป / Advance entertain · HR กรอกแทนได้ · แก้ใบที่ถูกตีกลับ (?id=)
-import { api, money, esc, todayYMD } from '../core.js?v=10.1.0';
-import { icon, toast, toastError, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.1.0';
-import { DOCS } from './pv-common.js?v=10.1.0';
+// ขอเบิก Petty Cash (ใบสำคัญจ่าย) — มี Job / ทั่วไป / Advance entertain · เลือกหมวดทุกบรรทัด · HR กรอกแทนได้ · แก้ใบที่ถูกตีกลับ (?id=)
+import { api, money, esc, todayYMD, loadPettyCategories } from '../core.js?v=10.1.1';
+import { icon, catIcon, toast, toastError, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.1.1';
+import { DOCS } from './pv-common.js?v=10.1.1';
 
 export async function render(ctx) {
   const { el, query } = ctx;
-  let meta, old = null;
+  let meta, old = null, cats = [];
   try {
-    [meta, old] = await Promise.all([api.rpc('get_pv_form_meta', {}, { ttl: 60 }), query.id ? api.rpc('get_pv', { p_id: query.id }) : null]);
+    [meta, old, cats] = await Promise.all([api.rpc('get_pv_form_meta', {}, { ttl: 60 }), query.id ? api.rpc('get_pv', { p_id: query.id }) : null, loadPettyCategories()]);
   } catch (e) { if (ctx.alive()) errorBox(el, e, () => render(ctx)); return; }
   if (!ctx.alive()) return;
   if (old && !old.canEdit) { ctx.go('/pv/view?id=' + encodeURIComponent(old.id)); return; }
   if (old) ctx.setTitle('แก้ไข ' + old.id);
 
-  const st = { type: old?.kind === 'ADV' ? 'ADV' : 'EXP', who: '', needJob: false, office: !!old?.isOffice, seq: 0 };
+  const st = { type: old?.kind === 'ADV' ? 'ADV' : 'EXP', who: '', needJob: false, seq: 0 };
+  const officeCats = (meta.officeCats || ['OFFICE']).map((c) => String(c).toUpperCase());
+  const catOf = (code) => cats.find((c) => c.code === code);
   const pickers = {};
 
   el.innerHTML = `
@@ -40,13 +42,12 @@ export async function render(ctx) {
           <input class="input" id="pv-acc" data-f="payAccount" maxlength="50" inputmode="numeric" value="${esc(old?.payAccount || '')}"></div>
         <div class="field"><label class="req" for="pv-date" data-datelabel>วันที่</label>
           <input type="date" class="input" id="pv-date" data-f="expenseDate" value="${esc(old?.expenseDate || todayYMD())}"></div>
-        <div class="field" data-officebox><label>&nbsp;</label>
-          <label class="check"><input type="checkbox" data-office ${st.office ? 'checked' : ''}> ค่าใช้จ่ายสำนักงาน (Office expenses)</label></div>
       </div>
     </div>
 
     <div class="card pad stack-sm">
-      <div class="flex between"><b>รายการ</b><span class="text-sm muted">ยอดก่อน VAT · บัญชีเป็นคนใส่ VAT / หัก ณ ที่จ่าย</span></div>
+      <div class="flex between wrap"><b>รายการ</b><span class="text-sm muted">ยอดก่อน VAT · บัญชีเป็นคนใส่ VAT / หัก ณ ที่จ่าย</span></div>
+      <p class="hint" data-officehint></p>
       <div class="stack-sm" data-lines></div>
       <button type="button" class="add-item" data-act="add-line">${icon('plus')} เพิ่มบรรทัด</button>
     </div>
@@ -80,23 +81,28 @@ export async function render(ctx) {
 
   DOCS.forEach(([k]) => { pickers[k] = receiptPicker($(`[data-picker="${k}"]`, el), { max: 10, existing: old?.docs?.[k] || [] }); });
   const linesBox = $('[data-lines]', el);
-  function addLine(desc = '', amt = '') {
+  function addLine(desc = '', amt = '', cat = '') {
     const k = ++st.seq;
     const d = document.createElement('div');
-    d.className = 'pv-line'; d.dataset.line = k;
-    d.innerHTML = `<input class="input" data-l="description" maxlength="300" placeholder="รายละเอียด เช่น ค่า Service งวด 50%" aria-label="รายละเอียด" value="${esc(desc)}">
+    d.className = 'pv-line-card'; d.dataset.line = k; d.dataset.cat = cat;
+    d.innerHTML = `<div class="cat-picker" data-cats>${cats.map((c) => `<button type="button" class="cat-opt ${c.code === cat ? 'on' : ''}" data-cat="${esc(c.code)}">${catIcon(c.code)}<span>${esc(c.name_th)}</span></button>`).join('')}</div>
+      <div class="pv-line"><input class="input" data-l="description" maxlength="300" placeholder="รายละเอียด เช่น ค่า Service งวด 50%" aria-label="รายละเอียด" value="${esc(desc)}">
       <div class="input-group has-suf"><input type="number" class="input" data-l="amount" inputmode="decimal" step="0.01" min="0" placeholder="0.00" aria-label="จำนวนเงิน" value="${esc(amt)}"><span class="suf">บาท</span></div>
-      <button type="button" class="btn-icon sm" data-act="rm-line" aria-label="ลบบรรทัด">${icon('trash')}</button>`;
+      <button type="button" class="btn-icon sm" data-act="rm-line" aria-label="ลบบรรทัด">${icon('trash')}</button></div>`;
     linesBox.appendChild(d);
     renumber();
   }
-  const lineRows = () => $$('.pv-line', linesBox);
+  const lineRows = () => $$('.pv-line-card', linesBox);
   function renumber() { lineRows().forEach((r) => r.querySelector('[data-act=rm-line]').classList.toggle('hidden', lineRows().length < 2)); }
   function lines() {
-    return lineRows().map((r) => ({ description: r.querySelector('[data-l=description]').value.trim(), amount: Math.round((Number(r.querySelector('[data-l=amount]').value) || 0) * 100) / 100 }));
+    return lineRows().map((r) => ({ description: r.querySelector('[data-l=description]').value.trim(), amount: Math.round((Number(r.querySelector('[data-l=amount]').value) || 0) * 100) / 100,
+      category: st.type === 'ADV' ? 'ENT' : r.dataset.cat || '' }));
   }
+  // ใบนี้เป็นค่าใช้จ่ายสำนักงาน = ทุกบรรทัดเป็นหมวดสำนักงาน (ส่งไปผู้อนุมัติค่าใช้จ่ายสำนักงาน)
+  const isOffice = () => st.type !== 'ADV' && lines().length > 0 && lines().every((l) => officeCats.includes(l.category));
+  const mixedOffice = () => st.type !== 'ADV' && lines().some((l) => officeCats.includes(l.category)) && !isOffice();
   const total = () => Math.round(lines().reduce((s, l) => s + l.amount, 0) * 100) / 100;
-  (old?.lines?.length ? old.lines : [{ description: '', amount: '' }]).forEach((l) => addLine(l.description, l.amount));
+  (old?.lines?.length ? old.lines : [{ description: '', amount: '', category: '' }]).forEach((l) => addLine(l.description, l.amount, l.category || ''));
 
   const val = (f) => $(`[data-f="${f}"]`, el)?.value.trim() || '';
 
@@ -107,16 +113,20 @@ export async function render(ctx) {
       ? `ขอเงินล่วงหน้าไปเลี้ยงรับรอง · รับเงินแล้วต้องเคลียร์ใบเสร็จภายใน <b>${Number(meta.advDays) || 15} วัน</b>`
       : job ? 'แผนกนี้ต้องกรอก <b>Job No., PO No., Cost sheet No.</b> และแนบ <b>Cost sheet, PO, Invoice</b>' : 'แนบใบเสร็จอย่างน้อย 1 ไฟล์';
     $('[data-datelabel]', el).textContent = adv ? 'วันที่จะใช้' : 'วันที่';
-    $('[data-officebox]', el).classList.toggle('hidden', adv);
+    $$('[data-cats]', el).forEach((c) => c.classList.toggle('hidden', adv));
+    $('[data-officehint]', el).innerHTML = mixedOffice() ? '<span class="err-text">ค่าใช้จ่ายสำนักงานต้องแยกเป็นอีกใบ (ไม่ปนกับหมวดอื่น)</span>'
+      : isOffice() ? 'หมวดค่าใช้จ่ายสำนักงาน → ส่งให้ผู้อนุมัติค่าใช้จ่ายสำนักงาน' : '';
     $('[data-jobbox]', el).classList.toggle('hidden', !job && !(old?.jobNo));
     $$('[data-jreq]', el).forEach((l) => l.classList.toggle('req', job && !adv));
     $('[data-filebox]', el).classList.toggle('hidden', adv);
     $$('[data-doc]', el).forEach((d) => {
       const k = d.dataset.doc, show = job ? k !== 'receipt' : k === 'receipt' || (old?.docs?.[k] || []).length > 0;
       d.classList.toggle('hidden', !show);
-      d.querySelector('label').classList.toggle('req', show && !adv);
+      d.querySelector('label').classList.toggle('req', show && !adv && (job || needReceipt()));
     });
   }
+  // แนบใบเสร็จตามกฎหมวด: มีบรรทัดไหนเป็นหมวดที่ต้องแนบ → ต้องแนบ
+  function needReceipt() { return lines().some((l) => (catOf(l.category)?.need_receipt || 'YES') === 'YES'); }
   function recalc() {
     $('[data-count]', el).textContent = `${lineRows().length} บรรทัด · ยอดก่อน VAT`;
     $('[data-total]', el).textContent = money(total()) + ' บาท';
@@ -124,7 +134,7 @@ export async function render(ctx) {
   const preview = debounce(async () => {
     const box = $('[data-chain]', el);
     try {
-      const r = await api.rpc('get_pv_preview', { p_requester: old ? old.requesterEmail : st.who, p_amount: total(), p_office: st.type !== 'ADV' && st.office }, { ttl: 30, quiet: true });
+      const r = await api.rpc('get_pv_preview', { p_requester: old ? old.requesterEmail : st.who, p_amount: total(), p_office: isOffice() }, { ttl: 30, quiet: true });
       if (!ctx.alive()) return;
       st.needJob = !!r.needJob;
       layout();
@@ -136,13 +146,15 @@ export async function render(ctx) {
   function validate() {
     const L = lines(), adv = st.type === 'ADV';
     if (!val('payee')) return 'กรุณาใส่ชื่อผู้รับเงิน (จ่ายให้)';
+    if (!adv && L.some((l) => !l.category)) return 'กรุณาเลือกหมวดให้ครบทุกบรรทัด';
+    if (mixedOffice()) return 'ค่าใช้จ่ายสำนักงานต้องแยกเป็นอีกใบ (ไม่ปนกับหมวดอื่น)';
     if (L.some((l) => !l.description)) return 'กรุณาใส่รายละเอียดให้ครบทุกบรรทัด';
     if (L.some((l) => l.amount <= 0)) return 'กรุณาใส่จำนวนเงินให้ครบทุกบรรทัด';
     if (!adv && st.needJob) {
       if (!val('jobNo') || !val('poNo') || !val('costSheetNo')) return 'กรุณากรอก Job No., PO No. และ Cost sheet No.';
       if (!pickers.costSheet.count() || !pickers.po.count() || !pickers.invoice.count()) return 'กรุณาแนบ Cost sheet, PO และ Invoice ให้ครบ';
     }
-    if (!adv && !st.needJob && !pickers.receipt.count() && !pickers.invoice.count()) return 'กรุณาแนบใบเสร็จ';
+    if (!adv && !st.needJob && needReceipt() && !pickers.receipt.count() && !pickers.invoice.count()) return 'กรุณาแนบใบเสร็จ';
     return '';
   }
 
@@ -163,7 +175,7 @@ export async function render(ctx) {
           id: old?.id || '', type: st.type, requesterEmail: st.who, fundId: meta.fund?.fundId || '',
           payee: val('payee'), payBank: val('payBank'), payAccount: val('payAccount'), expenseDate: val('expenseDate'),
           jobNo: val('jobNo'), poNo: val('poNo'), costSheetNo: val('costSheetNo'), deliveryDate: val('deliveryDate'),
-          note: val('note'), isOffice: st.type !== 'ADV' && st.office, lines: lines(), docs,
+          note: val('note'), lines: lines(), docs,
         } });
       });
       toast(`${old ? 'ส่งใหม่แล้ว' : 'ส่งแล้ว'} ${res.id} · รอ ${res.waiting}`);
@@ -176,12 +188,16 @@ export async function render(ctx) {
   const offs = [
     on(el, 'click', '[data-t]', (e, t) => { st.type = t.dataset.t; $$('[data-t]', el).forEach((b) => b.classList.toggle('on', b === t)); layout(); preview(); }),
     on(el, 'change', '[data-who]', (e, t) => { st.who = t.value; preview(); }),
-    on(el, 'change', '[data-office]', (e, t) => { st.office = t.checked; preview(); }),
+    on(el, 'click', '[data-cat]', (e, t) => {
+      const card = t.closest('.pv-line-card'); card.dataset.cat = t.dataset.cat;
+      $$('.cat-opt', card).forEach((o) => o.classList.toggle('on', o === t));
+      layout(); preview();
+    }),
     on(el, 'input', '[data-l=amount]', () => { recalc(); preview(); }),
     on(el, 'click', '[data-act]', (e, t) => {
       const a = t.dataset.act;
-      if (a === 'add-line') { addLine(); recalc(); lineRows().at(-1).querySelector('input').focus(); }
-      else if (a === 'rm-line') { t.closest('.pv-line').remove(); renumber(); recalc(); preview(); }
+      if (a === 'add-line') { addLine(); recalc(); layout(); lineRows().at(-1).scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+      else if (a === 'rm-line') { t.closest('.pv-line-card').remove(); renumber(); recalc(); layout(); preview(); }
       else if (a === 'submit') submit();
     }),
   ];

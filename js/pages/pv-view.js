@@ -1,7 +1,7 @@
 // ใบสำคัญจ่าย 1 ใบ — ขั้นอนุมัติ / กดอนุมัติ-ตีกลับ / บัญชี 1 เลือก VAT-WHT + จ่ายเงิน / เคลียร์ advance / พิมพ์ใบฟ้า
-import { api, money, fmtDate, fmtDateTime, esc, todayYMD } from '../core.js?v=10.1.0';
-import { icon, toast, toastError, confirmBox, promptBox, busy, withBtn, sheet, thumbs, hydrateThumbs, receiptPicker, errorBox, skeleton, on, $ } from '../ui.js?v=10.1.0';
-import { DOCS, KIND, stageBadge, kindBadge, voucherHtml, hydrateSigs, printVoucher } from './pv-common.js?v=10.1.0';
+import { api, money, fmtDate, fmtDateTime, esc, todayYMD, catName, loadPettyCategories } from '../core.js?v=10.1.1';
+import { icon, catIcon, toast, toastError, confirmBox, promptBox, busy, withBtn, sheet, thumbs, hydrateThumbs, receiptPicker, errorBox, skeleton, on, $ } from '../ui.js?v=10.1.1';
+import { DOCS, KIND, stageBadge, kindBadge, voucherHtml, hydrateSigs, printVoucher } from './pv-common.js?v=10.1.1';
 
 const ACT = { submit: 'ส่งใบเบิก', resubmit: 'แก้แล้วส่งใหม่', approve: 'อนุมัติ', reject: 'ตีกลับ', pay: 'จ่ายเงิน', cancel: 'ยกเลิก',
   adv_clear: 'ส่งเคลียร์', adv_back: 'ตีกลับการเคลียร์', adv_ok: 'เคลียร์เรียบร้อย' };
@@ -14,7 +14,7 @@ export async function render(ctx) {
 
   async function load() {
     try {
-      st.v = await api.rpc('get_pv', { p_id: id });
+      [st.v] = await Promise.all([api.rpc('get_pv', { p_id: id }), loadPettyCategories().catch(() => [])]);
       if (!ctx.alive()) return;
       ctx.setTitle(st.v.id);
       paint();
@@ -55,12 +55,12 @@ export async function render(ctx) {
           [v.kind === 'ADV' ? 'วันที่จะใช้' : 'วันที่', v.expenseDate ? fmtDate(v.expenseDate) : ''], ['วันที่จัดส่งสินค้า', v.deliveryDate ? fmtDate(v.deliveryDate) : ''], ['หมายเหตุ', v.note],
           ['ประเภท', KIND[v.kind]],
         ].filter(([, x]) => x).map(([k, x]) => `<dt>${k}</dt><dd>${esc(x)}</dd>`).join('')}</dl>
-        <div class="table-wrap" style="max-height:none"><table class="tbl"><thead><tr><th>#</th><th>รายการ</th><th class="r">จำนวนเงิน</th></tr></thead><tbody>
-          ${(v.lines || []).map((l, i) => `<tr><td>${i + 1}</td><td>${esc(l.description)}</td><td class="r">${money(l.amount)}</td></tr>`).join('')}
-          <tr><td></td><td class="muted">ยอดก่อน VAT</td><td class="r">${money(v.base)}</td></tr>
-          ${Number(v.vatAmount) ? `<tr><td></td><td class="muted">VAT ${Number(v.vatRate)}%</td><td class="r">${money(v.vatAmount)}</td></tr>` : ''}
-          ${Number(v.whtAmount) ? `<tr><td></td><td class="muted">หัก ณ ที่จ่าย ${Number(v.whtRate)}%</td><td class="r">(${money(v.whtAmount)})</td></tr>` : ''}
-        </tbody><tfoot><tr><td></td><td>ยอดจ่ายสุทธิ</td><td class="r">${money(v.amount)}</td></tr></tfoot></table></div>
+        <div class="table-wrap" style="max-height:none"><table class="tbl"><thead><tr><th>#</th><th>หมวด</th><th>รายการ</th><th class="r">จำนวนเงิน</th></tr></thead><tbody>
+          ${(v.lines || []).map((l, i) => `<tr><td>${i + 1}</td><td><span class="flex gap-8 nowrap" style="align-items:center">${catIcon(l.category, 28)}${esc(catName(l.category))}</span></td><td>${esc(l.description)}</td><td class="r">${money(l.amount)}</td></tr>`).join('')}
+          <tr><td></td><td></td><td class="muted">ยอดก่อน VAT</td><td class="r">${money(v.base)}</td></tr>
+          ${Number(v.vatAmount) ? `<tr><td></td><td></td><td class="muted">VAT ${Number(v.vatRate)}%</td><td class="r">${money(v.vatAmount)}</td></tr>` : ''}
+          ${Number(v.whtAmount) ? `<tr><td></td><td></td><td class="muted">หัก ณ ที่จ่าย ${Number(v.whtRate)}%</td><td class="r">(${money(v.whtAmount)})</td></tr>` : ''}
+        </tbody><tfoot><tr><td></td><td></td><td>ยอดจ่ายสุทธิ</td><td class="r">${money(v.amount)}</td></tr></tfoot></table></div>
       </div>
 
       ${filesCard(v)}

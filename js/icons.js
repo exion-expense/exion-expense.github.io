@@ -86,7 +86,7 @@ const CAT = {
   OVERSEAS: ['globe', 'c-violet'], APT: ['building', 'c-violet'], TRAVEL: ['plane', 'c-blue'], OTHER: ['receipt', ''],
   // เงินสดย่อย
   SUPPLY: ['package', 'c-blue'], POST: ['send', 'c-teal'], WATER: ['coins', 'c-blue'], REPAIR: ['settings', 'c-amber'], TAXI: ['car', 'c-amber'],
-  WELFARE: ['sparkles', 'c-violet'], FEE: ['banknote', 'c-teal'], TOPUP: ['plus-circle', 'c-green'], CLEAR: ['refresh', 'c-green'], COUNT: ['calculator', 'c-amber'],
+  WELFARE: ['sparkles', 'c-violet'], FEE: ['banknote', 'c-teal'], OFFICE: ['building', 'c-blue'], SERVICE: ['stamp', 'c-violet'], MATERIAL: ['package', 'c-amber'], TOPUP: ['plus-circle', 'c-green'], CLEAR: ['refresh', 'c-green'], COUNT: ['calculator', 'c-amber'],
 };
 export function catIcon(code, size = '') {
   const [n, c] = CAT[String(code || '').toUpperCase()] || ['receipt', ''];

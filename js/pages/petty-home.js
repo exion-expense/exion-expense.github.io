@@ -1,6 +1,6 @@
 // หน้าแรกเงินสดย่อย — เงินในกล่อง / ทางลัด / คำขอล่าสุด / งานที่รอ (ผู้อนุมัติ, คนถือกล่อง)
-import { api, money, fmtDate, esc, catName, statusBadge, loadPettyCategories } from '../core.js?v=10.1.0';
-import { icon, catIcon, empty, errorBox, skeleton, on } from '../ui.js?v=10.1.0';
+import { api, money, fmtDate, esc, catName, statusBadge, loadPettyCategories } from '../core.js?v=10.1.1';
+import { icon, catIcon, empty, errorBox, skeleton, on } from '../ui.js?v=10.1.1';
 
 // กล่องเงินที่เลือกไว้ (ใช้ร่วมทุกหน้าเงินสดย่อย) · ว่าง = กล่องหลัก
 const FUND_KEY = 'exion_petty_fund';
@@ -9,7 +9,7 @@ function setFund(v) { try { v ? localStorage.setItem(FUND_KEY, v) : localStorage
 
 export async function render(ctx) {
   const { el } = ctx;
-  const st = { home: null, inbox: null };
+  const st = { home: null, inbox: null, pv: 0 };
   loadPettyCategories().catch(() => {});
 
   async function load() {
@@ -43,6 +43,8 @@ async function loadHome(ctx, st) {
     else throw e;
   }
   const d = st.home;
+  // ใบสำคัญจ่ายที่รอฉัน (อนุมัติ / จ่าย / ตรวจเคลียร์)
+  api.rpc('get_pv_todo_count', {}, { quiet: true }).then((n) => { st.pv = Number(n) || 0; if (ctx.alive() && st.pv) paint(ctx, st); }).catch(() => {});
   // มีงานรอ → ดึงรายการมาแสดงบางส่วน
   if (d && (d.toApprove || d.toPay)) {
     api.load('get_petty_inbox', args(), (x) => { st.inbox = x; if (ctx.alive()) paint(ctx, st); }).catch(() => {});
@@ -89,6 +91,8 @@ function paint(ctx, st) {
 
     <div class="split">
       <div class="stack">
+        ${st.pv ? `<a class="card row" href="#/pv?scope=todo"><span class="row-icon c-red">${icon('receipt')}</span><div class="row-main"><div class="row-title">ใบสำคัญจ่ายรอคุณ <span class="badge b-pending plain">${st.pv}</span></div>
+          <div class="row-sub">อนุมัติ / จ่ายเงิน / ตรวจเคลียร์ advance</div></div>${icon('chevron-right')}</a>` : ''}
         ${pendingCard(d, st.inbox)}
         ${recentCard(d, profile)}
       </div>
@@ -96,15 +100,15 @@ function paint(ctx, st) {
         <div class="card"><div class="card-head"><h3>${icon('info')} ข้อมูลกล่อง</h3></div>
           <div class="pad"><dl class="kv tight">
             <dt>คนถือกล่อง</dt><dd>${esc(b.holderName || f.holderEmail || '-')}</dd>
-            <dt>เบิกได้ต่อครั้ง</dt><dd>ไม่เกิน <span class="amount">${money(d.maxPerRequest, 0)}</span> บาท</dd>
             <dt>เติมเงินล่าสุด</dt><dd>${b.lastTopUpAt ? fmtDate(b.lastTopUpAt) : '-'}</dd>
             ${d.myPending ? `<dt>คำขอของฉันที่ค้าง</dt><dd>${d.myPending} รายการ</dd>` : ''}
           </dl></div></div>
         <div class="card"><div class="card-head"><h3>${icon('grid')} เมนูลัด</h3></div>
           <div class="pad tiles">
             <a class="tile" href="#/petty/request"><span class="row-icon c-red">${icon('plus')}</span>ขอเบิก</a>
+            <a class="tile" href="#/pv"><span class="row-icon c-red">${icon('receipt')}</span>ใบสำคัญจ่าย</a>
             <a class="tile" href="#/petty/list"><span class="row-icon c-blue">${icon('list')}</span>รายการ</a>
-            ${d.toApprove || d.toPay || canFund || role.isManager ? `<a class="tile" href="#/petty/approve"><span class="row-icon c-amber">${icon('inbox')}</span>รออนุมัติ / รอจ่าย</a>` : ''}
+            ${d.toApprove || d.toPay || canFund ? `<a class="tile" href="#/petty/approve"><span class="row-icon c-amber">${icon('inbox')}</span>เติมเงิน / รายการแบบเดิม</a>` : ''}
             ${canFund || role.canViewAll ? `<a class="tile" href="#/petty/fund"><span class="row-icon c-green">${icon('wallet')}</span>กล่องเงิน</a>` : ''}
             ${showMsbc ? `<a class="tile" href="#/petty/msbc"><span class="row-icon c-teal">${icon('sheet')}</span>ตาราง MSBC</a>` : ''}
             <a class="tile" href="#/"><span class="row-icon">${icon('receipt')}</span>เบิกค่าใช้จ่าย</a>

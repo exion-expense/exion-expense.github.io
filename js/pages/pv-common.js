@@ -1,6 +1,6 @@
 // ใช้ร่วมหน้าใบสำคัญจ่าย (ใบฟ้า): ป้ายสถานะ / แถวรายการ / ใบฟ้าสำหรับพิมพ์
-import { api, money, fmtDate, esc } from '../core.js?v=10.1.0';
-import { icon } from '../ui.js?v=10.1.0';
+import { api, money, fmtDate, esc } from '../core.js?v=10.1.1';
+import { icon, catIcon } from '../ui.js?v=10.1.1';
 
 export const KIND = { PCJ: 'มี Job', PCN: 'ทั่วไป', ADV: 'Advance' };
 export const DOCS = [['costSheet', 'Cost sheet'], ['po', 'PO'], ['invoice', 'Invoice'], ['receipt', 'ใบเสร็จ']];
@@ -27,12 +27,13 @@ export function stageBadge(x) {
 export function kindBadge(k) {
   return `<span class="badge ${k === 'PCJ' ? 'b-brand' : k === 'ADV' ? 'b-violet' : 'b-neutral'} plain">${esc(KIND[k] || k)}</span>`;
 }
-/** แถวในรายการ */
-export function pvRow(x) {
+/** แถวในรายการ · select = มีช่องติ๊กสำหรับอนุมัติหลายใบ */
+export function pvRow(x, { select = false, checked = false } = {}) {
   const open = ['dept', 'fin1', 'fin2', 'fin3', 'pay', 'returned', 'adv_open', 'adv_check'].includes(x.stage);
   const wait = open && x.waiting ? `รอ ${esc(x.waiting)} · ${daysSince(x.stepAt)} วัน` : fmtDate(x.paidAt || x.createdAt);
-  return `<a class="row" href="#/pv/view?id=${encodeURIComponent(x.id)}">
-    <span class="row-icon ${x.kind === 'PCJ' ? 'c-red' : ''}">${icon(x.kind === 'ADV' ? 'utensils' : x.kind === 'PCJ' ? 'briefcase' : 'receipt')}</span>
+  return `<a class="row ${checked ? 'selected' : ''}" href="#/pv/view?id=${encodeURIComponent(x.id)}">
+    ${select ? `<label class="check"><input type="checkbox" data-sel="${esc(x.id)}" ${checked ? 'checked' : ''} aria-label="เลือก ${esc(x.id)}"></label>` : ''}
+    ${catIcon(x.category)}
     <div class="row-main"><div class="row-title"><span class="mono">${esc(x.id)}</span> · ${esc(x.payee)}</div>
       <div class="row-sub">${esc(x.requesterName)}${x.department ? ' · ' + esc(x.department) : ''}${x.jobNo ? ' · Job ' + esc(x.jobNo) : ''}${x.onBehalfBy ? ' · กรอกโดย ' + esc(x.onBehalfBy) : ''}</div></div>
     <div class="row-end"><span class="amount">${money(x.amount)}</span>${stageBadge(x)}<span class="text-xs muted">${wait}</span></div>
@@ -103,7 +104,7 @@ export function voucherHtml(v) {
     </div>
     <div class="pv-sigs">${signers(v).map(([th, en, s]) => `<div class="pv-sig"><div class="lab">${th}<br>${en}</div>
       <div class="ink">${s ? (s.sig ? `<img data-sig="${esc(s.sig)}" alt=""><span class="nm-ink hidden">${esc(s.name)}</span>` : `<span class="nm-ink">${esc(s.name)}</span>`) : ''}</div>
-      <div class="nm">${s ? esc(s.name) : '&nbsp;'}</div><div class="dt">${s ? thd(s.at) : '&nbsp;'}</div></div>`).join('')}</div>
+      <div class="nm">${s ? `(${esc(s.name)})` : '(&nbsp;'.padEnd(40, '.') + ')'}</div><div class="dt">${s ? thd(s.at) : '&nbsp;'}</div></div>`).join('')}</div>
     ${others.length ? `<div class="pv-trail">${others.join(' · ')}</div>` : ''}
   </div>`;
 }
