@@ -1,7 +1,24 @@
 // ขอเบิก Petty Cash (ใบสำคัญจ่าย) — มี Job / ทั่วไป / Advance entertain · เลือกหมวดทุกบรรทัด · HR กรอกแทนได้ · แก้ใบที่ถูกตีกลับ (?id=)
-import { api, money, esc, todayYMD, loadPettyCategories } from '../core.js?v=10.1.1';
-import { icon, catIcon, toast, toastError, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.1.1';
-import { DOCS } from './pv-common.js?v=10.1.1';
+import { api, money, esc, todayYMD, loadPettyCategories } from '../core.js?v=10.1.2';
+import { icon, catIcon, toast, toastError, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.1.2';
+import { DOCS } from './pv-common.js?v=10.1.2';
+
+// คำอธิบายหมวด: อะไรเข้าหมวดนี้บ้าง (แสดงใต้ปุ่มหมวดที่เลือก)
+const CAT_HINT = {
+  OFFICE: 'ค่าใช้จ่ายส่วนกลางของสำนักงาน เช่น ค่าน้ำ-ไฟ ค่าอินเทอร์เน็ต/โทรศัพท์สำนักงาน ค่าเช่าเครื่องถ่ายเอกสาร ค่าแม่บ้าน/รปภ.',
+  SUPPLY: 'เช่น กระดาษ ปากกา แฟ้ม หมึกพิมพ์ ซองเอกสาร อุปกรณ์คอมพิวเตอร์ชิ้นเล็ก (เมาส์ คีย์บอร์ด)',
+  POST: 'เช่น ไปรษณีย์ EMS ค่าส่งของ Kerry / Flash / Lalamove ค่าแมสเซนเจอร์ส่งเอกสาร',
+  SERVICE: 'เช่น ค่า Service ค่าจ้างช่าง/ผู้รับเหมา ค่าติดตั้ง ค่าสอบเทียบ (Calibration) ค่าตรวจเช็ค',
+  MATERIAL: 'เช่น อะไหล่ วัสดุ อุปกรณ์ที่ซื้อเข้างานลูกค้า วัสดุสิ้นเปลืองหน้างาน',
+  WATER: 'เช่น น้ำดื่ม กาแฟ ของใช้ในครัว กระดาษทิชชู่ น้ำยาทำความสะอาด',
+  REPAIR: 'เช่น ซ่อมแอร์ ซ่อมรถบริษัท ซ่อมเครื่องใช้สำนักงาน ค่าบำรุงรักษา',
+  TRAVEL: 'เช่น ตั๋วเครื่องบิน รถทัวร์/รถไฟ ค่าโรงแรม ค่าเดินทางไปต่างจังหวัด',
+  ENT: 'เช่น เลี้ยงรับรองลูกค้า ของขวัญ/ของฝากลูกค้า',
+  TAXI: 'เช่น แท็กซี่ Grab / Bolt วินมอเตอร์ไซค์ (ไม่บังคับใบเสร็จ)',
+  WELFARE: 'เช่น ขนม/อาหารประชุม ของเยี่ยมไข้ งานวันเกิดพนักงาน รับรองแขกเล็กน้อย',
+  FEE: 'เช่น ค่าธรรมเนียมโอนเงิน ค่าอากรแสตมป์ ค่าธรรมเนียมราชการ ค่าบริการออนไลน์',
+  OTHER: 'ค่าใช้จ่ายที่ไม่เข้าหมวดไหน — อธิบายในช่องรายละเอียดให้ชัด',
+};
 
 export async function render(ctx) {
   const { el, query } = ctx;
@@ -28,16 +45,16 @@ export async function render(ctx) {
       ${meta.canBehalf && !old ? `<div class="field"><label for="pv-who">เบิกให้</label>
         <select class="input" id="pv-who" data-who><option value="">ตัวเอง (${esc(meta.me.name)})</option>
         ${(meta.staff || []).filter((s) => s.email !== meta.me.email).map((s) => `<option value="${esc(s.email)}">${esc(s.name)}${s.department ? ' · ' + esc(s.department) : ''}</option>`).join('')}
-        </select><div class="hint">HR / บัญชีกรอกแทนได้ — ใบวิ่งตามสายอนุมัติของคนที่เลือก และขึ้นว่ากรอกโดยคุณ</div></div>` : ''}
+        </select><div class="hint">HR / บัญชีกรอกแทนได้ — ใบเป็นของคนที่เลือก และขึ้นว่ากรอกโดยคุณ</div></div>` : ''}
       <p class="hint" data-typehint></p>
     </div>
 
     <div class="card pad stack-sm">
       <div class="form-grid two">
         <div class="field span-2"><label class="req" for="pv-payee">จ่ายให้</label>
-          <input class="input" id="pv-payee" data-f="payee" maxlength="150" placeholder="ชื่อบริษัท / ร้าน / บุคคล" value="${esc(old?.payee || '')}"></div>
+          <input class="input" id="pv-payee" data-f="payee" maxlength="150" value="${esc(old?.payee || '')}"></div>
         <div class="field"><label for="pv-bank">ธนาคาร <span class="opt">ไม่บังคับ</span></label>
-          <input class="input" id="pv-bank" data-f="payBank" maxlength="100" placeholder="เช่น ไทยพาณิชย์" value="${esc(old?.payBank || '')}"></div>
+          <input class="input" id="pv-bank" data-f="payBank" maxlength="100" value="${esc(old?.payBank || '')}"></div>
         <div class="field"><label for="pv-acc">เลขบัญชี <span class="opt">ไม่บังคับ</span></label>
           <input class="input" id="pv-acc" data-f="payAccount" maxlength="50" inputmode="numeric" value="${esc(old?.payAccount || '')}"></div>
         <div class="field"><label class="req" for="pv-date" data-datelabel>วันที่</label>
@@ -53,7 +70,7 @@ export async function render(ctx) {
     </div>
 
     <div class="card pad stack-sm" data-jobbox>
-      <b>ข้อมูล Job</b>
+      <b>ข้อมูล Job <span class="opt" data-jopt>ไม่บังคับ · กรอกแล้วขึ้นในใบฟ้า</span></b>
       <div class="form-grid two">
         <div class="field"><label data-jreq for="pv-job">Job No.</label><input class="input" id="pv-job" data-f="jobNo" maxlength="50" value="${esc(old?.jobNo || '')}"></div>
         <div class="field"><label data-jreq for="pv-po">PO No.</label><input class="input" id="pv-po" data-f="poNo" maxlength="50" value="${esc(old?.poNo || '')}"></div>
@@ -70,7 +87,6 @@ export async function render(ctx) {
     <div class="card pad stack-sm">
       <div class="field"><label for="pv-note">หมายเหตุ <span class="opt">ไม่บังคับ</span></label>
         <input class="input" id="pv-note" data-f="note" maxlength="300" value="${esc(old?.note || '')}"></div>
-      <div><div class="label">สายอนุมัติ</div><div class="pv-chain" data-chain><span class="spin"></span></div></div>
     </div>
 
     <div class="submit-bar">
@@ -85,9 +101,11 @@ export async function render(ctx) {
     const k = ++st.seq;
     const d = document.createElement('div');
     d.className = 'pv-line-card'; d.dataset.line = k; d.dataset.cat = cat;
-    d.innerHTML = `<div class="cat-picker" data-cats>${cats.map((c) => `<button type="button" class="cat-opt ${c.code === cat ? 'on' : ''}" data-cat="${esc(c.code)}">${catIcon(c.code)}<span>${esc(c.name_th)}</span></button>`).join('')}</div>
-      <div class="pv-line"><input class="input" data-l="description" maxlength="300" placeholder="รายละเอียด เช่น ค่า Service งวด 50%" aria-label="รายละเอียด" value="${esc(desc)}">
-      <div class="input-group has-suf"><input type="number" class="input" data-l="amount" inputmode="decimal" step="0.01" min="0" placeholder="0.00" aria-label="จำนวนเงิน" value="${esc(amt)}"><span class="suf">บาท</span></div>
+    d.innerHTML = `<div class="cat-picker" data-cats>${cats.map((c) => `<button type="button" class="cat-opt ${c.code === cat ? 'on' : ''}" data-cat="${esc(c.code)}" title="${esc(CAT_HINT[c.code] || '')}">${catIcon(c.code)}<span>${esc(c.name_th)}</span></button>`).join('')}</div>
+      <div class="hint" data-cathint>${esc(CAT_HINT[cat] || '')}</div>
+      <div class="pv-line pv-line-lab"><span class="label">รายละเอียด</span><span class="label">จำนวนเงิน</span></div>
+      <div class="pv-line"><input class="input" data-l="description" maxlength="300" aria-label="รายละเอียด" value="${esc(desc)}">
+      <div class="input-group has-suf"><input type="number" class="input" data-l="amount" inputmode="decimal" step="0.01" min="0" aria-label="จำนวนเงิน" value="${esc(amt)}"><span class="suf">บาท</span></div>
       <button type="button" class="btn-icon sm" data-act="rm-line" aria-label="ลบบรรทัด">${icon('trash')}</button></div>`;
     linesBox.appendChild(d);
     renumber();
@@ -114,15 +132,16 @@ export async function render(ctx) {
       : job ? 'แผนกนี้ต้องกรอก <b>Job No., PO No., Cost sheet No.</b> และแนบ <b>Cost sheet, PO, Invoice</b>' : 'แนบใบเสร็จอย่างน้อย 1 ไฟล์';
     $('[data-datelabel]', el).textContent = adv ? 'วันที่จะใช้' : 'วันที่';
     $$('[data-cats]', el).forEach((c) => c.classList.toggle('hidden', adv));
-    $('[data-officehint]', el).innerHTML = mixedOffice() ? '<span class="err-text">ค่าใช้จ่ายสำนักงานต้องแยกเป็นอีกใบ (ไม่ปนกับหมวดอื่น)</span>'
-      : isOffice() ? 'หมวดค่าใช้จ่ายสำนักงาน → ส่งให้ผู้อนุมัติค่าใช้จ่ายสำนักงาน' : '';
-    $('[data-jobbox]', el).classList.toggle('hidden', !job && !(old?.jobNo));
+    $('[data-officehint]', el).innerHTML = mixedOffice() ? '<span class="err-text">ค่าใช้จ่ายสำนักงานต้องแยกเป็นอีกใบ (ไม่ปนกับหมวดอื่น)</span>' : '';
+    // ข้อมูล Job: แผนกเซลล์บังคับ · แผนกอื่นกรอกได้ (ไม่บังคับ) กรอกแล้วขึ้นในใบฟ้า
     $$('[data-jreq]', el).forEach((l) => l.classList.toggle('req', job && !adv));
+    $('[data-jopt]', el).classList.toggle('hidden', job && !adv);
     $('[data-filebox]', el).classList.toggle('hidden', adv);
     $$('[data-doc]', el).forEach((d) => {
-      const k = d.dataset.doc, show = job ? k !== 'receipt' : k === 'receipt' || (old?.docs?.[k] || []).length > 0;
+      // แผนกเซลล์: Cost sheet / PO / Invoice บังคับ · แผนกอื่น: ใบเสร็จตามกฎหมวด + แนบ Cost sheet / PO / Invoice เพิ่มได้
+      const k = d.dataset.doc, show = job ? k !== 'receipt' : true;
       d.classList.toggle('hidden', !show);
-      d.querySelector('label').classList.toggle('req', show && !adv && (job || needReceipt()));
+      d.querySelector('label').classList.toggle('req', show && !adv && (job || (k === 'receipt' && needReceipt())));
     });
   }
   // แนบใบเสร็จตามกฎหมวด: มีบรรทัดไหนเป็นหมวดที่ต้องแนบ → ต้องแนบ
@@ -131,16 +150,14 @@ export async function render(ctx) {
     $('[data-count]', el).textContent = `${lineRows().length} บรรทัด · ยอดก่อน VAT`;
     $('[data-total]', el).textContent = money(total()) + ' บาท';
   }
+  // ถามฐานข้อมูลว่าคนเบิกอยู่แผนกที่ต้องกรอก Job ไหม (ไม่แสดงสายอนุมัติบนฟอร์ม)
   const preview = debounce(async () => {
-    const box = $('[data-chain]', el);
     try {
       const r = await api.rpc('get_pv_preview', { p_requester: old ? old.requesterEmail : st.who, p_amount: total(), p_office: isOffice() }, { ttl: 30, quiet: true });
       if (!ctx.alive()) return;
       st.needJob = !!r.needJob;
       layout();
-      box.innerHTML = (r.steps || []).map((s, i) => `${i ? `<span class="arr">${icon('chevron-right', 'sm')}</span>` : ''}<span class="pv-step ${s.k === 'dept' ? 'dept' : 'fin'}${s.auto ? ' done' : ''}">
-        <span class="t">${esc(s.label)}</span><span class="n">${esc(s.names || '-')}</span></span>`).join('');
-    } catch (e) { box.innerHTML = `<span class="err-text">${esc(e.message)}</span>`; }
+    } catch { /* ฟอร์มยังกรอกได้ · ฐานข้อมูลตรวจซ้ำตอนส่ง */ }
   }, 300);
 
   function validate() {
@@ -191,6 +208,7 @@ export async function render(ctx) {
     on(el, 'click', '[data-cat]', (e, t) => {
       const card = t.closest('.pv-line-card'); card.dataset.cat = t.dataset.cat;
       $$('.cat-opt', card).forEach((o) => o.classList.toggle('on', o === t));
+      $('[data-cathint]', card).textContent = CAT_HINT[t.dataset.cat] || '';
       layout(); preview();
     }),
     on(el, 'input', '[data-l=amount]', () => { recalc(); preview(); }),
