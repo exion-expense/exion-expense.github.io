@@ -1,7 +1,7 @@
 // Dashboard ใบสำคัญจ่าย (บัญชี / ผู้บริหาร) — งานค้างแต่ละขั้น · กล่องเงิน · advance · ยอดแยกแผนก/Job · ใบค้างนาน
-import { api, money, esc, ymd, todayYMD } from '../core.js?v=10.1.2';
-import { icon, bars, empty, errorBox, skeleton, on, $ } from '../ui.js?v=10.1.2';
-import { pvRow } from './pv-common.js?v=10.1.2';
+import { api, money, esc, ymd, todayYMD } from '../core.js?v=10.1.3';
+import { icon, bars, empty, errorBox, skeleton, on, $ } from '../ui.js?v=10.1.3';
+import { pvRow } from './pv-common.js?v=10.1.3';
 
 const TILES = [['dept', 'รออนุมัติแผนก'], ['fin1', 'รอบัญชี 1'], ['fin2', 'รอบัญชี 2'], ['fin3', 'รอบัญชี 3'], ['pay', 'รอจ่ายเงิน'], ['returned', 'ตีกลับให้แก้']];
 

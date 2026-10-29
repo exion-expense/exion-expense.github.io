@@ -564,39 +564,56 @@ a.stat { text-decoration: none; color: inherit; display: block; }
 
 /* ใบฟ้า: กระดาษสีฟ้าเหมือนใบจริง (A4 แนวตั้ง) */
 .pv-preview { overflow-x: auto; padding: 4px; background: var(--line-2); border-radius: var(--r); }
-.pv-sheet { width: 780px; margin: 0 auto; background: #DCEFEF; color: #16324A; padding: 22px 24px 16px; font-size: 12.5px; line-height: 1.45; border-radius: 4px;
+/* สีกระดาษใบฟ้า (เลือกได้ตอนพิมพ์) */
+.pv-sheet { --pv-paper: #DCEFEF; --pv-head: #C4E2E3; --pv-line: #7FA8AE; --pv-ink: #16324A; --pv-pen: #1B3FA0; }
+.pv-sheet.pv-c-white { --pv-paper: #FFFFFF; --pv-head: #EEF0F3; --pv-line: #9AA0AE; --pv-ink: #17181C; --pv-pen: #1B3FA0; }
+.pv-sheet.pv-c-yellow { --pv-paper: #FFF6CF; --pv-head: #FBE9A6; --pv-line: #C9AE5B; --pv-ink: #3D3108; --pv-pen: #1B3FA0; }
+.pv-sheet.pv-c-pink { --pv-paper: #FCE6EC; --pv-head: #F7CFDA; --pv-line: #C98A9C; --pv-ink: #4A1626; --pv-pen: #1B3FA0; }
+.pv-sheet.pv-c-green { --pv-paper: #E3F4E5; --pv-head: #C9E8CD; --pv-line: #7FAE86; --pv-ink: #163A1C; --pv-pen: #1B3FA0; }
+/* ขนาด: เต็ม A4 = ตัวอักษร/ช่องใหญ่ขึ้น */
+.pv-sheet.pv-full { font-size: 14px; padding: 28px 30px 20px; }
+.pv-sheet.pv-full .pv-tbl td { height: 32px; } .pv-sheet.pv-full .pv-sig { grid-template-rows: auto 70px auto auto; }
+.pv-sheet.pv-full .pv-sig .ink img { max-height: 64px; } .pv-sheet.pv-full .pv-hd img { height: 52px; }
+.pv-sheet.pv-full .pv-payto div, .pv-sheet.pv-full .pv-foot div { min-height: 38px; }
+.pv-sheet.pv-half .pv-tbl td { height: 21px; padding: 2px 8px; } .pv-sheet.pv-half .pv-sig { grid-template-rows: auto 44px auto auto; }
+.pv-cut { border-top: 1.5px dashed #9AA0AE; margin-top: 6mm; padding-top: 1mm; font-size: 9px; color: #9AA0AE; text-align: center; }
+.pv-printopts { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin-bottom: 12px; }
+.pv-swatches { display: flex; gap: 6px; }
+.pv-swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--line); cursor: pointer; padding: 0; }
+.pv-swatch.on { border-color: var(--ink); box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink); }
+.pv-sheet { width: 780px; margin: 0 auto; background: var(--pv-paper); color: var(--pv-ink); padding: 22px 24px 16px; font-size: 12.5px; line-height: 1.45; border-radius: 4px;
   -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-.pv-sheet .pen { color: #1B3FA0; font-weight: 500; }
+.pv-sheet .pen { color: var(--pv-pen); font-weight: 500; }
 .pv-hd { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; }
 .pv-hd img { height: 42px; width: auto; }
 .pv-co b { display: block; font-size: 13.5px; }
-.pv-ttl { border: 1.5px solid #7FA8AE; border-radius: 6px; padding: 5px 16px; text-align: center; background: #C4E2E3; font-weight: 700; letter-spacing: .03em; }
+.pv-ttl { border: 1.5px solid var(--pv-line); border-radius: 6px; padding: 5px 16px; text-align: center; background: var(--pv-head); font-weight: 700; letter-spacing: .03em; }
 .pv-meta { display: grid; grid-template-columns: auto auto; gap: 1px 10px; font-size: 11.5px; margin-top: 6px; }
 .pv-meta b { font-family: ui-monospace, 'SF Mono', Menlo, monospace; }
 .pv-payto { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 14px; margin: 14px 0 8px; }
-.pv-payto div, .pv-foot div { border-bottom: 1px solid #7FA8AE; padding-bottom: 2px; min-height: 30px; }
+.pv-payto div, .pv-foot div { border-bottom: 1px solid var(--pv-line); padding-bottom: 2px; min-height: 30px; }
 .pv-payto small, .pv-foot small { display: block; font-size: 10px; opacity: .75; }
-.pv-tbl { width: 100%; border-collapse: collapse; border: 1.5px solid #7FA8AE; }
-.pv-tbl th { background: #C4E2E3; font-size: 10.5px; text-align: center; border: 1px solid #7FA8AE; padding: 4px 6px; }
-.pv-tbl td { border: 1px solid #7FA8AE; padding: 4px 9px; height: 24px; }
+.pv-tbl { width: 100%; border-collapse: collapse; border: 1.5px solid var(--pv-line); }
+.pv-tbl th { background: var(--pv-head); font-size: 10.5px; text-align: center; border: 1px solid var(--pv-line); padding: 4px 6px; }
+.pv-tbl td { border: 1px solid var(--pv-line); padding: 4px 9px; height: 24px; }
 .pv-tbl .r { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; } .pv-tbl .c { text-align: center; }
-.pv-tbl tr.tot td { font-weight: 700; background: #C4E2E3; }
+.pv-tbl tr.tot td { font-weight: 700; background: var(--pv-head); }
 .pv-foot { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 14px; margin-top: 12px; }
 .pv-foot .w3 { grid-column: 1 / -1; }
-.pv-sigs { display: grid; grid-template-columns: repeat(5, 1fr); margin-top: 14px; border: 1.5px solid #7FA8AE; }
-.pv-sig { border-right: 1px solid #7FA8AE; text-align: center; display: grid; grid-template-rows: auto 52px auto auto; padding-bottom: 6px; }
+.pv-sigs { display: grid; grid-template-columns: repeat(5, 1fr); margin-top: 14px; border: 1.5px solid var(--pv-line); }
+.pv-sig { border-right: 1px solid var(--pv-line); text-align: center; display: grid; grid-template-rows: auto 52px auto auto; padding-bottom: 6px; }
 .pv-sig:last-child { border-right: 0; }
-.pv-sig .lab { font-size: 10px; font-weight: 600; background: #C4E2E3; padding: 4px 2px; border-bottom: 1px solid #7FA8AE; }
+.pv-sig .lab { font-size: 10px; font-weight: 600; background: var(--pv-head); padding: 4px 2px; border-bottom: 1px solid var(--pv-line); }
 .pv-sig .ink { display: flex; align-items: flex-end; justify-content: center; padding: 2px 6px; }
 .pv-sig .ink img { max-height: 48px; max-width: 100%; object-fit: contain; }
-.pv-sig .nm-ink { font-family: 'Segoe Script', 'Bradley Hand', 'Snell Roundhand', cursive; font-size: 14px; line-height: 1.15; color: #1B3FA0; text-align: center; overflow-wrap: anywhere; }
-.pv-sig .nm { font-size: 10.5px; line-height: 1.3; border-top: 1px dotted #7FA8AE; margin: 0 6px; padding-top: 2px; overflow-wrap: anywhere; }
+.pv-sig .nm-ink { font-family: 'Segoe Script', 'Bradley Hand', 'Snell Roundhand', cursive; font-size: 14px; line-height: 1.15; color: var(--pv-pen); text-align: center; overflow-wrap: anywhere; }
+.pv-sig .nm { font-size: 10.5px; line-height: 1.3; border-top: 1px dotted var(--pv-line); margin: 0 6px; padding-top: 2px; overflow-wrap: anywhere; }
 .pv-sig .dt { font-size: 10.5px; opacity: .8; }
 .pv-trail { margin-top: 6px; font-size: 10.5px; opacity: .8; }
 .pv-print-root { display: none; }
 @media print {
   body.printing-pv > *:not(.pv-print-root) { display: none !important; }
   body.printing-pv .pv-print-root { display: block; }
-  body.printing-pv .pv-sheet { width: auto; border-radius: 0; }
-  @page { size: A4; margin: 12mm; }
+  body.printing-pv .pv-sheet { width: 718px; border-radius: 0; margin: 0 auto; }
+  @page { size: A4 portrait; margin: 10mm; }
 }

@@ -1,6 +1,6 @@
 // ใช้ร่วมหน้าใบสำคัญจ่าย (ใบฟ้า): ป้ายสถานะ / แถวรายการ / ใบฟ้าสำหรับพิมพ์
-import { api, money, fmtDate, esc } from '../core.js?v=10.1.2';
-import { icon, catIcon } from '../ui.js?v=10.1.2';
+import { api, money, fmtDate, esc } from '../core.js?v=10.1.3';
+import { icon, catIcon } from '../ui.js?v=10.1.3';
 
 export const KIND = { PCJ: 'มี Job', PCN: 'ทั่วไป', ADV: 'Advance' };
 export const DOCS = [['costSheet', 'Cost sheet'], ['po', 'PO'], ['invoice', 'Invoice'], ['receipt', 'ใบเสร็จ']];
@@ -65,14 +65,25 @@ export function signers(v) {
   ];
 }
 
+/** ตัวเลือกพิมพ์: ขนาด (ครึ่ง / เต็ม A4) + สีกระดาษ · จำไว้ในเครื่อง */
+export const PRINT_SIZES = [['half', 'ครึ่ง A4'], ['full', 'เต็ม A4']];
+export const PRINT_COLORS = [['blue', 'ฟ้า', '#DCEFEF'], ['white', 'ขาว', '#FFFFFF'], ['yellow', 'เหลือง', '#FFF6CF'], ['pink', 'ชมพู', '#FCE6EC'], ['green', 'เขียว', '#E3F4E5']];
+const PRINT_KEY = 'exion_pv_print';
+export function printPrefs() {
+  let p = {};
+  try { p = JSON.parse(localStorage.getItem(PRINT_KEY) || '{}'); } catch { /* */ }
+  return { size: PRINT_SIZES.some(([k]) => k === p.size) ? p.size : 'half', color: PRINT_COLORS.some(([k]) => k === p.color) ? p.color : 'blue' };
+}
+export function savePrintPrefs(p) { try { localStorage.setItem(PRINT_KEY, JSON.stringify(p)); } catch { /* */ } }
+
 /** HTML ใบฟ้า (ใช้ทั้งดูตัวอย่างและพิมพ์) */
-export function voucherHtml(v) {
+export function voucherHtml(v, { size = 'half', color = 'blue' } = {}) {
   const lines = v.lines || [];
-  const pad = Math.max(0, 6 - lines.length);
+  const pad = Math.max(0, (size === 'full' ? 12 : 4) - lines.length);
   const others = (v.steps || []).filter((s) => s.k === 'fin2' || s.k === 'fin3').filter((s) => s.state === 'done')
     .map((s) => `${s.label}: ${esc(s.byName)} ${thd(s.at)}`);
   if (v.paidAt) others.push(`จ่ายแล้ว ${thd(v.paidAt)}`);
-  return `<div class="pv-sheet">
+  return `<div class="pv-sheet pv-${size} pv-c-${color}">
     <div class="pv-hd">
       <img src="brand/logo.png" alt="EXION Thailand">
       <div class="pv-co"><b>บริษัท เอ็กซิออน (ประเทศไทย) จำกัด</b>EXION (THAILAND) CO., LTD.</div>
@@ -120,12 +131,21 @@ export function hydrateSigs(root) {
   });
 }
 /** พิมพ์ใบฟ้า: วางใบลงชั้นพิมพ์ แล้วเรียกหน้าพิมพ์ของเบราว์เซอร์ */
-export function printVoucher(v) {
+// พื้นที่พิมพ์บน A4 (ขอบ 10 มม.) เป็นพิกเซล: กว้าง 190 มม. · ครึ่งแผ่น ≈ 128 มม. (เผื่อเส้นตัด) · เต็มแผ่น 277 มม.
+const PAGE_W = 718, PAGE_H = { half: 484, full: 1040 };
+export function printVoucher(v, { size = 'half', color = 'blue' } = {}) {
   document.querySelector('.pv-print-root')?.remove();
   const root = document.createElement('div');
   root.className = 'pv-print-root';
-  root.innerHTML = voucherHtml(v);
+  root.innerHTML = voucherHtml(v, { size, color }) + (size === 'half' ? '<div class="pv-cut">✂ ตัดตามเส้นนี้ (ครึ่ง A4)</div>' : '');
   document.body.appendChild(root);
+  // ย่อให้พอดีพื้นที่: วัดขนาดจริงนอกจอก่อน แล้วตั้ง zoom
+  const sheet = root.querySelector('.pv-sheet');
+  root.style.cssText = `display:block;position:fixed;left:-99999px;top:0;width:${PAGE_W}px`;
+  sheet.style.width = PAGE_W + 'px';
+  const z = Math.min(1, PAGE_H[size] / sheet.offsetHeight);
+  sheet.style.width = ''; root.style.cssText = '';
+  if (z < 1) sheet.style.zoom = String(Math.floor(z * 100) / 100);
   hydrateSigs(root);
   document.body.classList.add('printing-pv');
   const done = () => { document.body.classList.remove('printing-pv'); root.remove(); window.removeEventListener('afterprint', done); };
