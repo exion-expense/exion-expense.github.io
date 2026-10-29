@@ -1,6 +1,6 @@
 // ใช้ร่วมหน้าใบสำคัญจ่าย (ใบฟ้า): ป้ายสถานะ / แถวรายการ / ใบฟ้าสำหรับพิมพ์
-import { api, money, fmtDate, esc } from '../core.js?v=10.1.6';
-import { icon, catIcon } from '../ui.js?v=10.1.6';
+import { api, money, fmtDate, esc } from '../core.js?v=10.1.7';
+import { icon, catIcon } from '../ui.js?v=10.1.7';
 
 export const KIND = { PCJ: 'มี Job', PCN: 'ทั่วไป', ADV: 'Advance' };
 /** ใบทดลอง (ลบทิ้งทีหลัง) */
