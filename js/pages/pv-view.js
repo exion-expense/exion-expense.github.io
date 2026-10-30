@@ -1,8 +1,8 @@
 // ใบสำคัญจ่าย 1 ใบ — ขั้นอนุมัติ / กดอนุมัติ-ตีกลับ / บัญชี 1 เลือก VAT + หัก ณ ที่จ่ายหลายอัตรา / ส่วนของบัญชี (รอบจ่าย · วันที่ + No. ของบัญชี · แก้ไข · สลิป)
 // จ่ายเงิน (+ สลิปโอน) / เคลียร์ advance / พิมพ์ใบฟ้า
-import { api, money, fmtDate, fmtDateTime, esc, todayYMD, catName, loadPettyCategories } from '../core.js?v=10.3.0';
-import { icon, catIcon, toast, toastError, confirmBox, promptBox, busy, withBtn, sheet, thumbs, hydrateThumbs, receiptPicker, errorBox, skeleton, on, $, $$ } from '../ui.js?v=10.3.0';
-import { DOCS, KIND, isTest, stageBadge, kindBadge, roundBadge, roundLabel, whtLines, remarkText, deptInfo, lineDept, voucherHtml, hydrateSigs, printVoucher, PRINT_SIZES, PRINT_COLORS, printPrefs, savePrintPrefs } from './pv-common.js?v=10.3.0';
+import { api, money, fmtDate, fmtDateTime, esc, todayYMD, catName, loadPettyCategories } from '../core.js?v=10.3.1';
+import { icon, catIcon, toast, toastError, confirmBox, promptBox, busy, withBtn, sheet, thumbs, hydrateThumbs, receiptPicker, errorBox, skeleton, on, $, $$ } from '../ui.js?v=10.3.1';
+import { DOCS, KIND, isTest, stageBadge, kindBadge, roundBadge, roundLabel, whtLines, remarkText, deptInfo, lineDept, roundNet, roundAdj, roundText, roundSeg, voucherHtml, hydrateSigs, printVoucher, PRINT_SIZES, PRINT_COLORS, printPrefs, savePrintPrefs } from './pv-common.js?v=10.3.1';
 
 const ACT = { submit: 'ส่งใบเบิก', resubmit: 'แก้แล้วส่งใหม่', approve: 'อนุมัติ', reject: 'ตีกลับ', pay: 'จ่ายเงิน', cancel: 'ยกเลิก',
   adv_clear: 'ส่งเคลียร์', adv_back: 'ตีกลับการเคลียร์', adv_ok: 'เคลียร์เรียบร้อย', edit: 'แก้ไขใบ', round: 'เลือกรอบจ่าย', slip: 'แนบสลิป' };
@@ -21,7 +21,7 @@ export async function render(ctx) {
   const id = query.id;
   if (!id) { ctx.go('/pv'); return; }
   // vat: null = ยังไม่เลือก · wht: null = ยังไม่เลือก / [] = ไม่หัก / [{rate, base}]
-  const st = { v: null, vat: null, wht: null, clr: null, slip: null, slip2: null, cash: null };
+  const st = { v: null, vat: null, wht: null, rnd: '', clr: null, slip: null, slip2: null, cash: null };   // rnd: ปัดเศษ '' / DOWN / UP
 
   async function load() {
     try {
@@ -30,7 +30,7 @@ export async function render(ctx) {
       ctx.setTitle(st.v.id);
       // บัญชี 1 เคยเลือก VAT / หัก ณ ที่จ่ายแล้ว (ใบถูกตีกลับมา) → ใช้ค่าเดิม ไม่ต้องเลือกใหม่
       if (st.v.isFin1Step && st.vat == null && (st.v.history || []).some((h) => h.act === 'approve' && h.label === 'บัญชี 1')) {
-        st.vat = Number(st.v.vatRate) || 0; st.wht = whtLines(st.v).map((w) => ({ rate: Number(w.rate), base: Number(w.base) }));
+        st.vat = Number(st.v.vatRate) || 0; st.wht = whtLines(st.v).map((w) => ({ rate: Number(w.rate), base: Number(w.base) })); st.rnd = st.v.roundMode || '';
       }
       st.cash = (st.v.canPay || st.v.canSetRound) ? await api.rpc('get_pv_cash_check', {}, { quiet: true }).catch(() => null) : null;
       if (ctx.alive()) paint();
@@ -81,6 +81,7 @@ export async function render(ctx) {
           <tr><td></td><td></td><td class="muted">ยอดก่อน VAT</td><td class="r">${money(v.base)}</td></tr>
           ${Number(v.vatAmount) ? `<tr><td></td><td></td><td class="muted">VAT ${Number(v.vatRate)}%</td><td class="r">${money(v.vatAmount)}</td></tr>` : ''}
           ${W.map((w) => `<tr><td></td><td></td><td class="muted">หัก ณ ที่จ่าย ${Number(w.rate)}% · ฐาน ${money(w.base)}</td><td class="r">(${money(w.amount)})</td></tr>`).join('')}
+          ${roundAdj(v) ? `<tr><td></td><td></td><td class="muted">ปัดเศษสตางค์</td><td class="r">${roundText(roundAdj(v))}</td></tr>` : ''}
         </tbody><tfoot><tr><td></td><td></td><td>ยอดจ่ายสุทธิ</td><td class="r">${money(v.amount)}</td></tr></tfoot></table></div>
       </div>
 
@@ -101,11 +102,12 @@ export async function render(ctx) {
   function taxTotals(v) {
     const b = Number(v.base) || 0, va = st.vat ? r2(b * st.vat / 100) : 0;
     const wa = (st.wht || []).reduce((s, w) => s + r2((Number(w.base) || 0) * w.rate / 100), 0);
-    return { b, va, wa: r2(wa), net: r2(b + va - wa) };
+    const raw = r2(b + va - r2(wa)), net = roundNet(raw, st.rnd);
+    return { b, va, wa: r2(wa), raw, net, adj: r2(net - raw) };
   }
   function vatCalc(v) {
     const t = taxTotals(v);
-    return `${money(t.b)} ${st.vat ? `+ VAT ${money(t.va)}` : ''} ${t.wa ? `− หัก ณ ที่จ่าย ${money(t.wa)}` : ''} = <b class="amount">${money(t.net)}</b> บาท`;
+    return `${money(t.b)} ${st.vat ? `+ VAT ${money(t.va)}` : ''} ${t.wa ? `− หัก ณ ที่จ่าย ${money(t.wa)}` : ''} = ${t.adj ? `${money(t.raw)} · ปัดเศษ ${roundText(t.adj)} = ` : ''}<b class="amount">${money(t.net)}</b> บาท`;
   }
   function taxBox(v) {
     const vat = st.vat, W = st.wht;
@@ -119,6 +121,7 @@ export async function render(ctx) {
           <span class="amount nowrap" data-whtamt>${money(r2((Number(w.base) || 0) * w.rate / 100))}</span>
           <button type="button" class="btn-icon sm" data-whtrm="${i}" aria-label="ลบบรรทัดหัก ณ ที่จ่าย">${icon('trash')}</button></div>`).join('')}
         <button type="button" class="btn btn-ghost btn-sm" data-act="wht-add">${icon('plus', 'sm')} เพิ่มอีกอัตรา</button></div>` : ''}
+      <div data-rndbox>${roundSeg(taxTotals(v).raw, st.rnd)}</div>
       <div class="text-sm" data-vatcalc>${vatCalc(v)}</div>`;
   }
   const repaintTax = () => { const b = $('[data-taxbox]', el); if (b) b.innerHTML = taxBox(st.v); };
@@ -223,7 +226,7 @@ export async function render(ctx) {
       try {
         const fin1 = action === 'approve' && v.isFin1Step;
         const r = await api.rpc('pv_decide', { p_id: v.id, p_action: action, p_remark: remark, p_vat: fin1 ? st.vat : null,
-          p_wht_lines: fin1 ? st.wht.map((w) => ({ rate: w.rate, base: r2(w.base) })) : null });
+          p_wht_lines: fin1 ? st.wht.map((w) => ({ rate: w.rate, base: r2(w.base) })) : null, p_round: fin1 ? st.rnd : null });
         await after(action === 'approve' ? (r.status === 'Approved' ? 'อนุมัติครบแล้ว · รอจ่ายเงิน' : `อนุมัติแล้ว · ต่อไป ${r.waiting}`) : `ตีกลับแล้ว · ไปที่ ${r.waiting}`);
       } catch (e) { toastError(e); }
     });
@@ -322,6 +325,7 @@ export async function render(ctx) {
   await load();
   const offs = [
     on(el, 'click', '[data-vat]', (e, t) => { st.vat = Number(t.dataset.vat); repaintTax(); }),
+    on(el, 'click', '[data-rnd]', (e, t) => { st.rnd = t.dataset.rnd; repaintTax(); }),
     on(el, 'click', '[data-whtmode]', (e, t) => {
       if (t.dataset.whtmode === 'none') st.wht = [];
       else if (!st.wht?.length) st.wht = [{ rate: 3, base: Number(st.v.base) || 0 }];
@@ -335,6 +339,7 @@ export async function render(ctx) {
       w.base = Number(t.value) || 0;
       row.querySelector('[data-whtamt]').textContent = money(r2(w.base * w.rate / 100));
       const c = $('[data-vatcalc]', el); if (c) c.innerHTML = vatCalc(st.v);
+      const rb = $('[data-rndbox]', el); if (rb) rb.innerHTML = roundSeg(taxTotals(st.v).raw, st.rnd);
     }),
     on(el, 'click', '[data-round]', (e, t) => setRound(t, t.dataset.round)),
     on(el, 'click', '[data-act]', (e, t) => {

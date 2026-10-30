@@ -1,9 +1,9 @@
 // ขอเบิก Petty Cash (ใบสำคัญจ่าย) — ค่าใช้จ่าย / Advance entertain · เลือกหมวดทุกบรรทัด · HR กรอกแทนได้ · แก้ใบที่ถูกตีกลับ (?id=)
 // บัญชีแก้ไขใบ (?id=&fin=1): แก้ได้ทุกช่อง + VAT / หัก ณ ที่จ่าย + รหัสแผนก · ไม่เริ่มสายอนุมัติใหม่
 // บัญชี (ทั้งตอนเบิกเอง / กรอกแทน / แก้ไข) เลือกแผนกรายบรรทัดได้ = ลงต้นทุนแยกทีม
-import { api, money, esc, todayYMD, loadPettyCategories } from '../core.js?v=10.3.0';
-import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.3.0';
-import { DOCS, whtLines } from './pv-common.js?v=10.3.0';
+import { api, money, esc, todayYMD, loadPettyCategories } from '../core.js?v=10.3.1';
+import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.3.1';
+import { DOCS, whtLines, roundNet, roundAdj, roundText, roundSeg } from './pv-common.js?v=10.3.1';
 
 // คำอธิบายหมวด: อะไรเข้าหมวดนี้บ้าง (การ์ดตอนชี้ที่ปุ่มหมวด + ใต้หมวดที่เลือก)
 const CAT_HINT = {
@@ -63,7 +63,7 @@ export async function render(ctx) {
   const draft = old ? null : loadJSON(DRAFT_KEY, null);
   const src = old || draft || {};
   const st = { type: (old?.kind === 'ADV' || draft?.type === 'ADV') ? 'ADV' : 'EXP', who: draft?.who || '', needJob: false, seq: 0, whoDept: '', whoOpen: false,
-    vat: fin ? Number(old.vatRate) || 0 : 0, wht: fin ? whtLines(old).map((w) => ({ rate: Number(w.rate), base: Number(w.base) })) : [] };
+    vat: fin ? Number(old.vatRate) || 0 : 0, wht: fin ? whtLines(old).map((w) => ({ rate: Number(w.rate), base: Number(w.base) })) : [], rnd: fin ? old.roundMode || '' : '' };
   const staff = (meta.staff || []).filter((x) => x.email !== meta.me.email);
   const up = (a) => (a || []).map((d) => String(d).toUpperCase());
   const jobDepts = up(meta.jobDepts), jobCats = up(meta.jobCats || ['MATERIAL', 'SERVICE']), entCats = up(meta.entCats || ['ENT']);
@@ -260,7 +260,8 @@ export async function render(ctx) {
   // ── VAT / หัก ณ ที่จ่าย (เฉพาะบัญชีแก้ไข) ──
   function taxTotals() {
     const b = total(), va = r2(b * st.vat / 100), wa = r2(st.wht.reduce((s, w) => s + r2((Number(w.base) || 0) * w.rate / 100), 0));
-    return { b, va, wa, net: r2(b + va - wa) };
+    const raw = r2(b + va - wa), net = roundNet(raw, st.rnd);
+    return { b, va, wa, raw, net, adj: r2(net - raw) };
   }
   function paintTax() {
     const box = $('[data-taxbox]', el); if (!box) return;
@@ -273,8 +274,9 @@ export async function render(ctx) {
           <span class="amount nowrap">${money(r2((Number(w.base) || 0) * w.rate / 100))}</span>
           <button type="button" class="btn-icon sm" data-whtrm="${i}" aria-label="ลบบรรทัดหัก ณ ที่จ่าย">${icon('trash')}</button></div>`).join('')}
         <button type="button" class="btn btn-ghost btn-sm" data-act="wht-add">${icon('plus', 'sm')} เพิ่มหัก ณ ที่จ่าย</button></div>
-      <div class="text-sm">${money(t.b)} ${st.vat ? `+ VAT ${money(t.va)}` : ''} ${t.wa ? `− หัก ณ ที่จ่าย ${money(t.wa)}` : ''} = <b class="amount">${money(t.net)}</b> บาท
-        ${paid && Math.abs(t.net - Number(old.amount)) > 0.004 ? `<span class="err-text"> · ต้องเท่ายอดที่จ่ายไปแล้ว ${money(old.amount)}</span>` : ''}</div>`;
+      <div>${roundSeg(t.raw, st.rnd)}</div>
+      <div class="text-sm">${money(t.b)} ${st.vat ? `+ VAT ${money(t.va)}` : ''} ${t.wa ? `− หัก ณ ที่จ่าย ${money(t.wa)}` : ''} = ${t.adj ? `${money(t.raw)} · ปัดเศษ ${roundText(t.adj)} = ` : ''}<b class="amount">${money(t.net)}</b> บาท
+        ${paid && Math.abs(t.raw - r2(Number(old.amount) - roundAdj(old))) > 0.004 ? `<span class="err-text"> · ยอดก่อนปัดต้องเท่าเดิม ${money(r2(Number(old.amount) - roundAdj(old)))} (จ่ายแล้ว แก้ได้แค่การปัดเศษ)</span>` : ''}</div>`;
     recalc();
   }
 
@@ -323,7 +325,7 @@ export async function render(ctx) {
           const docs = await uploadDocs(set, true);
           set('กำลังบันทึก…');
           return api.rpc('pv_fin_edit', { p: { id: old.id, ...fields(), deptCode: val('deptCode'), docs, vatRate: st.vat,
-            whtLines: st.wht.map((w) => ({ rate: w.rate, base: r2(w.base) })) } });
+            whtLines: st.wht.map((w) => ({ rate: w.rate, base: r2(w.base) })), roundMode: st.rnd } });
         });
         toast(res.changed ? 'บันทึกการแก้ไขแล้ว · แจ้งคนเบิกแล้ว' : 'ไม่มีอะไรเปลี่ยน');
         ctx.go('/pv/view?id=' + encodeURIComponent(old.id));
@@ -458,6 +460,7 @@ export async function render(ctx) {
     on(el, 'input', '[data-l=amount]', () => { recalc(); preview(); if (fin) paintTax(); }),
     // VAT / หัก ณ ที่จ่าย (บัญชีแก้ไข)
     on(el, 'click', '[data-vat]', (e, t) => { st.vat = Number(t.dataset.vat); paintTax(); }),
+    on(el, 'click', '[data-rnd]', (e, t) => { st.rnd = t.dataset.rnd; paintTax(); }),
     on(el, 'click', '[data-whtrate]', (e, t) => { st.wht[+t.closest('[data-whti]').dataset.whti].rate = Number(t.dataset.whtrate); paintTax(); }),
     on(el, 'click', '[data-whtrm]', (e, t) => { st.wht.splice(+t.dataset.whtrm, 1); paintTax(); }),
     on(el, 'change', '[data-whtbase]', (e, t) => { st.wht[+t.closest('[data-whti]').dataset.whti].base = Number(t.value) || 0; paintTax(); }),

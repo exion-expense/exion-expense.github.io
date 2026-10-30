@@ -1,6 +1,6 @@
 // ใช้ร่วมหน้าใบสำคัญจ่าย (ใบฟ้า): ป้ายสถานะ / แถวรายการ / ใบฟ้าสำหรับพิมพ์
-import { api, money, fmtDate, esc } from '../core.js?v=10.3.0';
-import { icon, catIcon } from '../ui.js?v=10.3.0';
+import { api, money, fmtDate, esc } from '../core.js?v=10.3.1';
+import { icon, catIcon } from '../ui.js?v=10.3.1';
 
 export const KIND = { PCJ: 'มี Job', PCN: 'ทั่วไป', ADV: 'Advance' };
 /** ใบทดลอง (ลบทิ้งทีหลัง) */
@@ -91,6 +91,26 @@ export function whtLines(v) {
   if (v.whtLines?.length) return v.whtLines;
   return Number(v.whtAmount) ? [{ rate: Number(v.whtRate), base: Number(v.base), amount: Number(v.whtAmount) }] : [];
 }
+/** ปัดเศษสตางค์ไปที่ 25 สตางค์ (เงินสดไม่มีเหรียญ .12) · บัญชีเลือก · ฐานข้อมูลคำนวณซ้ำตอนบันทึก */
+export const ROUND_MODES = [['', 'ไม่ปัด'], ['DOWN', 'ปัดลง'], ['UP', 'ปัดขึ้น']];
+export function roundNet(raw, mode) {
+  const s = Math.round((Number(raw) || 0) * 100);
+  return (mode === 'UP' ? Math.ceil(s / 25) * 25 : mode === 'DOWN' ? Math.floor(s / 25) * 25 : s) / 100;
+}
+/** ยอดปัดของใบ (ยอดสุทธิ − ยอดก่อนปัด) · 0 = ไม่ได้ปัด */
+export function roundAdj(v) {
+  const raw = Math.round(((Number(v.base) || 0) + (Number(v.vatAmount) || 0) - (Number(v.whtAmount) || 0)) * 100);
+  const d = Math.round((Number(v.amount) || 0) * 100) - raw;
+  return Math.abs(d) < 25 ? d / 100 : 0;   // ยอดต่างเกิน 25 สตางค์ = ไม่ใช่การปัด (เช่นใบแบบเดิม)
+}
+export const roundText = (a) => (a > 0 ? '+' + money(a) : `(${money(-a)})`);
+/** ปุ่มเลือกการปัด (ใส่ในกล่อง VAT / หัก ณ ที่จ่าย) */
+export function roundSeg(raw, mode) {
+  const even = roundNet(raw, 'UP') === roundNet(raw, 'DOWN');
+  return `<div class="text-sm muted mb-8">ปัดเศษสตางค์ <span class="opt">${even ? 'ยอดลงตัวแล้ว' : 'จ่ายเงินสดเศษนี้ไม่ได้ · เลือกปัด'}</span></div>
+    <div class="seg">${ROUND_MODES.map(([k, l]) => `<button type="button" data-rnd="${k}" class="${(mode || '') === k ? 'on' : ''}">${l}${k ? ` <span class="text-xs">${money(roundNet(raw, k))}</span>` : ''}</button>`).join('')}</div>`;
+}
+
 /** หมายเหตุ + วันที่ต้องใช้เงิน (ต่อท้าย) */
 export function remarkText(v) {
   return [v.note, v.needDate ? `ต้องการใช้เงินวันที่ ${thd(v.needDate)}` : ''].filter(Boolean).join(' · ');
@@ -107,7 +127,7 @@ export function deptInfo(v) {
 /** HTML ใบฟ้า (ใช้ทั้งดูตัวอย่างและพิมพ์) · No. = เลขของบัญชี (กรอกเอง) · ID document = เลขใบในระบบ */
 export function voucherHtml(v, { size = 'half', color = 'blue' } = {}) {
   const lines = v.lines || [];
-  const dpt = deptInfo(v);
+  const dpt = deptInfo(v), adj = roundAdj(v);
   const pad = Math.max(0, (size === 'full' ? 12 : 4) - lines.length);
   const others = (v.steps || []).filter((s) => s.k === 'fin2' || s.k === 'fin3').filter((s) => s.state === 'done')
     .map((s) => `${s.label}: ${esc(s.byName)} ${thd(s.at)}`);
@@ -134,6 +154,7 @@ export function voucherHtml(v, { size = 'half', color = 'blue' } = {}) {
         ${'<tr><td>&nbsp;</td><td></td><td></td></tr>'.repeat(pad)}
         ${Number(v.vatAmount) ? `<tr><td></td><td class="r">VAT ${Number(v.vatRate)}%</td><td class="r pen">${money(v.vatAmount)}</td></tr>` : ''}
         ${whtLines(v).map((w) => `<tr><td></td><td class="r">หัก ณ ที่จ่าย ${Number(w.rate)}% / WHT${Math.abs(Number(w.base) - Number(v.base)) > 0.004 ? ` (ฐาน ${money(w.base)})` : ''}</td><td class="r pen">(${money(w.amount)})</td></tr>`).join('')}
+        ${adj ? `<tr><td></td><td class="r">ปัดเศษ / ROUNDING</td><td class="r pen">${roundText(adj)}</td></tr>` : ''}
         <tr class="tot"><td></td><td class="r">รวมทั้งสิ้น / TOTAL</td><td class="r">${money(v.amount)}</td></tr>
       </tbody>
     </table>
