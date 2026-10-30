@@ -1,9 +1,9 @@
 // ขอเบิก Petty Cash (ใบสำคัญจ่าย) — ค่าใช้จ่าย / Advance entertain · เลือกหมวดทุกบรรทัด · HR กรอกแทนได้ · แก้ใบที่ถูกตีกลับ (?id=)
 // บัญชีแก้ไขใบ (?id=&fin=1): แก้ได้ทุกช่อง + VAT / หัก ณ ที่จ่าย + รหัสแผนก · ไม่เริ่มสายอนุมัติใหม่
 // บัญชี (ทั้งตอนเบิกเอง / กรอกแทน / แก้ไข) เลือกแผนกรายบรรทัดได้ = ลงต้นทุนแยกทีม
-import { api, money, esc, todayYMD, loadPettyCategories } from '../core.js?v=10.4.0';
-import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.4.0';
-import { DOCS, whtLines, roundNet, roundAdj, roundText, roundSeg } from './pv-common.js?v=10.4.0';
+import { api, money, esc, todayYMD, loadPettyCategories } from '../core.js?v=10.4.1';
+import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.4.1';
+import { DOCS, whtLines, roundNet, roundAdj, roundText, roundSeg } from './pv-common.js?v=10.4.1';
 
 // คำอธิบายหมวด: อะไรเข้าหมวดนี้บ้าง (การ์ดตอนชี้ที่ปุ่มหมวด + ใต้หมวดที่เลือก)
 const CAT_HINT = {
@@ -72,6 +72,9 @@ export async function render(ctx) {
   const catOf = (code) => cats.find((c) => c.code === code);
   const pickers = {};
   const paid = fin && old.status === 'Paid';
+  // บัญชี 1 กรอกเอง (เบิกเอง / เบิกแทน) → ไม่ผ่านขั้นอนุมัติ ไปรอจ่ายทันที · ใส่ VAT / หัก ณ ที่จ่าย / ปัดเศษ ในฟอร์มนี้เลย
+  const fin1 = !fin && !!meta.isFin1;
+  const tax = fin || fin1;
   // แผนกรายบรรทัด (ลงต้นทุนแยกทีม): เฉพาะบัญชี · ว่าง = ตามแผนกของใบ · สายอนุมัติไม่เปลี่ยน
   const lineDeptOn = !!meta.isFin && (meta.deptCodes || []).length > 0;
   const deptOpts = (sel) => `<option value="">ตามแผนกของใบ</option>
@@ -82,6 +85,7 @@ export async function render(ctx) {
   <div class="stack">
     ${draft ? `<div class="alert" data-draftbar>${icon('info')}<div class="grow">กู้ข้อมูลที่กรอกค้างไว้แล้ว · ไฟล์แนบต้องแนบใหม่</div><button type="button" class="btn btn-ghost btn-sm" data-act="draft-clear">เริ่มใหม่</button></div>` : ''}
     ${old && !fin ? `<div class="alert bad">${icon('alert')}<div><b>ถูกตีกลับ:</b> ${esc(old.remark || '-')}<br><span class="text-sm">แก้ไขแล้วกดส่งใหม่ ใบจะเริ่มอนุมัติใหม่ตั้งแต่ขั้นแรก (เลขเดิม ${esc(old.id)})</span></div></div>` : ''}
+    ${fin1 ? `<div class="alert ok">${icon('check')}<div><b>คุณเป็นบัญชี 1</b> · ใบนี้ไม่ต้องผ่านขั้นอนุมัติ ส่งแล้วไป<b>รอจ่ายเงินทันที</b> (ทั้งเบิกเองและเบิกแทน) — ใส่ VAT / หัก ณ ที่จ่าย / ปัดเศษ ให้ครบก่อนส่ง</div></div>` : ''}
     ${fin ? `<div class="alert">${icon('edit')}<div><b>บัญชีแก้ไขใบ ${esc(old.id)}</b> · ${esc(old.requesterName)}<br><span class="text-sm">ไม่เริ่มสายอนุมัติใหม่ · ระบบบันทึกว่าแก้อะไรในประวัติ และแจ้งคนเบิก${paid ? ' · <b>ใบนี้จ่ายแล้ว แก้ยอดเงินไม่ได้</b>' : ''}</span></div></div>` : ''}
     ${!fin ? `<div class="card pad stack-sm">
       ${!old ? `<div class="seg" role="tablist" data-type>
@@ -115,14 +119,14 @@ export async function render(ctx) {
     </div>
 
     <div class="card pad stack-sm">
-      <div class="flex between wrap"><b>รายการ</b><span class="text-sm muted">${fin ? 'ยอดก่อน VAT' : 'ยอดก่อน VAT · บัญชีเป็นคนใส่ VAT / หัก ณ ที่จ่าย'}</span></div>
+      <div class="flex between wrap"><b>รายการ</b><span class="text-sm muted">${tax ? 'ยอดก่อน VAT' : 'ยอดก่อน VAT · บัญชีเป็นคนใส่ VAT / หัก ณ ที่จ่าย'}</span></div>
       <p class="hint" data-officehint></p>
       ${lineDeptOn ? '<p class="hint">บัญชี: เลือก "ลงต้นทุนแผนก" ได้ทีละบรรทัด เช่น ค่าศุลกากรของทีม E&amp;I กับ SI · ใบฟ้า / MSBC / รายงานแยกตามแผนกให้เอง · สายอนุมัติไม่เปลี่ยน</p>' : ''}
       <div class="stack-sm" data-lines></div>
       <button type="button" class="add-item" data-act="add-line">${icon('plus')} เพิ่มบรรทัด</button>
     </div>
 
-    ${fin ? `<div class="card pad stack-sm"><b>VAT / หัก ณ ที่จ่าย</b><div class="stack-sm" data-taxbox></div></div>` : ''}
+    ${tax ? `<div class="card pad stack-sm"><b>VAT / หัก ณ ที่จ่าย</b><div class="stack-sm" data-taxbox></div></div>` : ''}
 
     <div class="card pad stack-sm" data-jobbox>
       <b>ข้อมูล Job <span class="opt" data-jopt>ไม่บังคับ · กรอกแล้วขึ้นในใบฟ้า</span></b>
@@ -199,7 +203,7 @@ export async function render(ctx) {
     $$('.cat-opt', card).forEach((o) => o.classList.toggle('on', o.dataset.cat === code));
     $('[data-catchosen]', card).innerHTML = chosenHtml(code);
     checkOther(card); hideTip();
-    layout(); preview(); saveDraft(); if (fin) paintTax();
+    layout(); preview(); saveDraft(); if (tax) paintTax();
   }
   // ใบนี้เป็นค่าใช้จ่ายสำนักงาน = ทุกบรรทัดเป็นหมวดสำนักงาน (ส่งไปผู้อนุมัติค่าใช้จ่ายสำนักงาน)
   const isOffice = () => st.type !== 'ADV' && lines().length > 0 && lines().every((l) => officeCats.includes(l.category));
@@ -243,8 +247,8 @@ export async function render(ctx) {
   // แนบใบเสร็จตามกฎหมวด: มีบรรทัดไหนเป็นหมวดที่ต้องแนบ → ต้องแนบ
   function needReceipt() { return lines().some((l) => (catOf(l.category)?.need_receipt || 'YES') === 'YES'); }
   function recalc() {
-    $('[data-count]', el).textContent = `${lineRows().length} บรรทัด · ${fin ? 'ยอดจ่ายสุทธิ' : 'ยอดก่อน VAT'}`;
-    $('[data-total]', el).textContent = money(fin ? taxTotals().net : total()) + ' บาท';
+    $('[data-count]', el).textContent = `${lineRows().length} บรรทัด · ${tax ? 'ยอดจ่ายสุทธิ' : 'ยอดก่อน VAT'}`;
+    $('[data-total]', el).textContent = money(tax ? taxTotals().net : total()) + ' บาท';
   }
   // ถามฐานข้อมูลว่าใบนี้ต้องกรอก Job ไหม (เซลล์ + ซื้อของหน้างาน) · ไม่แสดงสายอนุมัติบนฟอร์ม
   const preview = debounce(async () => {
@@ -287,9 +291,11 @@ export async function render(ctx) {
     if (!adv && L.some((l) => !l.category)) return 'กรุณาเลือกหมวดให้ครบทุกบรรทัด';
     if (!fin && mixedOffice()) return 'ค่าใช้จ่ายสำนักงานต้องแยกเป็นอีกใบ (ไม่ปนกับหมวดอื่น)';
     if (L.some((l) => l.amount <= 0)) return 'กรุณาใส่จำนวนเงินให้ครบทุกบรรทัด';
-    if (fin) {
+    if (tax) {
       if (st.wht.some((w) => !(Number(w.base) > 0))) return 'ใส่ยอดฐานหัก ณ ที่จ่ายให้ครบ';
       if (st.wht.reduce((s, w) => s + Number(w.base), 0) > total() + 0.004) return 'ยอดฐานหัก ณ ที่จ่ายรวมเกินยอดก่อน VAT';
+    }
+    if (fin) {
       if (paid && Math.abs(taxTotals().net - Number(old.amount)) > 0.004) return `ใบนี้จ่ายแล้ว ยอดสุทธิต้องเท่าเดิม (${money(old.amount)} บาท)`;
       return '';
     }
@@ -342,10 +348,11 @@ export async function render(ctx) {
       const res = await busy('กำลังเตรียมข้อมูล…', async (set) => {
         const docs = st.type !== 'ADV' ? await uploadDocs(set, false) : {};
         set('กำลังส่ง…');
-        return api.rpc('pv_submit', { p: { id: old?.id || '', type: st.type, requesterEmail: st.who, fundId: pettyFund() || meta.fund?.fundId || '', ...fields(), docs } });
+        return api.rpc('pv_submit', { p: { id: old?.id || '', type: st.type, requesterEmail: st.who, fundId: pettyFund() || meta.fund?.fundId || '', ...fields(), docs,
+          ...(fin1 ? { vatRate: st.vat, whtLines: st.wht.map((w) => ({ rate: w.rate, base: r2(w.base) })), roundMode: st.rnd } : {}) } });
       });
       if (!old) { st.sent = true; saveJSON(DRAFT_KEY, null); }
-      toast(`${old ? 'ส่งใหม่แล้ว' : 'ส่งแล้ว'} ${res.id}`);
+      toast(`${old ? 'ส่งใหม่แล้ว' : 'ส่งแล้ว'} ${res.id}${fin1 ? ' · รอจ่ายเงิน' : ''}`);
       ctx.refreshBadges();
       ctx.go('/pv/view?id=' + encodeURIComponent(res.id));
     } catch (e) { toastError(e); }
@@ -433,7 +440,7 @@ export async function render(ctx) {
   }
   function hideTip() { tip.classList.add('hidden'); }
 
-  if (fin) paintTax();
+  if (tax) paintTax();
   paintWho();
   layout(); recalc(); preview();
   const offs = [
@@ -457,7 +464,7 @@ export async function render(ctx) {
     on(el, 'change', '[data-l=dept]', () => saveDraft()),
     on(el, 'input', 'input, textarea', () => saveDraft()),
     on(el, 'input', '[data-l=description]', (e, t) => checkOther(t.closest('.pv-line-card'))),
-    on(el, 'input', '[data-l=amount]', () => { recalc(); preview(); if (fin) paintTax(); }),
+    on(el, 'input', '[data-l=amount]', () => { recalc(); preview(); if (tax) paintTax(); }),
     // VAT / หัก ณ ที่จ่าย (บัญชีแก้ไข)
     on(el, 'click', '[data-vat]', (e, t) => { st.vat = Number(t.dataset.vat); paintTax(); }),
     on(el, 'click', '[data-rnd]', (e, t) => { st.rnd = t.dataset.rnd; paintTax(); }),
@@ -470,7 +477,7 @@ export async function render(ctx) {
       else if (a === 'cat-change') { t.closest('.pv-line-card').classList.add('picking'); }
       else if (a === 'who-open') { st.whoOpen = !st.whoOpen; paintWho(); if (st.whoOpen) $('[data-whoq]', el)?.focus(); }
       else if (a === 'draft-clear') { saveJSON(DRAFT_KEY, null); ctx.go('/petty/request?r=' + Date.now()); }
-      else if (a === 'rm-line') { t.closest('.pv-line-card').remove(); renumber(); recalc(); layout(); preview(); saveDraft(); if (fin) paintTax(); }
+      else if (a === 'rm-line') { t.closest('.pv-line-card').remove(); renumber(); recalc(); layout(); preview(); saveDraft(); if (tax) paintTax(); }
       else if (a === 'payee-same') { const p = $('[data-f=payee]', el); p.value = val('supplier'); fillPayee(); }
       else if (a === 'wht-add') { const left = r2(total() - st.wht.reduce((s, w) => s + Number(w.base || 0), 0)); st.wht.push({ rate: 3, base: Math.max(0, left) }); paintTax(); }
       else if (a === 'submit') submit();
