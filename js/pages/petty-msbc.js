@@ -1,6 +1,6 @@
 // ตาราง MSBC (บัญชี) — บิลเงินสดย่อยตามช่วงวันที่ เรียงคอลัมน์ตรงไฟล์ MSBC · ก๊อปไปวาง หรือโหลด Excel
-import { api, money, fmtDate, esc, ymd, todayYMD } from '../core.js?v=10.2.0';
-import { icon, toast, toastError, withBtn, errorBox, empty, skeleton, on, $ } from '../ui.js?v=10.2.0';
+import { api, money, fmtDate, esc, ymd, todayYMD } from '../core.js?v=10.2.1';
+import { icon, toast, toastError, withBtn, errorBox, empty, skeleton, on, $ } from '../ui.js?v=10.2.1';
 
 const FUND_KEY = 'exion_petty_fund';
 function fundId() { try { return localStorage.getItem(FUND_KEY) || null; } catch { return null; } }
@@ -85,8 +85,8 @@ export async function render(ctx) {
       <dt class="bold">${foot[0]}</dt><dd class="text-right amount">${money(foot[1])}</dd></dl></div></div>`;
 
     body.innerHTML = `<div class="stack">
-      ${unmapped.length ? `<div class="alert warn">${icon('alert')}<div><b>แผนกที่ยังไม่มีรหัส MSBC:</b> ${unmapped.map(esc).join(' · ')}
-        <div class="text-sm mt-4">ตอนนี้ใส่ชื่อแผนกเดิมไปก่อน — ให้แอดมินเพิ่มในตาราง settings คีย์ <b>PETTY_DEPT_MAP</b> เช่น Sales=VS, Service=CS</div></div></div>` : ''}
+      ${unmapped.length ? `<div class="alert warn">${icon('alert')}<div><b>แผนกที่ยังไม่มีรหัส EXION CODE:</b> ${unmapped.map(esc).join(' · ')}
+        <div class="text-sm mt-4">ตอนนี้ใส่ชื่อแผนกเดิมไปก่อน — ให้แอดมินเพิ่มในตาราง settings คีย์ <b>PV_DEPT_CODES</b> (แผนก = รหัส) และ <b>PV_DEPT_NAMES</b> (รหัส = ชื่อเต็ม)</div></div></div>` : ''}
 
       <div class="toolbar between">
         <div><b>${rows.length}</b> รายการ · รวม <b class="amount">${money(total)}</b> บาท
@@ -105,7 +105,7 @@ export async function render(ctx) {
           <td>${esc(x.supplier || '-')}</td>
           <td style="min-width:220px">${esc(x.description)}</td>
           <td class="r">${money(x.amount)}</td>
-          <td>${x.deptUnmapped ? `<span class="badge b-pending plain" title="ยังไม่มีรหัส MSBC">${esc(x.department || '(ไม่ระบุ)')}</span>` : esc(x.department)}</td>
+          <td>${x.deptUnmapped ? `<span class="badge b-pending plain" title="ยังไม่มีรหัส EXION CODE">${esc(x.department || '(ไม่ระบุ)')}</span>` : esc(x.department)}</td>
           <td class="nowrap">${esc(x.preparedBy)}</td>
           <td>${x.status === 'Paid' ? '<span class="badge b-paid plain">Paid</span>' : '<span class="badge b-pending plain">Pending</span>'}</td>
           <td class="nowrap">${esc(x.paymentDate)}</td>

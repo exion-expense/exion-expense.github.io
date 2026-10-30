@@ -666,3 +666,6 @@ a.stat { text-decoration: none; color: inherit; display: block; }
   body.printing-pv .pv-rep-tbl thead { display: table-header-group; }
   body.printing-pv .pv-rep-tbl tr { break-inside: avoid; }
 }
+.pv-rep-sum { margin: 14px 0 0 auto; margin-right: 38%; border-collapse: collapse; font-size: 12px; min-width: 220px; }
+.pv-rep-sum td { padding: 3px 10px; } .pv-rep-sum td:first-child { font-weight: 700; } .pv-rep-sum .r { text-align: right; font-variant-numeric: tabular-nums; }
+.pv-rep-sum tr.tot td.r { font-weight: 700; border-top: 1px solid #17181C; border-bottom: 3px double #17181C; }
