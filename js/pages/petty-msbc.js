@@ -1,6 +1,6 @@
 // ตาราง MSBC (บัญชี) — บิลเงินสดย่อยตามช่วงวันที่ เรียงคอลัมน์ตรงไฟล์ MSBC · ก๊อปไปวาง หรือโหลด Excel
-import { api, money, fmtDate, esc, ymd, todayYMD } from '../core.js?v=10.2.1';
-import { icon, toast, toastError, withBtn, errorBox, empty, skeleton, on, $ } from '../ui.js?v=10.2.1';
+import { api, money, fmtDate, esc, ymd, todayYMD } from '../core.js?v=10.3.0';
+import { icon, toast, toastError, withBtn, errorBox, empty, skeleton, on, $ } from '../ui.js?v=10.3.0';
 
 const FUND_KEY = 'exion_petty_fund';
 function fundId() { try { return localStorage.getItem(FUND_KEY) || null; } catch { return null; } }
@@ -11,6 +11,7 @@ const COLS = [
   ['status', 'Status'], ['paymentDate', 'Payment date'], ['processingDate', 'Processing Date'], ['dueDate', 'Payment due date'], ['remark', 'Remark'],
 ];
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+const rk = (x) => x.key || x.id;   // แถวของตาราง (ใบที่แยกหลายแผนกมีหลายแถว เลขใบเดียวกัน)
 // กันช่องแตกตอนวางใน Excel + กันข้อความที่ขึ้นต้นด้วย = + - @ กลายเป็นสูตร (แทรก ' นำหน้า)
 const flat = (s) => { const v = String(s ?? '').replace(/[\t\r\n]+/g, ' ').trim(); return /^[=+\-@]/.test(v) ? "'" + v : v; };
 
@@ -42,7 +43,7 @@ export async function render(ctx) {
     try {
       await api.load('get_petty_msbc', { p_fund_id: fundId(), p_from: st.from || null, p_to: st.to || null, p_include_pending: st.inc }, (d) => {
         st.data = d;
-        st.removed = new Set([...st.removed].filter((id) => (d.items || []).some((x) => x.id === id)));
+        st.removed = new Set([...st.removed].filter((k) => (d.items || []).some((x) => rk(x) === k)));
         if (!st.titleEdited) { st.title = d.titleSuggest || ''; $('[data-title]', el).value = st.title; }
         if (ctx.alive()) { paintQuick(); paint(); }
       });
@@ -62,7 +63,7 @@ export async function render(ctx) {
     $('[data-quick]', el).innerHTML = ranges().map(([k, l, f, t]) => `<button type="button" class="chip ${st.from === f && st.to === t ? 'on' : ''}" data-range="${k}">${esc(l)}</button>`).join('');
   }
 
-  const visible = () => (st.data?.items || []).filter((x) => !st.removed.has(x.id));
+  const visible = () => (st.data?.items || []).filter((x) => !st.removed.has(rk(x)));
 
   function paint() {
     const d = st.data || {}, rows = visible();
@@ -112,7 +113,7 @@ export async function render(ctx) {
           <td class="nowrap">${esc(x.processingDate)}</td>
           <td class="nowrap">${esc(x.dueDate)}</td>
           <td>${esc(x.remark)}</td>
-          <td><button type="button" class="btn-icon sm" data-rm="${esc(x.id)}" aria-label="ตัดแถวที่ ${i + 1} ออก" title="ตัดแถวนี้ออก (ไม่ลบข้อมูลจริง)">${icon('x')}</button></td>
+          <td><button type="button" class="btn-icon sm" data-rm="${esc(rk(x))}" aria-label="ตัดแถวที่ ${i + 1} ออก" title="ตัดแถวนี้ออก (ไม่ลบข้อมูลจริง)">${icon('x')}</button></td>
         </tr>`).join('')}</tbody>
         <tfoot><tr><td></td><td></td><td class="text-right">TOTAL</td><td class="r">${money(total)}</td><td colspan="8"></td></tr></tfoot>
       </table></div>

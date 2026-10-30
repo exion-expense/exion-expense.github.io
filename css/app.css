@@ -646,6 +646,8 @@ a.stat { text-decoration: none; color: inherit; display: block; }
 @media (max-width: 560px) { .pv-wht-row { grid-template-columns: auto minmax(0, 1fr) 36px; } .pv-wht-row .amount { grid-column: 1 / span 2; } }
 .cat-tip { position: fixed; z-index: 60; max-width: 300px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 10px 30px rgba(23, 24, 28, .16);
   padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+.pv-line-dept { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.pv-line-dept select { width: auto; max-width: 100%; min-width: 0; flex: 1 1 200px; }
 .pv-catwarn { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--r-sm); background: var(--warn-bg); color: var(--warn); font-size: 13.5px; flex-wrap: wrap; }
 .pv-catwarn b { color: var(--ink); }
 .pv-rep-wrap { overflow-x: auto; background: var(--line-2); border-radius: var(--r); padding: 8px; }

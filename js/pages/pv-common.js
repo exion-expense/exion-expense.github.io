@@ -1,6 +1,6 @@
 // ใช้ร่วมหน้าใบสำคัญจ่าย (ใบฟ้า): ป้ายสถานะ / แถวรายการ / ใบฟ้าสำหรับพิมพ์
-import { api, money, fmtDate, esc } from '../core.js?v=10.2.1';
-import { icon, catIcon } from '../ui.js?v=10.2.1';
+import { api, money, fmtDate, esc } from '../core.js?v=10.3.0';
+import { icon, catIcon } from '../ui.js?v=10.3.0';
 
 export const KIND = { PCJ: 'มี Job', PCN: 'ทั่วไป', ADV: 'Advance' };
 /** ใบทดลอง (ลบทิ้งทีหลัง) */
@@ -96,9 +96,18 @@ export function remarkText(v) {
   return [v.note, v.needDate ? `ต้องการใช้เงินวันที่ ${thd(v.needDate)}` : ''].filter(Boolean).join(' · ');
 }
 
-/** HTML ใบฟ้า (ใช้ทั้งดูตัวอย่างและพิมพ์) */
+/** แผนกรายบรรทัด (บัญชีตั้ง · ว่าง = แผนกของใบ) → รายการแผนกในใบ · ปนหลายแผนก = mixed */
+export function lineDept(v, l) { return String(l?.dept || v.deptCode || '').toUpperCase(); }
+export function deptInfo(v) {
+  const codes = [...new Set((v.lines || []).map((l) => lineDept(v, l)).filter(Boolean))];
+  const mixed = codes.length > 1;
+  return { mixed, codes, label: mixed ? codes.join(' / ') : (v.deptName || v.department || '') };
+}
+
+/** HTML ใบฟ้า (ใช้ทั้งดูตัวอย่างและพิมพ์) · No. = เลขของบัญชี (กรอกเอง) · ID document = เลขใบในระบบ */
 export function voucherHtml(v, { size = 'half', color = 'blue' } = {}) {
   const lines = v.lines || [];
+  const dpt = deptInfo(v);
   const pad = Math.max(0, (size === 'full' ? 12 : 4) - lines.length);
   const others = (v.steps || []).filter((s) => s.k === 'fin2' || s.k === 'fin3').filter((s) => s.state === 'done')
     .map((s) => `${s.label}: ${esc(s.byName)} ${thd(s.at)}`);
@@ -109,8 +118,8 @@ export function voucherHtml(v, { size = 'half', color = 'blue' } = {}) {
       <img src="brand/logo.png" alt="EXION Thailand">
       <div class="pv-co"><b>บริษัท เอ็กซิออน (ประเทศไทย) จำกัด</b>EXION (THAILAND) CO., LTD.</div>
       <div><div class="pv-ttl">ใบสำคัญจ่าย<br>PAYMENT VOUCHER</div>
-        <div class="pv-meta"><span>เลขที่ / No.</span><b>${esc(v.id)}</b><span>วันที่ / Date</span><b class="pen">${thd(v.docDate || v.paidAt)}</b>
-          <span>ID document</span><b class="pen">${esc(v.docId || '')}</b></div></div>
+        <div class="pv-meta"><span>เลขที่ / No.</span><b class="pen">${esc(v.docId || '')}</b><span>วันที่ / Date</span><b class="pen">${thd(v.docDate || v.paidAt)}</b>
+          <span>ID document</span><b>${esc(v.id)}</b></div></div>
     </div>
     <div class="pv-supplier"><small>ผู้ขาย / SUPPLIER</small><span class="pen">${esc(v.supplier || v.payee || '')}</span></div>
     <div class="pv-payto">
@@ -121,7 +130,7 @@ export function voucherHtml(v, { size = 'half', color = 'blue' } = {}) {
     <table class="pv-tbl">
       <thead><tr><th style="width:52px">ลำดับ<br>ITEM</th><th>รายการ<br>DESCRIPTION</th><th style="width:150px">จำนวนเงิน<br>AMOUNT</th></tr></thead>
       <tbody>
-        ${lines.map((l, i) => `<tr><td class="c">${i + 1}</td><td class="pen">${esc(l.description)}</td><td class="r pen">${money(l.amount)}</td></tr>`).join('')}
+        ${lines.map((l, i) => `<tr><td class="c">${i + 1}</td><td class="pen">${esc(l.description)}${dpt.mixed ? ` (${esc(lineDept(v, l))})` : ''}</td><td class="r pen">${money(l.amount)}</td></tr>`).join('')}
         ${'<tr><td>&nbsp;</td><td></td><td></td></tr>'.repeat(pad)}
         ${Number(v.vatAmount) ? `<tr><td></td><td class="r">VAT ${Number(v.vatRate)}%</td><td class="r pen">${money(v.vatAmount)}</td></tr>` : ''}
         ${whtLines(v).map((w) => `<tr><td></td><td class="r">หัก ณ ที่จ่าย ${Number(w.rate)}% / WHT${Math.abs(Number(w.base) - Number(v.base)) > 0.004 ? ` (ฐาน ${money(w.base)})` : ''}</td><td class="r pen">(${money(w.amount)})</td></tr>`).join('')}
@@ -129,7 +138,7 @@ export function voucherHtml(v, { size = 'half', color = 'blue' } = {}) {
       </tbody>
     </table>
     <div class="pv-foot">
-      <div><small>แผนก / DEPARTMENT</small><span class="pen">${esc(v.deptName || v.department || '')}</span></div>
+      <div><small>แผนก / DEPARTMENT</small><span class="pen">${esc(dpt.label)}</span></div>
       <div><small>ใบสั่งซื้อ / PO NO.</small><span class="pen">${esc(v.poNo || '')}</span></div>
       <div><small>โครงการ / JOB NO.</small><span class="pen">${esc(v.jobNo || '')}</span></div>
       <div><small>ใบประมาณต้นทุน / COST SHEET NO.</small><span class="pen">${esc(v.costSheetNo || '')}</span></div>

@@ -1,8 +1,8 @@
-// ใบสำคัญจ่าย 1 ใบ — ขั้นอนุมัติ / กดอนุมัติ-ตีกลับ / บัญชี 1 เลือก VAT + หัก ณ ที่จ่ายหลายอัตรา / ส่วนของบัญชี (รอบจ่าย · วันที่ + ID document · แก้ไข · สลิป)
+// ใบสำคัญจ่าย 1 ใบ — ขั้นอนุมัติ / กดอนุมัติ-ตีกลับ / บัญชี 1 เลือก VAT + หัก ณ ที่จ่ายหลายอัตรา / ส่วนของบัญชี (รอบจ่าย · วันที่ + No. ของบัญชี · แก้ไข · สลิป)
 // จ่ายเงิน (+ สลิปโอน) / เคลียร์ advance / พิมพ์ใบฟ้า
-import { api, money, fmtDate, fmtDateTime, esc, todayYMD, catName, loadPettyCategories } from '../core.js?v=10.2.1';
-import { icon, catIcon, toast, toastError, confirmBox, promptBox, busy, withBtn, sheet, thumbs, hydrateThumbs, receiptPicker, errorBox, skeleton, on, $, $$ } from '../ui.js?v=10.2.1';
-import { DOCS, KIND, isTest, stageBadge, kindBadge, roundBadge, roundLabel, whtLines, remarkText, voucherHtml, hydrateSigs, printVoucher, PRINT_SIZES, PRINT_COLORS, printPrefs, savePrintPrefs } from './pv-common.js?v=10.2.1';
+import { api, money, fmtDate, fmtDateTime, esc, todayYMD, catName, loadPettyCategories } from '../core.js?v=10.3.0';
+import { icon, catIcon, toast, toastError, confirmBox, promptBox, busy, withBtn, sheet, thumbs, hydrateThumbs, receiptPicker, errorBox, skeleton, on, $, $$ } from '../ui.js?v=10.3.0';
+import { DOCS, KIND, isTest, stageBadge, kindBadge, roundBadge, roundLabel, whtLines, remarkText, deptInfo, lineDept, voucherHtml, hydrateSigs, printVoucher, PRINT_SIZES, PRINT_COLORS, printPrefs, savePrintPrefs } from './pv-common.js?v=10.3.0';
 
 const ACT = { submit: 'ส่งใบเบิก', resubmit: 'แก้แล้วส่งใหม่', approve: 'อนุมัติ', reject: 'ตีกลับ', pay: 'จ่ายเงิน', cancel: 'ยกเลิก',
   adv_clear: 'ส่งเคลียร์', adv_back: 'ตีกลับการเคลียร์', adv_ok: 'เคลียร์เรียบร้อย', edit: 'แก้ไขใบ', round: 'เลือกรอบจ่าย', slip: 'แนบสลิป' };
@@ -44,7 +44,7 @@ export async function render(ctx) {
     const done = (s) => s.state === 'done';
     const nowIdx = v.status === 'Pending' ? v.step : -1;
     const payDone = v.status === 'Paid', payNow = v.status === 'Approved';
-    const W = whtLines(v);
+    const W = whtLines(v), dpt = deptInfo(v);
     el.innerHTML = `
     <div class="stack">
       <div class="card pad stack-sm">
@@ -73,11 +73,11 @@ export async function render(ctx) {
         <dl class="kv">${[
           ['Supplier', v.supplier], ['จ่ายให้', v.payee], ['ธนาคาร', v.payBank], ['เลขบัญชี', v.payAccount], ['Job No.', v.jobNo], ['PO No.', v.poNo], ['Cost sheet No.', v.costSheetNo],
           [v.kind === 'ADV' ? 'วันที่จะใช้' : 'วันที่', v.expenseDate ? fmtDate(v.expenseDate) : ''], ['วันที่จัดส่งสินค้า', v.deliveryDate ? fmtDate(v.deliveryDate) : ''],
-          ['หมายเหตุ', remarkText(v)], ['แผนก (ใบฟ้า)', v.deptCode ? `${v.deptName}${v.deptName !== v.deptCode ? ' · ' + v.deptCode : ''}` : ''],
-          ['รอบจ่าย', roundLabel(v)], ['ID document', v.docId], ['วันที่ (หัวใบ)', v.docDate ? fmtDate(v.docDate) : ''], ['ประเภท', KIND[v.kind]],
+          ['หมายเหตุ', remarkText(v)], ['แผนก (ใบฟ้า)', dpt.mixed ? `${dpt.label} (แยกตามบรรทัด)` : v.deptCode ? `${v.deptName}${v.deptName !== v.deptCode ? ' · ' + v.deptCode : ''}` : ''],
+          ['รอบจ่าย', roundLabel(v)], ['No. (เลขของบัญชี)', v.docId], ['วันที่ (หัวใบ)', v.docDate ? fmtDate(v.docDate) : ''], ['ประเภท', KIND[v.kind]],
         ].filter(([, x]) => x).map(([k, x]) => `<dt>${k}</dt><dd>${esc(x)}</dd>`).join('')}</dl>
         <div class="table-wrap" style="max-height:none"><table class="tbl"><thead><tr><th>#</th><th>หมวด</th><th>รายการ</th><th class="r">จำนวนเงิน</th></tr></thead><tbody>
-          ${(v.lines || []).map((l, i) => `<tr><td>${i + 1}</td><td><span class="flex gap-8 nowrap" style="align-items:center">${catIcon(l.category, 28)}${esc(catName(l.category))}</span></td><td>${esc(l.description) || '<span class="muted">-</span>'}</td><td class="r">${money(l.amount)}</td></tr>`).join('')}
+          ${(v.lines || []).map((l, i) => `<tr><td>${i + 1}</td><td><span class="flex gap-8 nowrap" style="align-items:center">${catIcon(l.category, 28)}${esc(catName(l.category))}</span></td><td>${esc(l.description) || '<span class="muted">-</span>'}${dpt.mixed ? ` <span class="badge plain">${esc(lineDept(v, l))}</span>` : ''}</td><td class="r">${money(l.amount)}</td></tr>`).join('')}
           <tr><td></td><td></td><td class="muted">ยอดก่อน VAT</td><td class="r">${money(v.base)}</td></tr>
           ${Number(v.vatAmount) ? `<tr><td></td><td></td><td class="muted">VAT ${Number(v.vatRate)}%</td><td class="r">${money(v.vatAmount)}</td></tr>` : ''}
           ${W.map((w) => `<tr><td></td><td></td><td class="muted">หัก ณ ที่จ่าย ${Number(w.rate)}% · ฐาน ${money(w.base)}</td><td class="r">(${money(w.amount)})</td></tr>`).join('')}
@@ -174,7 +174,7 @@ export async function render(ctx) {
     return parts.length ? `<div class="card pad stack">${parts.join('<div class="divider"></div>')}</div>` : '';
   }
 
-  // ส่วนของบัญชี: รอบจ่าย · วันที่ + ID document ที่หัวใบ · แนบสลิปหลังจ่าย · แก้ไขใบ
+  // ส่วนของบัญชี: รอบจ่าย · วันที่ + No. (เลขของบัญชี) ที่หัวใบ · แนบสลิปหลังจ่าย · แก้ไขใบ
   function finCard(v) {
     const parts = [];
     if (v.canSetRound) {
@@ -189,9 +189,9 @@ export async function render(ctx) {
       parts.push(`<div class="stack-sm"><div class="text-sm muted">หัวใบฟ้า (บัญชีกรอก · ว่างไว้ = ปริ้นแล้วเขียนมือ)</div>
         <div class="flex wrap gap-8 items-end">
           <div class="field" style="margin:0"><label for="pv-docdate">วันที่ / Date</label><input type="date" class="input" id="pv-docdate" data-docdate value="${esc(v.docDate || '')}"></div>
-          <div class="field" style="margin:0"><label for="pv-docid">ID document</label><input class="input" id="pv-docid" data-docid maxlength="50" value="${esc(v.docId || '')}"></div>
+          <div class="field" style="margin:0"><label for="pv-docid">No. (เลขของบัญชี)</label><input class="input" id="pv-docid" data-docid maxlength="50" value="${esc(v.docId || '')}"></div>
           <button type="button" class="btn btn-secondary" data-act="docinfo">${icon('check', 'sm')} บันทึก</button></div>
-        ${!v.docDate ? '<div class="hint">ไม่ใส่วันที่ = ใช้วันที่จ่ายเงิน (หลังจ่ายแล้ว)</div>' : ''}</div>`);
+        <div class="hint">ID document ในใบฟ้า = เลข ${esc(v.id)} (ขึ้นให้เอง)${!v.docDate ? ' · ไม่ใส่วันที่ = ใช้วันที่จ่ายเงิน (หลังจ่ายแล้ว)' : ''}</div></div>`);
     }
     if (v.canAddSlip) {
       parts.push(`<div class="stack-sm"><div class="text-sm muted">แนบสลิปโอนเงินเพิ่ม</div><div data-slip2pick></div>

@@ -1,7 +1,7 @@
 // รายการที่จ่ายแล้วรายเดือน (ใบสำคัญจ่าย) — คอลัมน์ตามไฟล์ของบัญชี · สรุป PAID / Pending ท้ายตาราง · พิมพ์ได้ · ก๊อปไปวาง Excel
 // รวมทั้งรอบ Petty cash และรอบวันที่ 20 · แผนกเป็น EXION CODE · Description = ชื่อหมวดภาษาอังกฤษ
-import { api, money, esc } from '../core.js?v=10.2.1';
-import { icon, toast, empty, errorBox, skeleton, on, $ } from '../ui.js?v=10.2.1';
+import { api, money, esc } from '../core.js?v=10.3.0';
+import { icon, toast, empty, errorBox, skeleton, on, $ } from '../ui.js?v=10.3.0';
 
 const COLS = ['No.', 'Suppliers', 'Description', 'Amount', 'Department', 'Prepared By', 'Status', 'Payment date'];
 const ym = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;

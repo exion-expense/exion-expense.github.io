@@ -1,8 +1,9 @@
 // ขอเบิก Petty Cash (ใบสำคัญจ่าย) — ค่าใช้จ่าย / Advance entertain · เลือกหมวดทุกบรรทัด · HR กรอกแทนได้ · แก้ใบที่ถูกตีกลับ (?id=)
 // บัญชีแก้ไขใบ (?id=&fin=1): แก้ได้ทุกช่อง + VAT / หัก ณ ที่จ่าย + รหัสแผนก · ไม่เริ่มสายอนุมัติใหม่
-import { api, money, esc, todayYMD, loadPettyCategories } from '../core.js?v=10.2.1';
-import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.2.1';
-import { DOCS, whtLines } from './pv-common.js?v=10.2.1';
+// บัญชี (ทั้งตอนเบิกเอง / กรอกแทน / แก้ไข) เลือกแผนกรายบรรทัดได้ = ลงต้นทุนแยกทีม
+import { api, money, esc, todayYMD, loadPettyCategories } from '../core.js?v=10.3.0';
+import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.3.0';
+import { DOCS, whtLines } from './pv-common.js?v=10.3.0';
 
 // คำอธิบายหมวด: อะไรเข้าหมวดนี้บ้าง (การ์ดตอนชี้ที่ปุ่มหมวด + ใต้หมวดที่เลือก)
 const CAT_HINT = {
@@ -71,6 +72,11 @@ export async function render(ctx) {
   const catOf = (code) => cats.find((c) => c.code === code);
   const pickers = {};
   const paid = fin && old.status === 'Paid';
+  // แผนกรายบรรทัด (ลงต้นทุนแยกทีม): เฉพาะบัญชี · ว่าง = ตามแผนกของใบ · สายอนุมัติไม่เปลี่ยน
+  const lineDeptOn = !!meta.isFin && (meta.deptCodes || []).length > 0;
+  const deptOpts = (sel) => `<option value="">ตามแผนกของใบ</option>
+    ${sel && !(meta.deptCodes || []).some((d) => d.code === sel) ? `<option value="${esc(sel)}" selected>${esc(sel)}</option>` : ''}
+    ${(meta.deptCodes || []).map((d) => `<option value="${esc(d.code)}" ${d.code === sel ? 'selected' : ''}>${esc(d.code)} · ${esc(d.name)}</option>`).join('')}`;
 
   el.innerHTML = `
   <div class="stack">
@@ -111,6 +117,7 @@ export async function render(ctx) {
     <div class="card pad stack-sm">
       <div class="flex between wrap"><b>รายการ</b><span class="text-sm muted">${fin ? 'ยอดก่อน VAT' : 'ยอดก่อน VAT · บัญชีเป็นคนใส่ VAT / หัก ณ ที่จ่าย'}</span></div>
       <p class="hint" data-officehint></p>
+      ${lineDeptOn ? '<p class="hint">บัญชี: เลือก "ลงต้นทุนแผนก" ได้ทีละบรรทัด เช่น ค่าศุลกากรของทีม E&amp;I กับ SI · ใบฟ้า / MSBC / รายงานแยกตามแผนกให้เอง · สายอนุมัติไม่เปลี่ยน</p>' : ''}
       <div class="stack-sm" data-lines></div>
       <button type="button" class="add-item" data-act="add-line">${icon('plus')} เพิ่มบรรทัด</button>
     </div>
@@ -153,7 +160,7 @@ export async function render(ctx) {
   const linesBox = $('[data-lines]', el);
   const chosenHtml = (code) => { const c = catOf(code); return c ? `${catIcon(code)}<div class="grow" style="min-width:0"><b>${esc(c.name_th)}</b>${c.name_en ? ` <span class="text-xs muted">${esc(c.name_en)}</span>` : ''}<div class="hint" data-cathint>${esc(CAT_HINT[code] || '')}</div></div>
       <button type="button" class="btn btn-ghost btn-sm" data-act="cat-change">เปลี่ยนหมวด</button>` : `<button type="button" class="btn btn-ghost btn-sm" data-act="cat-change">เปลี่ยนหมวด</button>`; };
-  function addLine(desc = '', amt = '', cat = '') {
+  function addLine(desc = '', amt = '', cat = '', dept = '') {
     const k = ++st.seq;
     const d = document.createElement('div');
     d.className = 'pv-line-card' + (cat ? '' : ' picking'); d.dataset.line = k; d.dataset.catval = cat;   // ไม่ใช้ data-cat บนการ์ด (ชนกับปุ่มหมวด)
@@ -165,6 +172,8 @@ export async function render(ctx) {
       <div class="pv-line"><input class="input" data-l="description" maxlength="300" aria-label="รายละเอียด" value="${esc(desc)}">
       <div class="input-group has-suf"><input type="number" class="input" data-l="amount" inputmode="decimal" step="0.01" min="0" aria-label="จำนวนเงิน" value="${Number(amt) > 0 ? esc(amt) : ''}"><span class="suf">บาท</span></div>
       <button type="button" class="btn-icon sm" data-act="rm-line" aria-label="ลบบรรทัด">${icon('trash')}</button></div>
+      ${lineDeptOn ? `<div class="pv-line-dept"><label class="text-sm muted" for="pv-ld-${k}">ลงต้นทุนแผนก</label>
+        <select class="input" id="pv-ld-${k}" data-l="dept">${deptOpts(String(dept || '').toUpperCase())}</select></div>` : ''}
       <div class="pv-catwarn hidden" data-catwarn></div>`;
     linesBox.appendChild(d);
     renumber();
@@ -174,7 +183,7 @@ export async function render(ctx) {
   function renumber() { lineRows().forEach((r) => r.querySelector('[data-act=rm-line]').classList.toggle('hidden', lineRows().length < 2)); }
   function lines() {
     return lineRows().map((r) => ({ description: r.querySelector('[data-l=description]').value.trim(), amount: r2(r.querySelector('[data-l=amount]').value),
-      category: st.type === 'ADV' ? 'ENT' : r.dataset.catval || '' }));
+      category: st.type === 'ADV' ? 'ENT' : r.dataset.catval || '', ...(lineDeptOn ? { dept: r.querySelector('[data-l=dept]')?.value || '' } : {}) }));
   }
   // เลือก "อื่นๆ" แต่สิ่งที่พิมพ์น่าจะอยู่หมวดอื่น → เตือน + ปุ่มเปลี่ยน
   function checkOther(card) {
@@ -206,7 +215,7 @@ export async function render(ctx) {
   }
   const entAmt = () => r2(lines().filter((l) => st.type === 'ADV' || entCats.includes(l.category)).reduce((s, l) => s + l.amount, 0));
   const total = () => r2(lines().reduce((s, l) => s + l.amount, 0));
-  (src.lines?.length ? src.lines : [{ description: '', amount: '', category: '' }]).forEach((l) => addLine(l.description, l.amount, l.category || ''));
+  (src.lines?.length ? src.lines : [{ description: '', amount: '', category: '' }]).forEach((l) => addLine(l.description, l.amount, l.category || '', l.dept || ''));
 
   const val = (f) => $(`[data-f="${f}"]`, el)?.value.trim() || '';
 
@@ -443,6 +452,7 @@ export async function render(ctx) {
     }),
     // ผู้รับเงินที่เคยจ่าย → เติมธนาคาร/เลขบัญชีให้ (เฉพาะช่องที่ยังว่าง)
     on(el, 'change', '[data-f=payee]', () => fillPayee()),
+    on(el, 'change', '[data-l=dept]', () => saveDraft()),
     on(el, 'input', 'input, textarea', () => saveDraft()),
     on(el, 'input', '[data-l=description]', (e, t) => checkOther(t.closest('.pv-line-card'))),
     on(el, 'input', '[data-l=amount]', () => { recalc(); preview(); if (fin) paintTax(); }),
