@@ -1,9 +1,9 @@
 // ขอเบิก Petty Cash (ใบสำคัญจ่าย) — ค่าใช้จ่าย / Advance entertain · เลือกหมวดทุกบรรทัด · HR กรอกแทนได้ · แก้ใบที่ถูกตีกลับ (?id=)
 // บัญชีแก้ไขใบ (?id=&fin=1): แก้ได้ทุกช่อง + VAT / หัก ณ ที่จ่าย + รหัสแผนก · ไม่เริ่มสายอนุมัติใหม่
 // บัญชี (ทั้งตอนเบิกเอง / กรอกแทน / แก้ไข) เลือกแผนกรายบรรทัดได้ = ลงต้นทุนแยกทีม
-import { api, money, esc, todayYMD, loadPettyCategories } from '../core.js?v=10.4.1';
-import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.4.1';
-import { DOCS, whtLines, roundNet, roundAdj, roundText, roundSeg } from './pv-common.js?v=10.4.1';
+import { api, money, esc, todayYMD, loadPettyCategories } from '../core.js?v=10.4.3';
+import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.4.3';
+import { DOCS, whtLines, roundNet, roundAdj, roundText, roundSeg } from './pv-common.js?v=10.4.3';
 
 // คำอธิบายหมวด: อะไรเข้าหมวดนี้บ้าง (การ์ดตอนชี้ที่ปุ่มหมวด + ใต้หมวดที่เลือก)
 const CAT_HINT = {
@@ -85,7 +85,7 @@ export async function render(ctx) {
   <div class="stack">
     ${draft ? `<div class="alert" data-draftbar>${icon('info')}<div class="grow">กู้ข้อมูลที่กรอกค้างไว้แล้ว · ไฟล์แนบต้องแนบใหม่</div><button type="button" class="btn btn-ghost btn-sm" data-act="draft-clear">เริ่มใหม่</button></div>` : ''}
     ${old && !fin ? `<div class="alert bad">${icon('alert')}<div><b>ถูกตีกลับ:</b> ${esc(old.remark || '-')}<br><span class="text-sm">แก้ไขแล้วกดส่งใหม่ ใบจะเริ่มอนุมัติใหม่ตั้งแต่ขั้นแรก (เลขเดิม ${esc(old.id)})</span></div></div>` : ''}
-    ${fin1 ? `<div class="alert ok">${icon('check')}<div><b>คุณเป็นบัญชี 1</b> · ใบนี้ไม่ต้องผ่านขั้นอนุมัติ ส่งแล้วไป<b>รอจ่ายเงินทันที</b> (ทั้งเบิกเองและเบิกแทน) — ใส่ VAT / หัก ณ ที่จ่าย / ปัดเศษ ให้ครบก่อนส่ง</div></div>` : ''}
+    ${fin1 ? `<div class="alert ok">${icon('check')}<div><b>คุณเป็นบัญชี 1</b> · ${meta.fin1Mode === 'pay' ? 'ใบนี้ไม่ต้องผ่านขั้นอนุมัติ ส่งแล้วไป<b>รอจ่ายเงินทันที</b>' : 'ใบนี้ข้ามหัวหน้าแผนกและบัญชี 1 ส่งแล้วไป<b>บัญชี 2 → บัญชี 3 → รอจ่าย</b>'} (ทั้งเบิกเองและเบิกแทน) — ใส่ VAT / หัก ณ ที่จ่าย / ปัดเศษ ให้ครบก่อนส่ง</div></div>` : ''}
     ${fin ? `<div class="alert">${icon('edit')}<div><b>บัญชีแก้ไขใบ ${esc(old.id)}</b> · ${esc(old.requesterName)}<br><span class="text-sm">ไม่เริ่มสายอนุมัติใหม่ · ระบบบันทึกว่าแก้อะไรในประวัติ และแจ้งคนเบิก${paid ? ' · <b>ใบนี้จ่ายแล้ว แก้ยอดเงินไม่ได้</b>' : ''}</span></div></div>` : ''}
     ${!fin ? `<div class="card pad stack-sm">
       ${!old ? `<div class="seg" role="tablist" data-type>
@@ -352,7 +352,7 @@ export async function render(ctx) {
           ...(fin1 ? { vatRate: st.vat, whtLines: st.wht.map((w) => ({ rate: w.rate, base: r2(w.base) })), roundMode: st.rnd } : {}) } });
       });
       if (!old) { st.sent = true; saveJSON(DRAFT_KEY, null); }
-      toast(`${old ? 'ส่งใหม่แล้ว' : 'ส่งแล้ว'} ${res.id}${fin1 ? ' · รอจ่ายเงิน' : ''}`);
+      toast(`${old ? 'ส่งใหม่แล้ว' : 'ส่งแล้ว'} ${res.id}${fin1 ? (meta.fin1Mode === 'pay' ? ' · รอจ่ายเงิน' : ' · รอบัญชี 2') : ''}`);
       ctx.refreshBadges();
       ctx.go('/pv/view?id=' + encodeURIComponent(res.id));
     } catch (e) { toastError(e); }

@@ -1,7 +1,7 @@
 // คำขอของฉัน — กรองตามสถานะ / ค้นหา / จัดกลุ่มรายเดือน · แตะดูรายละเอียด แก้ไข ลบ
-import { api, state, money, kmText, esc, fmtDate, fmtDateTime, catName, catInfo, monthLabel, requestBadge, loadCategories } from '../core.js?v=10.4.1';
-import { icon, catIcon, requestRow, toast, toastError, confirmBox, promptBox, sheet, busy, empty, skeleton, thumbs, hydrateThumbs, receiptPicker, on, debounce, $, $$ } from '../ui.js?v=10.4.1';
-import { catPickerHtml, fieldsHtml, applyCat, validateItem, showErrors, clearError, catFlags, fuelBox, pickFields, loadVisitRules, entWarn } from './submit.js?v=10.4.1';
+import { api, state, money, kmText, esc, fmtDate, fmtDateTime, catName, catInfo, monthLabel, requestBadge, loadCategories } from '../core.js?v=10.4.3';
+import { icon, catIcon, requestRow, toast, toastError, confirmBox, promptBox, sheet, busy, empty, skeleton, thumbs, hydrateThumbs, receiptPicker, on, debounce, $, $$ } from '../ui.js?v=10.4.3';
+import { catPickerHtml, fieldsHtml, applyCat, validateItem, showErrors, clearError, catFlags, fuelBox, pickFields, loadVisitRules, entWarn } from './submit.js?v=10.4.3';
 
 const FILTERS = [['all', 'ทั้งหมด'], ['pending', 'รออนุมัติ'], ['approved', 'อนุมัติแล้ว'], ['rejected', 'ไม่อนุมัติ'], ['pre', 'งบล่วงหน้า']];
 
@@ -183,6 +183,7 @@ export async function render(ctx) {
       if (fromPre) T.push({ ic: 'receipt', cls: 'c-blue', title: 'ส่งบิลจริงแล้ว', sub: `ยอดจริง ฿${money(r.amount)}` });
       if (!fromPre) return T;
     }
+    if (r.acct_edited_at) T.push({ ic: 'edit', cls: 'c-blue', title: 'บัญชีแก้ไขรายการ', sub: fmtDateTime(r.acct_edited_at), note: r.acct_edit_note });
     if (r.acct_returned_at) T.push({ ic: 'rotate-ccw', cls: 'c-red', title: 'บัญชีตีกลับให้แก้', sub: fmtDateTime(r.acct_returned_at) + (r.status === 'Pending' ? ' · แก้แล้วรอหัวหน้าอนุมัติใหม่ (ไปรวมรอบถัดไป)' : ''), note: r.acct_remark });
     const ms = r.manager_status || '';
     const auto = r.status === 'Approved' && (r.approved_by === 'auto' || r.approved_by === 'system' || !ms);

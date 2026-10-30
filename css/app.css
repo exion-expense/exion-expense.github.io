@@ -673,5 +673,5 @@ a.stat { text-decoration: none; color: inherit; display: block; }
 .pv-rep-sum tr.tot td.r { font-weight: 700; border-top: 1px solid #17181C; border-bottom: 3px double #17181C; }
 /* บัญชีตีกลับรายการ (หน้าต่างรายการของพนักงาน) */
 .row:has(+ .row-act) { border-bottom: 0; padding-bottom: 4px; }
-.row-act { display: flex; justify-content: flex-end; padding: 0 12px 8px; border-bottom: 1px solid var(--line-2); }
+.row-act { display: flex; justify-content: flex-end; align-items: center; gap: 4px; flex-wrap: wrap; padding: 0 12px 8px; border-bottom: 1px solid var(--line-2); }
 .row-act:last-child { border-bottom: 0; }

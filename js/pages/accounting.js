@@ -1,7 +1,7 @@
 // บัญชี · โอนเงิน — บอร์ดรายคนต่อเดือน: ยังไม่ขอ → รออนุมัติ → รอโอน → โอนแล้ว + ส่งสรุปให้ CEO
 // แถบแผนก (ซ้าย/บน) เลือกแผนกแล้วดูยอด · ส่ง CEO ทีละแผนก · VIEWER เปิดได้แบบดูอย่างเดียว (canAct = false)
-import { api, money, compact, fmtDate, fmtDateTime, esc, initials, monthLabel, catName, statusBadge } from '../core.js?v=10.4.1';
-import { icon, catIcon, requestRow, toast, toastError, confirmBox, promptBox, sheet, withBtn, monthNav, shiftMonth, empty, errorBox, lightbox, on, debounce } from '../ui.js?v=10.4.1';
+import { api, money, compact, fmtDate, fmtDateTime, esc, initials, monthLabel, catName, statusBadge, loadCategories } from '../core.js?v=10.4.3';
+import { icon, catIcon, requestRow, toast, toastError, confirmBox, promptBox, sheet, withBtn, monthNav, shiftMonth, empty, errorBox, lightbox, on, debounce } from '../ui.js?v=10.4.3';
 
 const STAGE = {
   ready: ['รอโอน', 'b-approved'], export: ['รออนุมัติ', 'b-pending'], bills: ['บิลรออนุมัติ', 'b-violet'],
@@ -143,6 +143,52 @@ export async function render(ctx) {
           ${canAct() ? `<button class="btn btn-success btn-sm" data-act="paid" data-id="${esc(e.id)}" data-name="${esc(e.staff_name)}" data-amt="${e.total_amount}" data-dept="">${icon('check', 'sm')} โอนแล้ว</button>` : ''}</div></div></div>`).join('')}</div></div>`;
   }
 
+  // ─────────── บัญชีแก้ไขรายการเอง (ผิดนิดหน่อย ไม่ต้องตีกลับ) · สถานะไม่เปลี่ยน · ปรับยอดใบขอเบิกให้เอง ───────────
+  async function editItem(r) {
+    const cats = await loadCategories().catch(() => []);
+    const cur = String(r.category || '').toUpperCase(), fuel = cur === 'FUEL';
+    const catOpts = cats.filter((c) => c.active !== false);
+    if (!catOpts.some((c) => c.code === cur)) catOpts.unshift({ code: cur, name_th: catName(cur) });
+    const ymd = String(r.expense_date || '').slice(0, 10);
+    return new Promise((resolve) => sheet({
+      title: `แก้ไขรายการ · ${r.staff_name || ''}`,
+      body: `<div class="stack-sm">
+        <p class="hint">${esc(catName(r.category))} · ${money(r.amount)} บาท — สถานะไม่เปลี่ยน · ระบบบันทึกว่าแก้อะไร แจ้งพนักงานและหัวหน้า และปรับยอดในใบขอเบิกให้เอง</p>
+        <div class="form-grid two">
+          <div class="field"><label for="ae-cat">หมวด</label><select class="input" id="ae-cat">${catOpts.map((c) => `<option value="${esc(c.code)}" ${c.code === cur ? 'selected' : ''}>${esc(c.name_th || catName(c.code))}</option>`).join('')}</select></div>
+          <div class="field"><label for="ae-date">วันที่</label><input type="date" class="input" id="ae-date" value="${esc(ymd)}"></div>
+          <div class="field ${fuel ? '' : 'hidden'}" data-km><label for="ae-km">ระยะทาง (กม.)</label><input type="number" class="input" id="ae-km" inputmode="numeric" step="1" min="0" value="${r.mileage_km ?? ''}"><div class="hint">ยอดคิดตามเรทน้ำมันให้เอง</div></div>
+          <div class="field ${fuel ? 'hidden' : ''}" data-amt><label for="ae-amt">ยอดเงิน (บาท)</label><input type="number" class="input" id="ae-amt" inputmode="decimal" step="0.01" min="0" value="${esc(r.amount)}"></div>
+          <div class="field span-2"><label for="ae-venue">รายละเอียด</label><input class="input" id="ae-venue" maxlength="300" value="${esc(r.venue || '')}"></div>
+          <div class="field span-2"><label class="req" for="ae-why">เหตุผลที่แก้ <span class="opt">พนักงานจะเห็น</span></label><input class="input" id="ae-why" maxlength="300" placeholder="เช่น ยอดตามใบเสร็จจริง 280 บาท"></div>
+        </div></div>`,
+      foot: `<button class="btn btn-secondary" data-x>ยกเลิก</button><button class="btn btn-primary" data-save data-busy="กำลังบันทึก…">${icon('check')} บันทึกการแก้ไข</button>`,
+      onMount: (box, close) => {
+        const v = (id) => box.querySelector('#' + id).value.trim();
+        box.querySelector('#ae-cat').onchange = (e) => {
+          const f = e.target.value === 'FUEL';
+          box.querySelector('[data-km]').classList.toggle('hidden', !f); box.querySelector('[data-amt]').classList.toggle('hidden', f);
+        };
+        box.querySelector('[data-save]').onclick = async (e) => {
+          const why = v('ae-why');
+          if (!why) { toast('ใส่เหตุผลที่แก้', 'bad'); box.querySelector('#ae-why').focus(); return; }
+          const u = {}, cat = v('ae-cat');
+          if (cat !== String(r.category).toUpperCase()) u.category = cat;
+          if (v('ae-date') && v('ae-date') !== ymd) u.expense_date = v('ae-date');
+          if (cat === 'FUEL') { if (v('ae-km') !== String(r.mileage_km ?? '')) u.mileage_km = v('ae-km'); }
+          else if (Number(v('ae-amt')) !== Number(r.amount)) u.amount = v('ae-amt');
+          if (v('ae-venue') !== (r.venue || '')) u.venue = v('ae-venue');
+          if (!Object.keys(u).length) { toast('ไม่มีอะไรเปลี่ยน', 'info'); return; }
+          try {
+            const res = await withBtn(e.currentTarget, () => api.rpc('acct_edit_request', { p_id: r.id, p_updates: u, p_reason: why }));
+            toast(res.changed ? `แก้แล้ว · ${res.changes.join(' · ')}` : 'ไม่มีอะไรเปลี่ยน');
+            close(true); resolve(true);
+          } catch (err) { toastError(err); }
+        };
+      },
+    }).done.then((x) => resolve(!!x)));
+  }
+
   // ─────────── หน้าต่าง ───────────
   async function openItems(email, ym, name) {
     const s = sheet({ title: `รายการเบิก · ${name || email}`, wide: true, body: '<div class="flex"><span class="spin"></span><span class="muted">กำลังโหลด…</span></div>' });
@@ -161,14 +207,18 @@ export async function render(ctx) {
         </dl>
         ${items.some((r) => (r.receipt_paths || []).length) ? '<p class="hint">แตะรายการที่มีไฟล์แนบเพื่อดูใบเสร็จ</p>' : ''}
         <div class="card">${items.length || autos.length ? `<div class="list">
-          ${items.map((r, i) => requestRow(r, { attrs: `data-ri="${i}"` }) + (canAct() && r.status === 'Approved' && !String(r.batch_id || '').startsWith('AUTO-')
-            ? `<div class="row-act"><button type="button" class="btn btn-ghost btn-sm" data-ret="${i}">${icon('rotate-ccw', 'sm')} ตีกลับให้แก้</button></div>` : '')).join('')}
+          ${items.map((r, i) => requestRow(r, { attrs: `data-ri="${i}"` }) + (canAct() && (r.status === 'Approved' || r.status === 'Pending')
+            ? `<div class="row-act">${r.acct_edit_note ? `<span class="text-xs muted grow">${esc(r.acct_edit_note)}</span>` : ''}
+              <button type="button" class="btn btn-ghost btn-sm" data-edit="${i}">${icon('edit', 'sm')} แก้ไข</button>
+              ${r.status === 'Approved' && !String(r.batch_id || '').startsWith('AUTO-') ? `<button type="button" class="btn btn-ghost btn-sm" data-ret="${i}">${icon('rotate-ccw', 'sm')} ตีกลับให้แก้</button>` : ''}</div>` : '')).join('')}
           ${autos.map((a) => `<div class="row">${catIcon(a.category)}<div class="row-main"><div class="row-title">${esc(catName(a.category))}</div><div class="row-sub">ค่าเหมาจ่ายรายเดือน (อัตโนมัติ)</div></div>
             <div class="row-end"><span class="amount">${money(a.amount)}</span><span class="badge b-info plain">อัตโนมัติ</span></div></div>`).join('')}
         </div>` : empty({ ic: 'receipt', title: 'ไม่มีรายการ' })}</div>
         ${d.exportId && d.exportStatus === 'Approved' ? `<button class="btn btn-secondary btn-block" data-xls="${esc(d.exportId)}" data-busy="กำลังสร้างไฟล์…">${icon('download')} ดาวน์โหลดฟอร์มขอเบิกตัวจริง</button>` : ''}
       </div>`;
       s.el.addEventListener('click', async (e) => {
+        const eb = e.target.closest('[data-edit]');
+        if (eb) { if (await editItem(items[+eb.dataset.edit])) { s.close?.(); load(); openItems(email, ym, name); } return; }
         const rb = e.target.closest('[data-ret]');
         if (rb) {
           const it = items[+rb.dataset.ret];
