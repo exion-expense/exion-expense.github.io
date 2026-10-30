@@ -363,6 +363,8 @@ const nf2 = new Intl.NumberFormat('th-TH', { minimumFractionDigits: 2, maximumFr
 const nf0 = new Intl.NumberFormat('th-TH', { maximumFractionDigits: 0 });
 /** 1234.5 → "1,234.50" · money(x, 0) → "1,235" */
 export function money(n, digits = 2) { const v = Number(n) || 0; return digits === 0 ? nf0.format(v) : nf2.format(v); }
+/** ระยะทาง: เลขเต็ม (รายการเก่าที่มีทศนิยม แสดงทศนิยม 1 ตำแหน่งตามที่คิดเงินจริง) */
+export function kmText(k) { const v = Number(k) || 0; return Number.isInteger(v) ? nf0.format(v) : v.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 }); }
 /** "฿1,234.50" */
 export function baht(n, digits = 2) { return '฿' + money(n, digits); }
 /** ย่อเลขใหญ่: 1.2 ล้าน / 45.3K */

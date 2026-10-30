@@ -1,7 +1,7 @@
 // รออนุมัติ — กล่องเดียวแทน inbox / manager-inbox / senior-inbox เดิม
 // แท็บ "รายการเบิก" (เลือกหลายรายการ อนุมัติทีเดียว) + "ขอเบิกรายเดือน" (ใบ Export รอเซ็น)
-import { api, money, fmtDate, fmtDateTime, timeAgo, esc, initials, monthLabel, catName, requestBadge } from '../core.js?v=10.3.1';
-import { html, raw, icon, catIcon, toast, toastError, sheet, confirmBox, promptBox, busy, empty, thumbs, hydrateThumbs, signaturePad, debounce, on } from '../ui.js?v=10.3.1';
+import { api, money, kmText, fmtDate, fmtDateTime, timeAgo, esc, initials, monthLabel, catName, requestBadge } from '../core.js?v=10.4.0';
+import { html, raw, icon, catIcon, toast, toastError, sheet, confirmBox, promptBox, busy, empty, thumbs, hydrateThumbs, signaturePad, debounce, on } from '../ui.js?v=10.4.0';
 
 export async function render(ctx) {
   const { el } = ctx;
@@ -92,7 +92,7 @@ function itemRow(r, checked) {
     ${catIcon(r.category)}
     <div class="row-main">
       <div class="row-title">${pre ? '<span class="brand-text">ขออนุมัติงบ</span> · ' : ''}${esc(catName(r.category))}</div>
-      <div class="row-sub">${fmtDate(r.expense_date)}${desc ? ' · ' + esc(desc) : ''}${r.mileage_km ? ` · ${money(r.mileage_km, 0)} กม.` : ''}${files ? ` · ${icon('paperclip', 'sm')}${files}` : ''}${r.manager_status === 'Bypassed' ? ' · ข้ามขั้นหัวหน้า' : ''}${over ? ' · <span class="bad-text">เกินงบ</span>' : ''}</div>
+      <div class="row-sub">${fmtDate(r.expense_date)}${desc ? ' · ' + esc(desc) : ''}${r.mileage_km ? ` · ${kmText(r.mileage_km)} กม.` : ''}${files ? ` · ${icon('paperclip', 'sm')}${files}` : ''}${r.manager_status === 'Bypassed' ? ' · ข้ามขั้นหัวหน้า' : ''}${r.acct_remark ? ` · <span class="bad-text">บัญชีตีกลับ: ${esc(r.acct_remark)}</span>` : ''}${over ? ' · <span class="bad-text">เกินงบ</span>' : ''}</div>
     </div>
     <div class="row-end"><span class="amount">${money(amtOf(r))}</span>${requestBadge(r)}</div>
   </div>`;
@@ -134,7 +134,7 @@ function detailKv(r) {
     ['วันที่ใช้จ่าย', fmtDate(r.expense_date)],
     [pre ? 'งบที่ขอ' : 'จำนวนเงิน', raw(`<span class="amount">${money(amtOf(r))}</span> บาท`)],
     !pre && budget ? ['งบที่อนุมัติไว้', raw(`${money(budget)} บาท${Number(r.amount) > budget ? ` · <b class="bad-text">เกินงบ ${money(Number(r.amount) - budget)}</b>` : ' · <span class="ok-text">อยู่ในงบ</span>'}`)] : null,
-    r.mileage_km ? ['ระยะทาง', `${money(r.mileage_km, 0)} กม.`] : null,
+    r.mileage_km ? ['ระยะทาง', `${kmText(r.mileage_km)} กม.`] : null,
     r.origin || r.destination ? ['เส้นทาง', `${r.origin || '-'} → ${r.destination || '-'}`] : null,
     r.customer ? ['ลูกค้า', r.customer] : null,
     r.customer_contact ? ['Contact name', r.customer_contact] : null,

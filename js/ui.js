@@ -1,8 +1,8 @@
 // ════════════════════════════════════════════════════════════════════
 //  ui.js — ชิ้นส่วนหน้าจอที่ใช้ร่วมกัน (dialog / toast / รูปใบเสร็จ / ลายเซ็น / ช่องว่าง)
 // ════════════════════════════════════════════════════════════════════
-import { icon, catIcon } from './icons.js?v=10.3.1';
-import { api, esc, money, fmtDate, catName, requestBadge } from './core.js?v=10.3.1';
+import { icon, catIcon } from './icons.js?v=10.4.0';
+import { api, esc, money, kmText, fmtDate, catName, requestBadge } from './core.js?v=10.4.0';
 export { icon, catIcon, esc };
 
 /** html`...` — ค่าที่แทรกถูก escape อัตโนมัติ · array ต่อกันให้ · raw(x) = ไม่ escape */
@@ -132,14 +132,15 @@ export function skeleton(rows = 5) {
 export function requestRow(r, { who = false, href = '', select = false, checked = false, attrs = '' } = {}) {
   const tag = href ? 'a' : 'div';
   const desc = r.venue || r.customer || (r.origin && r.destination ? `${r.origin} → ${r.destination}` : '') || r.occasion || '';
-  const km = r.mileage_km ? ` · ${money(r.mileage_km, 0)} กม.` : '';
+  const km = r.mileage_km ? ` · ${kmText(r.mileage_km)} กม.` : '';
+  const back = r.acct_remark && r.status === 'Pending' ? ` · <span class="bad-text">บัญชีตีกลับ: ${esc(r.acct_remark)}</span>` : '';
   const files = (r.receipt_paths || []).length ? ` · ${icon('paperclip', 'sm')}${r.receipt_paths.length}` : '';
   return `<${tag} class="row ${href ? '' : 'click'}" ${href ? `href="${esc(href)}"` : ''} data-id="${esc(r.id)}" ${attrs}>
     ${select ? `<label class="check" data-stop><input type="checkbox" data-sel="${esc(r.id)}" ${checked ? 'checked' : ''}></label>` : ''}
     ${catIcon(r.category)}
     <div class="row-main">
       <div class="row-title">${who ? `${esc(r.staff_name)} · ` : ''}${esc(catName(r.category))}</div>
-      <div class="row-sub">${fmtDate(r.expense_date)}${desc ? ' · ' + esc(desc) : ''}${km}${files}</div>
+      <div class="row-sub">${fmtDate(r.expense_date)}${desc ? ' · ' + esc(desc) : ''}${km}${files}${back}</div>
     </div>
     <div class="row-end"><span class="amount">${money(r.status === 'PreApprove' && r.preapprove_budget ? r.preapprove_budget : r.amount)}</span>${requestBadge(r)}${String(r.batch_id || '').startsWith('AUTO-') ? '<span class="badge b-info plain">อัตโนมัติ</span>' : ''}</div>
   </${tag}>`;

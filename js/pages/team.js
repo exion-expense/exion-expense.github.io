@@ -1,6 +1,6 @@
 // ทีมของฉัน (หัวหน้า / GM) — ยอดรายคนต่อเดือน · ดูบิลรายคน · ขอเบิกแทน · ออกรหัสชั่วคราวให้ลูกทีม
-import { api, auth, money, compact, fmtDate, fmtDateTime, esc, initials, monthLabel, catName, todayYMD } from '../core.js?v=10.3.1';
-import { icon, catIcon, toast, toastError, sheet, confirmBox, withBtn, busy, empty, skeleton, requestRow, thumbs, hydrateThumbs, monthNav, shiftMonth, bars, debounce, on } from '../ui.js?v=10.3.1';
+import { api, auth, money, kmText, compact, fmtDate, fmtDateTime, esc, initials, monthLabel, catName, todayYMD } from '../core.js?v=10.4.0';
+import { icon, catIcon, toast, toastError, sheet, confirmBox, withBtn, busy, empty, skeleton, requestRow, thumbs, hydrateThumbs, monthNav, shiftMonth, bars, debounce, on } from '../ui.js?v=10.4.0';
 
 const STAGE = { waiting: ['รออนุมัติ', 'b-pending'], approved: ['อนุมัติแล้ว', 'b-approved'], paid: ['โอนแล้ว', 'b-paid'], rejected: ['ไม่อนุมัติ', 'b-rejected'] };
 const pad2 = (n) => String(n).padStart(2, '0');
@@ -95,7 +95,7 @@ function paint(ctx, st) {
       <div class="stat"><div class="l">${icon('chart', 'sm')} เฉลี่ย/คน</div><div class="v">${compact(active ? sum('total') / active : 0)}</div><div class="d">ของคนที่เบิก</div></div>
     </div>
     ${noLogin.length && !role.isViewer ? `<div class="alert warn">${icon('key')}<div><b>${noLogin.length} คนยังไม่เคยเข้าระบบ</b> — ${esc(noLogin.map((p) => p.name).join(', '))}<br>
-      <span class="text-sm">แตะชื่อ แล้วกด “ออกรหัสชั่วคราว” เพื่อให้พนักงานตั้งรหัสผ่านเอง</span></div></div>` : ''}
+      <span class="text-sm">${ctx.profile.isAdmin ? 'แตะชื่อ แล้วกด “ออกรหัสชั่วคราว” เพื่อให้พนักงานตั้งรหัสผ่านเอง' : 'ให้พนักงานติดต่อผู้ดูแลระบบเพื่อรับรหัสชั่วคราว'}</span></div></div>` : ''}
     <div class="split">
       <div class="card"><div class="card-head"><h3>${icon('users')} สมาชิก · ${monthLabel(st.y, st.m)}</h3><span class="text-sm muted">ยอดรวม ${money(sum('total'), 0)}</span></div>
         <div class="list">${memberList(rows, t.manager)}</div></div>
@@ -140,7 +140,7 @@ function openMember(ctx, st, email) {
         <div class="bold text-lg">${esc(p.fullName || p.name)}</div><div class="muted text-sm">${esc(p.email)}</div>
         <div class="flex wrap mt-4">${p.position ? `<span class="badge plain">${esc(p.position)}</span>` : ''}${p.department ? `<span class="badge plain">${esc(p.department)}</span>` : ''}
           ${p.hasPassword ? '<span class="badge b-ok">เข้าระบบแล้ว</span>' : '<span class="badge b-pending">ยังไม่เคยเข้าระบบ</span>'}</div></div></div>
-      ${role.isViewer ? '' : `<div class="alert ${p.hasPassword ? 'neutral' : 'warn'} mb-16">${icon('key')}<div class="grow"><div class="text-sm">${p.hasPassword ? 'ลืมรหัสผ่าน? ออกรหัสชั่วคราวให้พนักงานตั้งรหัสใหม่เอง' : 'ยังไม่เคยเข้าระบบ — ออกรหัสชั่วคราวให้พนักงานใช้ตั้งรหัสผ่านครั้งแรก'}</div>
+      ${role.isViewer || !ctx.profile.isAdmin ? '' : `<div class="alert ${p.hasPassword ? 'neutral' : 'warn'} mb-16">${icon('key')}<div class="grow"><div class="text-sm">${p.hasPassword ? 'ลืมรหัสผ่าน? ออกรหัสชั่วคราวให้พนักงานตั้งรหัสใหม่เอง' : 'ยังไม่เคยเข้าระบบ — ออกรหัสชั่วคราวให้พนักงานใช้ตั้งรหัสผ่านครั้งแรก'}</div>
         <button class="btn btn-secondary btn-sm mt-8" data-code>${icon('key', 'sm')} ออกรหัสชั่วคราว</button></div></div>`}
       <div data-claims>${skeleton(3)}</div>`,
     foot: `<button class="btn btn-secondary" data-xls data-busy="กำลังสร้างไฟล์…" disabled>${icon('download', 'sm')} ดาวน์โหลดฟอร์ม</button>
@@ -200,7 +200,7 @@ function claimsHtml(st, c, exps) {
 
 function itemSheet(r) {
   const paths = r.receipt_paths || [];
-  const kv = [['วันที่', fmtDate(r.expense_date)], ['จำนวนเงิน', money(r.amount) + ' บาท'], r.mileage_km ? ['ระยะทาง', money(r.mileage_km, 0) + ' กม.'] : null,
+  const kv = [['วันที่', fmtDate(r.expense_date)], ['จำนวนเงิน', money(r.amount) + ' บาท'], r.mileage_km ? ['ระยะทาง', kmText(r.mileage_km) + ' กม.'] : null,
     r.origin || r.destination ? ['เส้นทาง', `${r.origin || '-'} → ${r.destination || '-'}`] : null, r.customer ? ['ลูกค้า', r.customer] : null,
     r.venue ? ['สถานที่', r.venue] : null, r.occasion ? [(/^(ENT|GOLF)$/i.test(r.category) ? 'Purpose of entertainment' : 'Purpose of visiting'), r.occasion] : null, r.manager_remark ? ['ความเห็นหัวหน้า', r.manager_remark] : null]
     .filter(Boolean).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');

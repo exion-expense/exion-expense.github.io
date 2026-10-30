@@ -1,7 +1,7 @@
 // บัญชี · โอนเงิน — บอร์ดรายคนต่อเดือน: ยังไม่ขอ → รออนุมัติ → รอโอน → โอนแล้ว + ส่งสรุปให้ CEO
 // แถบแผนก (ซ้าย/บน) เลือกแผนกแล้วดูยอด · ส่ง CEO ทีละแผนก · VIEWER เปิดได้แบบดูอย่างเดียว (canAct = false)
-import { api, money, compact, fmtDate, fmtDateTime, esc, initials, monthLabel, catName, statusBadge } from '../core.js?v=10.3.1';
-import { icon, catIcon, requestRow, toast, toastError, confirmBox, sheet, withBtn, monthNav, shiftMonth, empty, errorBox, lightbox, on, debounce } from '../ui.js?v=10.3.1';
+import { api, money, compact, fmtDate, fmtDateTime, esc, initials, monthLabel, catName, statusBadge } from '../core.js?v=10.4.0';
+import { icon, catIcon, requestRow, toast, toastError, confirmBox, promptBox, sheet, withBtn, monthNav, shiftMonth, empty, errorBox, lightbox, on, debounce } from '../ui.js?v=10.4.0';
 
 const STAGE = {
   ready: ['รอโอน', 'b-approved'], export: ['รออนุมัติ', 'b-pending'], bills: ['บิลรออนุมัติ', 'b-violet'],
@@ -161,13 +161,24 @@ export async function render(ctx) {
         </dl>
         ${items.some((r) => (r.receipt_paths || []).length) ? '<p class="hint">แตะรายการที่มีไฟล์แนบเพื่อดูใบเสร็จ</p>' : ''}
         <div class="card">${items.length || autos.length ? `<div class="list">
-          ${items.map((r, i) => requestRow(r, { attrs: `data-ri="${i}"` })).join('')}
+          ${items.map((r, i) => requestRow(r, { attrs: `data-ri="${i}"` }) + (canAct() && r.status === 'Approved' && !String(r.batch_id || '').startsWith('AUTO-')
+            ? `<div class="row-act"><button type="button" class="btn btn-ghost btn-sm" data-ret="${i}">${icon('rotate-ccw', 'sm')} ตีกลับให้แก้</button></div>` : '')).join('')}
           ${autos.map((a) => `<div class="row">${catIcon(a.category)}<div class="row-main"><div class="row-title">${esc(catName(a.category))}</div><div class="row-sub">ค่าเหมาจ่ายรายเดือน (อัตโนมัติ)</div></div>
             <div class="row-end"><span class="amount">${money(a.amount)}</span><span class="badge b-info plain">อัตโนมัติ</span></div></div>`).join('')}
         </div>` : empty({ ic: 'receipt', title: 'ไม่มีรายการ' })}</div>
         ${d.exportId && d.exportStatus === 'Approved' ? `<button class="btn btn-secondary btn-block" data-xls="${esc(d.exportId)}" data-busy="กำลังสร้างไฟล์…">${icon('download')} ดาวน์โหลดฟอร์มขอเบิกตัวจริง</button>` : ''}
       </div>`;
       s.el.addEventListener('click', async (e) => {
+        const rb = e.target.closest('[data-ret]');
+        if (rb) {
+          const it = items[+rb.dataset.ret];
+          const why = await promptBox({ title: 'ตีกลับรายการให้แก้', label: `เหตุผล (${name || email} และหัวหน้าจะเห็น)`, required: true, ok: 'ตีกลับ', danger: true,
+            hint: `${catName(it.category)} · ${money(it.amount)} บาท — รายการกลับเป็น "รออนุมัติ" ให้พนักงานแก้ แล้วหัวหน้าอนุมัติใหม่ · อยู่ในใบขอเบิกแล้วจะถูกเอาออกจากใบ (ไปรวมรอบถัดไป)` });
+          if (why == null) return;
+          try { await withBtn(rb, () => api.rpc('acct_return_request', { p_id: it.id, p_reason: why })); toast('ตีกลับให้พนักงานแก้แล้ว'); s.close?.(); load(); openItems(email, ym, name); }
+          catch (err) { toastError(err); }
+          return;
+        }
         const x = e.target.closest('[data-xls]');
         if (x) { try { const meta = await withBtn(x, () => api.excel({ type: 'staff_form', kind: 'final', exportId: x.dataset.xls })); if (meta) toast(`ดาวน์โหลดแล้ว · ${meta.filename}`); } catch (err) { toastError(err); } return; }
         const r = e.target.closest('[data-ri]');
@@ -224,12 +235,15 @@ export async function render(ctx) {
     if (!(await confirmBox({ title: 'ส่งสรุปให้ CEO', message: msg, ok: 'ส่งให้ CEO' }))) return;
     return sendCeo(pick, btn);
   }
+  // เลือกได้หลายแผนก (Excel) · ส่ง CEO ได้เฉพาะแผนกเดียว / ทุกแผนก · ติ๊ก "รวมรายการที่หัวหน้าอนุมัติแล้ว" (ไม่ใช่เอกสารที่ CEO เซ็น)
   function openSummarySheet(mode) {
     const b = st.board, rows = deptRows(b);
-    let pick = rows.some((r) => r.d === st.dept) ? st.dept : '*';
+    let picks = new Set([rows.some((r) => r.d === st.dept) ? st.dept : '*']), pending = false;
+    const pickKey = () => (picks.has('*') || !picks.size ? '*' : rows.filter((r) => picks.has(r.d)).map((r) => r.d).join(','));
+    const pickLabel = () => (pickKey() === '*' ? 'ทุกแผนก' : [...picks].join(', '));
     const rowHtml = (r) => {
-      const cs = ceoState(b, r.d);
-      return `<label class="opt-row ${r.d === pick ? 'on' : ''}"><input type="radio" name="sum-dept" value="${esc(r.d)}" ${r.d === pick ? 'checked' : ''}>
+      const cs = ceoState(b, r.d), on = picks.has(r.d);
+      return `<label class="opt-row ${on ? 'on' : ''}"><input type="checkbox" name="sum-dept" value="${esc(r.d)}" ${on ? 'checked' : ''}>
         <div class="grow"><div class="bold">${r.d === '*' ? 'ทุกแผนก (รวมเป็นใบเดียว)' : esc(r.d)}</div>
           <div class="text-sm muted">${money(r.n, 0)} คน · ${money(r.total)} บาท${r.waiting ? ` · <span class="amber-text">รออนุมัติ Export ${money(r.waiting, 0)} คน</span>` : ''}</div></div>
         ${cs.tag ? `<span class="badge ${cs.cls}">${esc(cs.tag)}</span>` : ''}</label>`;
@@ -237,8 +251,9 @@ export async function render(ctx) {
     sheet({
       title: `สรุปยอด ${monthLabel(b.year, b.month, true)}`,
       body: `<div class="stack-sm">
-        <p class="muted text-sm">เลือกแผนกก่อน แล้ว <b>ดาวน์โหลด Excel</b> เพื่อพิมพ์ หรือ <b>ส่งให้ CEO ตรวจ</b> เฉพาะแผนกนั้น — ยอดมาจากใบขอเบิกที่อนุมัติแล้ว (รวมที่โอนแล้ว)</p>
+        <p class="muted text-sm">ติ๊กแผนก (เลือกได้หลายแผนก) แล้ว <b>ดาวน์โหลด Excel</b> เพื่อพิมพ์ — ส่งให้ CEO ตรวจได้ทีละแผนก หรือทุกแผนก · ยอดมาจากใบขอเบิกที่อนุมัติแล้ว (รวมที่โอนแล้ว)</p>
         <div class="opt-list">${rows.map(rowHtml).join('')}</div>
+        <label class="check"><input type="checkbox" data-pending> รวมรายการที่หัวหน้าอนุมัติแล้ว แต่ยังไม่มีใบขอเบิกที่อนุมัติ <span class="text-xs muted">(ชื่อมี * · ใช้ดูยอดก่อน ไม่ใช่เอกสารให้ CEO เซ็น)</span></label>
         <div class="alert neutral hidden" data-why>${icon('info')}<div data-whyt></div></div>
         ${!b.ceoConfigured ? `<div class="alert warn">${icon('alert')}<div>ยังไม่ได้ตั้งค่าอีเมล CEO (CEO_EMAIL) — ส่งให้ CEO ไม่ได้</div></div>` : ''}
       </div>`,
@@ -246,21 +261,32 @@ export async function render(ctx) {
         ${canAct() ? `<button class="btn ${mode === 'ceo' ? 'btn-primary' : 'btn-secondary'}" data-ceo data-busy="กำลังส่ง…">${icon('crown')} ส่งให้ CEO ตรวจ</button>` : ''}`,
       onMount: (box, close) => {
         const sync = () => {
-          box.querySelectorAll('.opt-row').forEach((l) => l.classList.toggle('on', l.querySelector('input').checked));
-          const r = rows.find((x) => x.d === pick), cs = ceoState(b, pick);
-          const why = !canAct() ? '' : !b.ceoConfigured ? 'ยังไม่ได้ตั้งค่าอีเมล CEO' : cs.block || (r && r.n === 0 ? 'แผนกนี้ยังไม่มีใบขอเบิกที่อนุมัติแล้วในเดือนนี้' : '');
+          box.querySelectorAll('.opt-row').forEach((l) => { const i = l.querySelector('input'); i.checked = picks.has(i.value); l.classList.toggle('on', i.checked); });
+          const key = pickKey(), one = key === '*' || !key.includes(',');
+          const sel = rows.filter((x) => (key === '*' ? x.d === '*' : picks.has(x.d)));
+          const n = sel.reduce((s, x) => s + x.n, 0), cs = one ? ceoState(b, key) : { block: '' };
+          const why = !canAct() ? '' : !b.ceoConfigured ? 'ยังไม่ได้ตั้งค่าอีเมล CEO' : !one ? 'ส่งให้ CEO ได้ทีละแผนก หรือทุกแผนก' : pending ? 'ติ๊ก "รวมรายการที่หัวหน้าอนุมัติแล้ว" อยู่ — เอาออกก่อนส่ง CEO'
+            : cs.block || (n === 0 ? 'แผนกนี้ยังไม่มีใบขอเบิกที่อนุมัติแล้วในเดือนนี้' : '');
           const ceoBtn = box.querySelector('[data-ceo]');
-          if (ceoBtn) { ceoBtn.disabled = !!why; ceoBtn.innerHTML = `${icon('crown')} ส่ง ${pick === '*' ? 'ทุกแผนก' : esc(pick)} ให้ CEO ตรวจ`; }
-          box.querySelector('[data-xls]').innerHTML = `${icon('download')} Excel ${pick === '*' ? 'ทุกแผนก' : esc(pick)}`;
-          box.querySelector('[data-xls]').disabled = !!(r && r.n === 0);
+          if (ceoBtn) { ceoBtn.disabled = !!why; ceoBtn.innerHTML = `${icon('crown')} ส่ง ${one ? esc(pickLabel()) : 'แผนก'} ให้ CEO ตรวจ`; }
+          box.querySelector('[data-xls]').innerHTML = `${icon('download')} Excel ${esc(pickLabel())}`;
+          box.querySelector('[data-xls]').disabled = !picks.size || (n === 0 && !pending);
           box.querySelector('[data-why]').classList.toggle('hidden', !why || why === 'ยังไม่ได้ตั้งค่าอีเมล CEO');
           box.querySelector('[data-whyt]').textContent = why;
         };
-        box.addEventListener('change', (e) => { if (e.target.name === 'sum-dept') { pick = e.target.value; sync(); } });
+        box.addEventListener('change', (e) => {
+          if (e.target.matches('[data-pending]')) { pending = e.target.checked; return sync(); }
+          if (e.target.name !== 'sum-dept') return;
+          const v = e.target.value;
+          if (v === '*') picks = new Set(e.target.checked ? ['*'] : []);
+          else { picks.delete('*'); if (e.target.checked) picks.add(v); else picks.delete(v); }
+          if (!picks.size) picks.add('*');
+          sync();
+        });
         sync();
-        box.querySelector('[data-xls]').onclick = (e) => downloadSummary(pick, e.currentTarget);
+        box.querySelector('[data-xls]').onclick = (e) => downloadSummary(pickKey() + (pending ? '|pending' : ''), e.currentTarget);
         const ceoBtn = box.querySelector('[data-ceo]');
-        if (ceoBtn) ceoBtn.onclick = (e) => sendCeo(pick, e.currentTarget, close);
+        if (ceoBtn) ceoBtn.onclick = (e) => sendCeo(pickKey(), e.currentTarget, close);
       },
     });
   }

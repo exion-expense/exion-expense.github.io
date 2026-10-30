@@ -1,6 +1,6 @@
 // ตรวจคำขอเบิกรายเดือน (ใบ Export) — ผู้อนุมัติเซ็น / ปรับช่วงรอบ · บัญชี/GM ยืนยันโอน · ดาวน์โหลดฟอร์ม
-import { api, money, fmtDate, fmtDateTime, esc, initials, monthLabel, catName, requestBadge, todayYMD } from '../core.js?v=10.3.1';
-import { html, raw, icon, catIcon, toast, toastError, sheet, confirmBox, promptBox, withBtn, empty, thumbs, hydrateThumbs, debounce, on } from '../ui.js?v=10.3.1';
+import { api, money, kmText, fmtDate, fmtDateTime, esc, initials, monthLabel, catName, requestBadge, todayYMD } from '../core.js?v=10.4.0';
+import { html, raw, icon, catIcon, toast, toastError, sheet, confirmBox, promptBox, withBtn, empty, thumbs, hydrateThumbs, debounce, on } from '../ui.js?v=10.4.0';
 
 const STAGE = { waiting: ['รออนุมัติ', 'b-pending'], approved: ['อนุมัติแล้ว · รอโอน', 'b-approved'], paid: ['โอนแล้ว', 'b-paid'], rejected: ['ไม่อนุมัติ', 'b-rejected'] };
 
@@ -195,7 +195,7 @@ function itemRow(r) {
   const files = (r.receipt_paths || []).length;
   return `<div class="row click" data-item="${esc(r.id)}">${catIcon(r.category)}
     <div class="row-main"><div class="row-title">${esc(desc || catName(r.category))}</div>
-      <div class="row-sub">${fmtDate(r.expense_date)}${r.mileage_km ? ` · ${money(r.mileage_km, 0)} กม.` : ''}${files ? ` · ${icon('paperclip', 'sm')}${files}` : ''}</div></div>
+      <div class="row-sub">${fmtDate(r.expense_date)}${r.mileage_km ? ` · ${kmText(r.mileage_km)} กม.` : ''}${files ? ` · ${icon('paperclip', 'sm')}${files}` : ''}</div></div>
     <div class="row-end"><span class="amount">${money(r.amount)}</span>${r.status !== 'Approved' ? requestBadge(r) : ''}</div></div>`;
 }
 
@@ -205,7 +205,7 @@ function openItem(st, id) {
   const rows = [
     ['หมวด', catName(r.category)], ['วันที่ใช้จ่าย', fmtDate(r.expense_date)],
     ['จำนวนเงิน', raw(`<span class="amount">${money(r.amount)}</span> บาท`)],
-    r.mileage_km ? ['ระยะทาง', `${money(r.mileage_km, 0)} กม.`] : null,
+    r.mileage_km ? ['ระยะทาง', `${kmText(r.mileage_km)} กม.`] : null,
     r.origin || r.destination ? ['เส้นทาง', `${r.origin || '-'} → ${r.destination || '-'}`] : null,
     r.customer ? ['ลูกค้า', r.customer] : null, r.customer_contact ? ['Contact name', r.customer_contact] : null,
     r.venue ? ['สถานที่', r.venue] : null, r.occasion ? [(/^(ENT|GOLF)$/i.test(r.category) ? 'Purpose of entertainment' : 'Purpose of visiting'), r.occasion] : null, r.attendees ? ['ผู้เข้าร่วม', r.attendees] : null,

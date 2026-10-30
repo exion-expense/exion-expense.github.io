@@ -1,7 +1,7 @@
 // ขอเบิกค่าใช้จ่าย — กรอกได้หลายรายการในครั้งเดียว · เซฟร่างอัตโนมัติ · กันส่งซ้ำด้วย batchId
 // ส่วนช่องกรอกตามหมวด (export ด้านล่าง) ใช้ร่วมกับหน้าแก้ไขใน requests.js
-import { api, state, money, esc, fmtDate, catName, catInfo, todayYMD, addDays, loadCategories, timeAgo } from '../core.js?v=10.3.1';
-import { html, icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, on, debounce, $, $$ } from '../ui.js?v=10.3.1';
+import { api, state, money, esc, fmtDate, catName, catInfo, todayYMD, addDays, loadCategories, timeAgo } from '../core.js?v=10.4.0';
+import { html, icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, on, debounce, $, $$ } from '../ui.js?v=10.4.0';
 
 const NO_JOB = [];                                      // ทุกหมวดใส่เลข Job ได้ (ไม่บังคับ · ค่ารับรอง/กอล์ฟบังคับ) → ลงช่อง Job ใน Excel
 const ENT_CATS = ['ENT', 'GOLF'];
@@ -63,7 +63,7 @@ export function fieldsHtml(it, { listId = 'exCustList' } = {}) {
     <div class="field"><label class="req">วันที่ใช้จ่าย</label>
       <input class="input" type="date" data-f="expenseDate" value="${v('expenseDate')}" max="${todayYMD()}">${err('expenseDate')}</div>
     <div class="field" data-g="km"><label class="req">ระยะทาง</label>
-      <div class="input-group has-suf"><input class="input" type="number" inputmode="decimal" step="0.1" min="0" placeholder="เช่น 45.5" data-f="mileageKm" value="${v('mileageKm')}"><span class="suf">กม.</span></div>${err('mileageKm')}</div>
+      <div class="input-group has-suf"><input class="input" type="number" inputmode="numeric" step="1" min="0" placeholder="เช่น 45" data-f="mileageKm" value="${v('mileageKm')}"><span class="suf">กม.</span></div>${err('mileageKm')}</div>
     <div class="field" data-g="amt"><label class="req">จำนวนเงิน</label>
       <div class="input-group has-pre has-suf"><span class="pre">฿</span><input class="input" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" data-f="amount" value="${v('amount')}"><span class="suf">บาท</span></div>${err('amount')}</div>
     <div class="span-2 hidden" data-g="fuelcalc"></div>
@@ -91,7 +91,7 @@ export function fieldsHtml(it, { listId = 'exCustList' } = {}) {
 /** ยอดของรายการ (น้ำมัน = กม. × เรท โดยประมาณ) */
 export function itemAmount(it, fuel) {
   if (String(it.category).toUpperCase() === 'FUEL') {
-    const km = Number(it.mileageKm) || 0;
+    const km = Math.floor(Number(it.mileageKm) || 0);   // ระยะทางเลขเต็ม (ทศนิยมปัดลง เหมือนฝั่งเซิร์ฟเวอร์)
     return fuel?.rate ? Math.round(km * fuel.rate * 100) / 100 : 0;
   }
   return Number(it.amount) || 0;
@@ -101,11 +101,11 @@ export function itemAmount(it, fuel) {
 export function fuelBox(it, fuel) {
   if (!fuel) return `<div class="alert neutral">${icon('fuel')}<span>กำลังโหลดเรทน้ำมัน…</span></div>`;
   if (fuel.error) return `<div class="alert warn">${icon('alert')}<span>โหลดเรทน้ำมันไม่สำเร็จ — ระบบจะคำนวณยอดให้ตอนบันทึก</span></div>`;
-  const km = Number(it.mileageKm) || 0;
+  const km = Math.floor(Number(it.mileageKm) || 0);
   return `<div class="alert ok">${icon('calculator')}<div class="grow">
     <div class="flex between wrap"><span>ค่าน้ำมันโดยประมาณ</span><b class="amount">฿${money(itemAmount(it, fuel))}</b></div>
-    <div class="text-sm">${money(km, 1)} กม. × ฿${money(fuel.rate)}/กม. · ${esc(RATE_TYPE[fuel.rateType] || fuel.rateType || '')}${fuel.gasPrice ? ` · น้ำมันวันนี้ ${money(fuel.gasPrice)} บาท/ลิตร` : ''}</div>
-    <div class="text-xs mt-4">ยอดจริงคิดจากราคาน้ำมันวันที่ 20 ของเดือนที่ใช้จ่าย (ก่อนวันที่ 20 เป็นยอดประมาณ)</div></div></div>`;
+    <div class="text-sm">${money(km, 0)} กม. × ฿${money(fuel.rate)}/กม. · ${esc(RATE_TYPE[fuel.rateType] || fuel.rateType || '')}${fuel.gasPrice ? ` · น้ำมันวันนี้ ${money(fuel.gasPrice)} บาท/ลิตร` : ''}</div>
+    <div class="text-xs mt-4">ระยะทางคิดเป็นเลขเต็ม (ทศนิยมปัดลง) · ยอดจริงคิดจากราคาน้ำมันวันที่ 20 ของรอบเบิก (เดินทางหลังวันตัดรอบ = รอบเดือนถัดไป)</div></div></div>`;
 }
 
 /** คำที่บ่งว่าเป็นค่ารับรอง / กอล์ฟ (เลี่ยงคำกว้าง ๆ เช่น "รับรอง" "เลี้ยง" ที่ไปติด "ใบรับรอง" "เบี้ยเลี้ยง") */

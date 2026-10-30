@@ -1,7 +1,7 @@
 // คำขอของฉัน — กรองตามสถานะ / ค้นหา / จัดกลุ่มรายเดือน · แตะดูรายละเอียด แก้ไข ลบ
-import { api, state, money, esc, fmtDate, fmtDateTime, catName, catInfo, monthLabel, requestBadge, loadCategories } from '../core.js?v=10.3.1';
-import { icon, catIcon, requestRow, toast, toastError, confirmBox, promptBox, sheet, busy, empty, skeleton, thumbs, hydrateThumbs, receiptPicker, on, debounce, $, $$ } from '../ui.js?v=10.3.1';
-import { catPickerHtml, fieldsHtml, applyCat, validateItem, showErrors, clearError, catFlags, fuelBox, pickFields, loadVisitRules, entWarn } from './submit.js?v=10.3.1';
+import { api, state, money, kmText, esc, fmtDate, fmtDateTime, catName, catInfo, monthLabel, requestBadge, loadCategories } from '../core.js?v=10.4.0';
+import { icon, catIcon, requestRow, toast, toastError, confirmBox, promptBox, sheet, busy, empty, skeleton, thumbs, hydrateThumbs, receiptPicker, on, debounce, $, $$ } from '../ui.js?v=10.4.0';
+import { catPickerHtml, fieldsHtml, applyCat, validateItem, showErrors, clearError, catFlags, fuelBox, pickFields, loadVisitRules, entWarn } from './submit.js?v=10.4.0';
 
 const FILTERS = [['all', 'ทั้งหมด'], ['pending', 'รออนุมัติ'], ['approved', 'อนุมัติแล้ว'], ['rejected', 'ไม่อนุมัติ'], ['pre', 'งบล่วงหน้า']];
 
@@ -135,7 +135,7 @@ export async function render(ctx) {
     const over = fromPre && preBudget != null && billTotal > Number(preBudget);
     const kv = [
       ['วันที่ใช้จ่าย', fmtDate(r.expense_date, { full: true })],
-      r.mileage_km ? ['ระยะทาง', `${money(r.mileage_km, 1)} กม.`] : null,
+      r.mileage_km ? ['ระยะทาง', `${kmText(r.mileage_km)} กม.`] : null,
       r.origin || r.destination ? ['เส้นทาง', esc([r.origin, r.destination].filter(Boolean).join(' → '))] : null,
       r.venue ? [f.ent ? 'สถานที่' : 'รายละเอียด', esc(r.venue)] : null,
       r.customer ? ['ลูกค้า', custHtml(r.customer)] : null,
@@ -183,6 +183,7 @@ export async function render(ctx) {
       if (fromPre) T.push({ ic: 'receipt', cls: 'c-blue', title: 'ส่งบิลจริงแล้ว', sub: `ยอดจริง ฿${money(r.amount)}` });
       if (!fromPre) return T;
     }
+    if (r.acct_returned_at) T.push({ ic: 'rotate-ccw', cls: 'c-red', title: 'บัญชีตีกลับให้แก้', sub: fmtDateTime(r.acct_returned_at) + (r.status === 'Pending' ? ' · แก้แล้วรอหัวหน้าอนุมัติใหม่ (ไปรวมรอบถัดไป)' : ''), note: r.acct_remark });
     const ms = r.manager_status || '';
     const auto = r.status === 'Approved' && (r.approved_by === 'auto' || r.approved_by === 'system' || !ms);
     if (auto && isAuto(r)) T.push({ ic: 'check', cls: 'c-green', title: 'ลงให้อัตโนมัติ · ค่าเหมาจ่ายรายเดือน', sub: r.manager_remark || 'ตามยอดที่บริษัทตั้งไว้' });

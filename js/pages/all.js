@@ -1,6 +1,6 @@
 // คำขอทั้งบริษัท (GM / บัญชี / CEO / ผู้ดูรายงาน) — เลือกช่วงวัน · กรองสถานะ/แผนก/หมวด/คน · ค้นหา · Excel
-import { api, money, compact, fmtDate, fmtDateTime, esc, catName, requestBadge, ymd } from '../core.js?v=10.3.1';
-import { html, raw, icon, catIcon, toast, toastError, sheet, withBtn, empty, skeleton, errorBox, requestRow, thumbs, hydrateThumbs, debounce, on } from '../ui.js?v=10.3.1';
+import { api, money, kmText, compact, fmtDate, fmtDateTime, esc, catName, requestBadge, ymd } from '../core.js?v=10.4.0';
+import { html, raw, icon, catIcon, toast, toastError, sheet, withBtn, empty, skeleton, errorBox, requestRow, thumbs, hydrateThumbs, debounce, on } from '../ui.js?v=10.4.0';
 
 const PRESETS = [['period', 'รอบนี้'], ['month', 'เดือนนี้'], ['last', 'เดือนก่อน'], ['custom', 'กำหนดเอง']];
 const STATUSES = [['all', 'ทั้งหมด'], ['Pending', 'รออนุมัติ'], ['Approved', 'อนุมัติแล้ว'], ['Rejected', 'ไม่อนุมัติ'], ['PreApprove', 'ขออนุมัติงบ'], ['Finalized', 'ส่งบิลแล้ว']];
@@ -174,7 +174,7 @@ function paintResults(ctx, st) {
           <td class="nowrap">${fmtDate(r.expense_date)}</td>
           <td><div class="bold">${esc(r.staff_name)}</div><div class="text-xs muted">${esc(r.department || '')}</div></td>
           <td class="nowrap">${esc(catName(r.category))}</td>
-          <td><div class="ellipsis" style="max-width:280px">${esc(desc) || '<span class="faint">-</span>'}</div>${r.mileage_km ? `<div class="text-xs muted">${money(r.mileage_km, 0)} กม.</div>` : ''}${files ? `<div class="text-xs muted">${icon('paperclip', 'sm')} ${files} ไฟล์</div>` : ''}</td>
+          <td><div class="ellipsis" style="max-width:280px">${esc(desc) || '<span class="faint">-</span>'}</div>${r.mileage_km ? `<div class="text-xs muted">${kmText(r.mileage_km)} กม.</div>` : ''}${files ? `<div class="text-xs muted">${icon('paperclip', 'sm')} ${files} ไฟล์</div>` : ''}</td>
           <td class="r"><span class="amount ${counts(r) ? '' : 'muted'}">${money(shownAmt(r))}</span>${r.status === 'PreApprove' ? '<div class="text-xs muted">งบที่ขอ</div>' : ''}</td>
           <td>${requestBadge(r)}</td></tr>`;
       }).join('')}</tbody>
@@ -195,7 +195,7 @@ function openDetail(st, id) {
     ['หมวด', catName(r.category)], ['วันที่ใช้จ่าย', fmtDate(r.expense_date)],
     [pre ? 'งบที่ขอ' : 'จำนวนเงิน', raw(`<span class="amount">${money(shownAmt(r))}</span> บาท`)],
     !pre && Number(r.preapprove_budget) > 0 ? ['งบที่อนุมัติไว้', `${money(r.preapprove_budget)} บาท`] : null,
-    r.mileage_km ? ['ระยะทาง', `${money(r.mileage_km, 0)} กม.`] : null,
+    r.mileage_km ? ['ระยะทาง', `${kmText(r.mileage_km)} กม.`] : null,
     r.origin || r.destination ? ['เส้นทาง', `${r.origin || '-'} → ${r.destination || '-'}`] : null,
     r.customer ? ['ลูกค้า', r.customer] : null, r.customer_contact ? ['Contact name', r.customer_contact] : null,
     r.venue ? ['สถานที่', r.venue] : null, r.occasion ? [(/^(ENT|GOLF)$/i.test(r.category) ? 'Purpose of entertainment' : 'Purpose of visiting'), r.occasion] : null, r.attendees ? ['ผู้เข้าร่วม', r.attendees] : null,

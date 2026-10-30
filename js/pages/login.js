@@ -1,9 +1,9 @@
 // หน้าเข้าสู่ระบบ: อีเมล + รหัสผ่าน (รหัสเดิมจากระบบเก่าใช้ได้)
-// ลืมรหัส → ลิงก์ทางอีเมล (ถ้าเปิดไว้) หรือ รหัสชั่วคราว 6 หลักจากหัวหน้า
+// ลืมรหัส → รหัสชั่วคราว 6 หลักจากผู้ดูแลระบบ (ลิงก์ทางอีเมลเฉพาะเมื่อเปิดโหมดอีเมลไว้)
 // ใช้ครั้งแรก (ยังไม่เคยมีรหัส · ช่วงเปิดระบบ SELF_SETUP_UNTIL) → ตั้งรหัสเองได้เลย
 // ข้อความทุกแบบไม่บอกว่าอีเมลไหนมีในระบบ (กันคนนอกสุ่มหารายชื่อพนักงาน)
-import { auth, esc, cfg, state, MOCK_MODE, passwordProblem } from '../core.js?v=10.3.1';
-import { icon, toast, withBtn } from '../ui.js?v=10.3.1';
+import { auth, esc, cfg, state, MOCK_MODE, passwordProblem } from '../core.js?v=10.4.0';
+import { icon, toast, withBtn } from '../ui.js?v=10.4.0';
 
 export function render({ el, onLoggedIn }) {
   let email = localStorage.getItem('exion_last_email') || '';
@@ -95,7 +95,7 @@ export function render({ el, onLoggedIn }) {
           const r = await auth.requestReset(v);
           if (r.mode === 'setup') stepSetup();
           else if (r.mode === 'email') stepSent(r.message);
-          else stepCode(r.message, 'info');
+          else stepCode('ถ้าอีเมลนี้อยู่ในระบบ เราแจ้งผู้ดูแลระบบแล้ว — ติดต่อผู้ดูแลระบบเพื่อรับรหัสชั่วคราว 6 หลัก แล้วกรอกในหน้านี้', 'info');
         } catch (err) { stepForgot(err.message); }
       });
     };
@@ -107,7 +107,7 @@ export function render({ el, onLoggedIn }) {
       <img class="auth-logo" src="brand/logo.png" alt="EXION Thailand">
       <h1>เช็คอีเมลของคุณ 📬</h1>
       <div class="alert ok mt-16 mb-16">${icon('check-circle')}<div>${esc(message)}</div></div>
-      <p class="muted text-sm">เปิดอีเมลจาก EXION บนเครื่องนี้ แล้วกดลิงก์ "ตั้งรหัสผ่านใหม่" — ถ้าไม่ได้รับภายใน 5 นาที ให้ขอใหม่ หรือขอรหัสชั่วคราวจากหัวหน้า/GM</p>
+      <p class="muted text-sm">เปิดอีเมลจาก EXION บนเครื่องนี้ แล้วกดลิงก์ "ตั้งรหัสผ่านใหม่" — ถ้าไม่ได้รับภายใน 5 นาที ให้ขอใหม่ หรือขอรหัสชั่วคราวจากผู้ดูแลระบบ</p>
       <div class="btn-row mt-16">
         <button class="btn btn-secondary" type="button" data-back>${icon('chevron-left', 'sm')} หน้าเข้าสู่ระบบ</button>
         <button class="btn btn-ghost" type="button" data-code>มีรหัสชั่วคราวแล้ว</button>
@@ -152,7 +152,7 @@ export function render({ el, onLoggedIn }) {
     af.innerHTML = `
       <img class="auth-logo" src="brand/logo.png" alt="EXION Thailand">
       <h1>ตั้งรหัสผ่านใหม่</h1>
-      <p class="sub">กรอก <b>รหัสชั่วคราว 6 หลัก</b> ที่ได้จากหัวหน้าหรือผู้ดูแลระบบ แล้วตั้งรหัสผ่านของคุณ</p>
+      <p class="sub">กรอก <b>รหัสชั่วคราว 6 หลัก</b> ที่ได้จากผู้ดูแลระบบ แล้วตั้งรหัสผ่านของคุณ</p>
       ${alertBox(msg, kind)}
       <form class="stack" id="f" novalidate>
         <div class="field"><label for="em">อีเมล</label>
