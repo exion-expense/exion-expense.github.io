@@ -1,7 +1,7 @@
 // ใบสำคัญจ่าย — รอฉัน / ของฉัน / ทั้งหมด · ค้นหาเลขใบ, Job, PO, Cost sheet, ผู้รับเงิน · กรองตามขั้น · อนุมัติหลายใบพร้อมกัน (ยกเว้นบัญชี 1 ที่ต้องเลือก VAT ทีละใบ)
-import { api, money, esc } from '../core.js?v=10.1.7';
-import { icon, toast, confirmBox, promptBox, busy, empty, errorBox, skeleton, debounce, on, $ } from '../ui.js?v=10.1.7';
-import { STAGES, pvRow } from './pv-common.js?v=10.1.7';
+import { api, money, esc } from '../core.js?v=10.2.0';
+import { icon, toast, confirmBox, promptBox, busy, empty, errorBox, skeleton, debounce, on, $ } from '../ui.js?v=10.2.0';
+import { STAGES, pvRow } from './pv-common.js?v=10.2.0';
 
 export async function render(ctx) {
   const { el, query } = ctx;
@@ -19,7 +19,9 @@ export async function render(ctx) {
       <div class="search">${icon('search')}<input class="input" type="search" data-q placeholder="ค้นหา เลขใบ / Job / PO / Cost sheet / ผู้รับเงิน" aria-label="ค้นหา" value="${esc(st.q)}"></div>
       <a class="btn btn-primary" href="#/petty/request">${icon('plus')} เบิกใหม่</a>
       <a class="btn btn-secondary hidden" href="#/pv/dashboard" data-dash>${icon('chart')} Dashboard</a>
+      <a class="btn btn-secondary hidden" href="#/pv/report" data-report>${icon('file')} รายการที่จ่ายแล้ว</a>
     </div>
+    <div data-cashwarn></div>
     <div class="chips" data-stages>${STAGES.map(([k, l]) => `<button type="button" class="chip ${st.stage === k ? 'on' : ''}" data-stage="${k}">${l}</button>`).join('')}</div>
     <div data-list>${skeleton(5)}</div>
   </div>`;
@@ -50,6 +52,7 @@ export async function render(ctx) {
     el.querySelectorAll('[data-s]').forEach((b) => b.classList.toggle('on', b.dataset.s === st.scope));
     el.querySelectorAll('[data-stage]').forEach((b) => b.classList.toggle('on', b.dataset.stage === st.stage));
     $('[data-dash]', el).classList.toggle('hidden', !st.meta?.canDash);
+    $('[data-report]', el).classList.toggle('hidden', !st.meta?.canReport);
     const list = $('[data-list]', el);
     if (!st.items.length) {
       list.innerHTML = `<div class="card">${empty({ ic: 'receipt', title: st.q || st.stage ? 'ไม่พบใบที่ตรงเงื่อนไข' : st.scope === 'todo' ? 'ไม่มีใบที่รอคุณ' : 'ยังไม่มีใบสำคัญจ่าย',
@@ -91,6 +94,14 @@ export async function render(ctx) {
     ctx.refreshBadges();
     await load();
   }
+
+  // บัญชี / คนถือกล่อง: ยอดใบรอจ่ายรอบ Petty cash เกินเงินในกล่อง → เตือน
+  api.rpc('get_pv_cash_check', {}, { quiet: true }).then((c) => {
+    const box = $('[data-cashwarn]', el);
+    if (!box || !c?.over) return;
+    box.innerHTML = `<div class="alert warn">${icon('alert')}<div>ใบที่รอจ่ายรอบ Petty cash รวม <b>${money(c.pending)}</b> บาท (${c.count} ใบ) เกินเงินในกล่อง <b>${money(c.cash)}</b> บาท อยู่ <b>${money(c.short)}</b> บาท
+      — เติมเงินกล่อง หรือย้ายบางใบไปรอบวันที่ 20</div></div>`;
+  }).catch(() => {});
 
   // ค่าเริ่ม: มีใบรอฉัน → แท็บรอฉัน ไม่งั้นของฉัน
   if (!st.scope) {

@@ -1,10 +1,13 @@
-// ใบสำคัญจ่าย 1 ใบ — ขั้นอนุมัติ / กดอนุมัติ-ตีกลับ / บัญชี 1 เลือก VAT-WHT + จ่ายเงิน / เคลียร์ advance / พิมพ์ใบฟ้า
-import { api, money, fmtDate, fmtDateTime, esc, todayYMD, catName, loadPettyCategories } from '../core.js?v=10.1.7';
-import { icon, catIcon, toast, toastError, confirmBox, promptBox, busy, withBtn, sheet, thumbs, hydrateThumbs, receiptPicker, errorBox, skeleton, on, $ } from '../ui.js?v=10.1.7';
-import { DOCS, KIND, isTest, stageBadge, kindBadge, voucherHtml, hydrateSigs, printVoucher, PRINT_SIZES, PRINT_COLORS, printPrefs, savePrintPrefs } from './pv-common.js?v=10.1.7';
+// ใบสำคัญจ่าย 1 ใบ — ขั้นอนุมัติ / กดอนุมัติ-ตีกลับ / บัญชี 1 เลือก VAT + หัก ณ ที่จ่ายหลายอัตรา / ส่วนของบัญชี (รอบจ่าย · วันที่ + ID document · แก้ไข · สลิป)
+// จ่ายเงิน (+ สลิปโอน) / เคลียร์ advance / พิมพ์ใบฟ้า
+import { api, money, fmtDate, fmtDateTime, esc, todayYMD, catName, loadPettyCategories } from '../core.js?v=10.2.0';
+import { icon, catIcon, toast, toastError, confirmBox, promptBox, busy, withBtn, sheet, thumbs, hydrateThumbs, receiptPicker, errorBox, skeleton, on, $, $$ } from '../ui.js?v=10.2.0';
+import { DOCS, KIND, isTest, stageBadge, kindBadge, roundBadge, roundLabel, whtLines, remarkText, voucherHtml, hydrateSigs, printVoucher, PRINT_SIZES, PRINT_COLORS, printPrefs, savePrintPrefs } from './pv-common.js?v=10.2.0';
 
 const ACT = { submit: 'ส่งใบเบิก', resubmit: 'แก้แล้วส่งใหม่', approve: 'อนุมัติ', reject: 'ตีกลับ', pay: 'จ่ายเงิน', cancel: 'ยกเลิก',
-  adv_clear: 'ส่งเคลียร์', adv_back: 'ตีกลับการเคลียร์', adv_ok: 'เคลียร์เรียบร้อย' };
+  adv_clear: 'ส่งเคลียร์', adv_back: 'ตีกลับการเคลียร์', adv_ok: 'เคลียร์เรียบร้อย', edit: 'แก้ไขใบ', round: 'เลือกรอบจ่าย', slip: 'แนบสลิป' };
+const WHT_RATES = [1, 3, 5];
+const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
 // พิมพ์ใบฟ้าได้ตั้งแต่ถึงขั้นบัญชี 1 (ลายเซ็นเติมตามคนที่อนุมัติแล้ว)
 function canPrint(v) {
@@ -17,7 +20,8 @@ export async function render(ctx) {
   const { el, query } = ctx;
   const id = query.id;
   if (!id) { ctx.go('/pv'); return; }
-  const st = { v: null, vat: null, wht: null, clr: null };
+  // vat: null = ยังไม่เลือก · wht: null = ยังไม่เลือก / [] = ไม่หัก / [{rate, base}]
+  const st = { v: null, vat: null, wht: null, clr: null, slip: null, slip2: null, cash: null };
 
   async function load() {
     try {
@@ -26,9 +30,10 @@ export async function render(ctx) {
       ctx.setTitle(st.v.id);
       // บัญชี 1 เคยเลือก VAT / หัก ณ ที่จ่ายแล้ว (ใบถูกตีกลับมา) → ใช้ค่าเดิม ไม่ต้องเลือกใหม่
       if (st.v.isFin1Step && st.vat == null && (st.v.history || []).some((h) => h.act === 'approve' && h.label === 'บัญชี 1')) {
-        st.vat = Number(st.v.vatRate) || 0; st.wht = Number(st.v.whtRate) || 0;
+        st.vat = Number(st.v.vatRate) || 0; st.wht = whtLines(st.v).map((w) => ({ rate: Number(w.rate), base: Number(w.base) }));
       }
-      paint();
+      st.cash = (st.v.canPay || st.v.canSetRound) ? await api.rpc('get_pv_cash_check', {}, { quiet: true }).catch(() => null) : null;
+      if (ctx.alive()) paint();
     } catch (e) { if (ctx.alive()) errorBox(el, e, load); }
   }
   const after = async (msg) => { if (msg) toast(msg); ctx.refreshBadges(); await load(); };
@@ -39,38 +44,43 @@ export async function render(ctx) {
     const done = (s) => s.state === 'done';
     const nowIdx = v.status === 'Pending' ? v.step : -1;
     const payDone = v.status === 'Paid', payNow = v.status === 'Approved';
+    const W = whtLines(v);
     el.innerHTML = `
     <div class="stack">
       <div class="card pad stack-sm">
         <div class="flex between wrap gap-8">
           <div class="stack-sm" style="gap:4px"><div class="flex wrap gap-8"><b class="mono text-lg">${esc(v.id)}</b>${isTest(v.id) ? '<span class="badge b-pending">ข้อมูลทดลอง</span>' : ''}${kindBadge(v.kind)}${v.isOffice ? '<span class="badge b-info plain">Office expenses</span>' : ''}</div>
+            <div><b>${esc(v.supplier || v.payee)}</b></div>
             <div class="text-sm muted">${esc(v.requesterName)}${v.department ? ' · ' + esc(v.department) : ''}${v.onBehalfBy ? ` · <span class="badge b-info plain">กรอกโดย ${esc(v.onBehalfBy)}</span>` : ''} · ${fmtDateTime(v.createdAt)}</div></div>
-          <div class="text-right"><div class="callout-amount"><span class="v amount">${money(v.amount)}</span><span class="muted">บาท</span></div>${stageBadge(v)}</div>
+          <div class="text-right"><div class="callout-amount"><span class="v amount">${money(v.amount)}</span><span class="muted">บาท</span></div>
+            <div class="flex wrap gap-8" style="justify-content:flex-end">${stageBadge(v)}${v.stage === 'pay' ? '' : roundBadge(v)}</div></div>
         </div>
         <div class="pv-progress">${steps.map((s, i) => `<div class="pv-ps ${done(s) ? 'done' : i === nowIdx ? 'now' : ''}">
             <span class="dot">${done(s) ? icon('check', 'sm') : ''}</span><span class="t">${esc(s.label)}</span>
             <span class="n">${done(s) ? esc(s.byName) : ''}</span>${done(s) && s.at ? `<span class="d">${fmtDate(s.at)}</span>` : ''}</div>`).join('')}
-          <div class="pv-ps ${payDone ? 'done' : payNow ? 'now' : ''}"><span class="dot">${payDone ? icon('check', 'sm') : ''}</span><span class="t">จ่ายเงิน</span>
-            <span class="n">${payDone ? esc(v.paidBy || '') : ''}</span>${payDone ? `<span class="d">${fmtDate(v.paidAt)}</span>` : ''}</div>
+          <div class="pv-ps ${payDone ? 'done' : payNow ? 'now' : ''}"><span class="dot">${payDone ? icon('check', 'sm') : ''}</span><span class="t">${v.payRound === 'D20' ? 'โอนรอบ 20' : 'จ่ายเงิน'}</span>
+            <span class="n">${payDone ? esc(v.paidBy || '') : ''}</span>${payDone ? `<span class="d">${fmtDate(v.paidAt)}</span>` : v.payRound === 'D20' && v.payDue ? `<span class="d">${fmtDate(v.payDue)}</span>` : ''}</div>
         </div>
         ${v.status === 'Returned' || (v.status === 'Pending' && v.remark) ? `<div class="alert ${v.status === 'Returned' ? 'bad' : 'warn'}">${icon('alert')}<div><b>${v.status === 'Returned' ? 'ถูกตีกลับให้แก้' : 'ถูกตีกลับมาที่ขั้นนี้'}:</b> ${esc(v.remark)}</div></div>` : ''}
         ${v.advOverdue ? `<div class="alert bad">${icon('clock')}<div>เลยกำหนดเคลียร์ advance (${fmtDate(v.advDue)}) — ส่งใบเสร็จด้านล่าง</div></div>` : v.kind === 'ADV' && v.advDue && v.advClear !== 'Cleared' ? `<div class="alert warn">${icon('clock')}<div>ต้องเคลียร์ advance ภายใน <b>${fmtDate(v.advDue)}</b></div></div>` : ''}
       </div>
 
       ${actionCard(v)}
+      ${finCard(v)}
 
       <div class="card pad stack-sm">
         <div class="flex between wrap"><b>รายละเอียด</b>${canPrint(v) ? `<button type="button" class="btn btn-secondary btn-sm" data-act="voucher">${icon('file', 'sm')} ใบฟ้า / พิมพ์</button>` : '<span class="text-xs muted">พิมพ์ใบฟ้าได้ตั้งแต่ขั้นบัญชี 1</span>'}</div>
         <dl class="kv">${[
-          ['จ่ายให้', v.payee], ['ธนาคาร', v.payBank], ['เลขบัญชี', v.payAccount], ['Job No.', v.jobNo], ['PO No.', v.poNo], ['Cost sheet No.', v.costSheetNo],
-          [v.kind === 'ADV' ? 'วันที่จะใช้' : 'วันที่', v.expenseDate ? fmtDate(v.expenseDate) : ''], ['วันที่จัดส่งสินค้า', v.deliveryDate ? fmtDate(v.deliveryDate) : ''], ['หมายเหตุ', v.note],
-          ['ประเภท', KIND[v.kind]],
+          ['Supplier', v.supplier], ['จ่ายให้', v.payee], ['ธนาคาร', v.payBank], ['เลขบัญชี', v.payAccount], ['Job No.', v.jobNo], ['PO No.', v.poNo], ['Cost sheet No.', v.costSheetNo],
+          [v.kind === 'ADV' ? 'วันที่จะใช้' : 'วันที่', v.expenseDate ? fmtDate(v.expenseDate) : ''], ['วันที่จัดส่งสินค้า', v.deliveryDate ? fmtDate(v.deliveryDate) : ''],
+          ['หมายเหตุ', remarkText(v)], ['แผนก (ใบฟ้า)', v.deptCode ? `${v.deptName}${v.deptName !== v.deptCode ? ' · ' + v.deptCode : ''}` : ''],
+          ['รอบจ่าย', roundLabel(v)], ['ID document', v.docId], ['วันที่ (หัวใบ)', v.docDate ? fmtDate(v.docDate) : ''], ['ประเภท', KIND[v.kind]],
         ].filter(([, x]) => x).map(([k, x]) => `<dt>${k}</dt><dd>${esc(x)}</dd>`).join('')}</dl>
         <div class="table-wrap" style="max-height:none"><table class="tbl"><thead><tr><th>#</th><th>หมวด</th><th>รายการ</th><th class="r">จำนวนเงิน</th></tr></thead><tbody>
-          ${(v.lines || []).map((l, i) => `<tr><td>${i + 1}</td><td><span class="flex gap-8 nowrap" style="align-items:center">${catIcon(l.category, 28)}${esc(catName(l.category))}</span></td><td>${esc(l.description)}</td><td class="r">${money(l.amount)}</td></tr>`).join('')}
+          ${(v.lines || []).map((l, i) => `<tr><td>${i + 1}</td><td><span class="flex gap-8 nowrap" style="align-items:center">${catIcon(l.category, 28)}${esc(catName(l.category))}</span></td><td>${esc(l.description) || '<span class="muted">-</span>'}</td><td class="r">${money(l.amount)}</td></tr>`).join('')}
           <tr><td></td><td></td><td class="muted">ยอดก่อน VAT</td><td class="r">${money(v.base)}</td></tr>
           ${Number(v.vatAmount) ? `<tr><td></td><td></td><td class="muted">VAT ${Number(v.vatRate)}%</td><td class="r">${money(v.vatAmount)}</td></tr>` : ''}
-          ${Number(v.whtAmount) ? `<tr><td></td><td></td><td class="muted">หัก ณ ที่จ่าย ${Number(v.whtRate)}%</td><td class="r">(${money(v.whtAmount)})</td></tr>` : ''}
+          ${W.map((w) => `<tr><td></td><td></td><td class="muted">หัก ณ ที่จ่าย ${Number(w.rate)}% · ฐาน ${money(w.base)}</td><td class="r">(${money(w.amount)})</td></tr>`).join('')}
         </tbody><tfoot><tr><td></td><td></td><td>ยอดจ่ายสุทธิ</td><td class="r">${money(v.amount)}</td></tr></tfoot></table></div>
       </div>
 
@@ -78,48 +88,71 @@ export async function render(ctx) {
 
       <div class="card pad stack-sm"><b>ประวัติ</b>
         <div class="pv-history">${(v.history || []).slice().reverse().map((h) => `<div class="it ${h.act === 'reject' || h.act === 'adv_back' ? 'bad' : h.act === 'pay' || h.act === 'adv_ok' ? 'ok' : ''}">
-          <span class="dot"></span><div class="grow"><b>${esc(h.name || h.by)}</b> · ${esc(ACT[h.act] || h.act)}${h.label && h.act !== 'submit' && h.act !== 'resubmit' ? ' · ' + esc(h.label) : ''}
-          ${h.remark ? `<div class="text-sm muted">“${esc(h.remark)}”</div>` : ''}</div><span class="text-xs muted nowrap">${fmtDateTime(h.at)}</span></div>`).join('')}</div>
+          <span class="dot"></span><div class="grow"><b>${esc(h.name || h.by)}</b> · ${esc(ACT[h.act] || h.act)}${h.label && !['submit', 'resubmit', 'edit'].includes(h.act) ? ' · ' + esc(h.label) : ''}
+          ${h.remark ? `<div class="text-sm muted">${h.act === 'edit' ? esc(h.remark) : `“${esc(h.remark)}”`}</div>` : ''}</div><span class="text-xs muted nowrap">${fmtDateTime(h.at)}</span></div>`).join('')}</div>
       </div>
     </div>`;
     hydrateThumbs(el);
-    const cp = $('[data-clrpick]', el); st.clr = cp ? receiptPicker(cp, { max: 10 }) : null;
+    const pick = (sel) => { const n = $(sel, el); return n ? receiptPicker(n, { max: 10 }) : null; };
+    st.clr = pick('[data-clrpick]'); st.slip = pick('[data-slippick]'); st.slip2 = pick('[data-slip2pick]');
   }
 
+  // ─────────────── VAT / หัก ณ ที่จ่าย (บัญชี 1) ───────────────
+  function taxTotals(v) {
+    const b = Number(v.base) || 0, va = st.vat ? r2(b * st.vat / 100) : 0;
+    const wa = (st.wht || []).reduce((s, w) => s + r2((Number(w.base) || 0) * w.rate / 100), 0);
+    return { b, va, wa: r2(wa), net: r2(b + va - wa) };
+  }
   function vatCalc(v) {
-    const b = Number(v.base) || 0, va = st.vat ? Math.round(b * st.vat) / 100 : 0, wa = st.wht ? Math.round(b * st.wht) / 100 : 0;
-    return `${money(b)} ${st.vat ? `+ VAT ${money(va)}` : ''} ${st.wht ? `− WHT ${money(wa)}` : ''} = <b class="amount">${money(b + va - wa)}</b> บาท`;
+    const t = taxTotals(v);
+    return `${money(t.b)} ${st.vat ? `+ VAT ${money(t.va)}` : ''} ${t.wa ? `− หัก ณ ที่จ่าย ${money(t.wa)}` : ''} = <b class="amount">${money(t.net)}</b> บาท`;
   }
-  function pickTax(k, val, t) {
-    st[k] = val;
-    t.parentElement.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b === t));
-    const c = $('[data-vatcalc]', el); if (c) c.innerHTML = vatCalc(st.v);
+  function taxBox(v) {
+    const vat = st.vat, W = st.wht;
+    return `<div class="flex wrap gap-16">
+        <div><div class="text-sm muted mb-8">VAT</div><div class="seg"><button type="button" data-vat="0" class="${vat === 0 ? 'on' : ''}">ไม่มี</button><button type="button" data-vat="7" class="${vat === 7 ? 'on' : ''}">7%</button></div></div>
+        <div><div class="text-sm muted mb-8">หัก ณ ที่จ่าย</div><div class="seg"><button type="button" data-whtmode="none" class="${W && !W.length ? 'on' : ''}">ไม่หัก</button><button type="button" data-whtmode="on" class="${W?.length ? 'on' : ''}">หัก ณ ที่จ่าย</button></div></div>
+      </div>
+      ${W?.length ? `<div class="pv-wht">${W.map((w, i) => `<div class="pv-wht-row" data-whti="${i}">
+          <div class="seg sm">${WHT_RATES.map((r) => `<button type="button" data-whtrate="${r}" class="${w.rate === r ? 'on' : ''}">${r}%</button>`).join('')}</div>
+          <div class="input-group has-pre"><span class="pre">ฐาน</span><input type="number" class="input" data-whtbase inputmode="decimal" step="0.01" min="0" aria-label="ยอดฐานหัก ณ ที่จ่าย" value="${w.base || ''}"></div>
+          <span class="amount nowrap" data-whtamt>${money(r2((Number(w.base) || 0) * w.rate / 100))}</span>
+          <button type="button" class="btn-icon sm" data-whtrm="${i}" aria-label="ลบบรรทัดหัก ณ ที่จ่าย">${icon('trash')}</button></div>`).join('')}
+        <button type="button" class="btn btn-ghost btn-sm" data-act="wht-add">${icon('plus', 'sm')} เพิ่มอีกอัตรา</button></div>` : ''}
+      <div class="text-sm" data-vatcalc>${vatCalc(v)}</div>`;
   }
+  const repaintTax = () => { const b = $('[data-taxbox]', el); if (b) b.innerHTML = taxBox(st.v); };
+  function whtLeft() { return r2((Number(st.v.base) || 0) - (st.wht || []).reduce((s, w) => s + (Number(w.base) || 0), 0)); }
+  function taxError() {
+    if (st.vat == null) return 'เลือก VAT ก่อน';
+    if (st.wht == null) return 'เลือกหัก ณ ที่จ่าย (หรือ "ไม่หัก") ก่อน';
+    if (st.wht.some((w) => !(Number(w.base) > 0))) return 'ใส่ยอดฐานหัก ณ ที่จ่ายให้ครบ';
+    if (whtLeft() < -0.004) return 'ยอดฐานหัก ณ ที่จ่ายรวมเกินยอดก่อน VAT';
+    return '';
+  }
+
   function actionCard(v) {
     const parts = [];
-    if (v.canAct && v.isFin1Step) {
-      const vat = st.vat, wht = st.wht;
-      parts.push(`<div class="stack-sm"><b>บัญชี 1: เลือก VAT และหัก ณ ที่จ่าย</b>
-        <div class="flex wrap gap-16">
-          <div><div class="text-sm muted mb-8">VAT</div><div class="seg"><button type="button" data-vat="0" class="${vat === 0 ? 'on' : ''}">ไม่มี</button><button type="button" data-vat="7" class="${vat === 7 ? 'on' : ''}">7%</button></div></div>
-          <div><div class="text-sm muted mb-8">หัก ณ ที่จ่าย</div><div class="seg"><button type="button" data-wht="0" class="${wht === 0 ? 'on' : ''}">ไม่หัก</button><button type="button" data-wht="3" class="${wht === 3 ? 'on' : ''}">3%</button></div></div>
-        </div>
-        <div class="text-sm" data-vatcalc>${vatCalc(v)}</div></div>`);
-    }
+    if (v.canAct && v.isFin1Step) parts.push(`<div class="stack-sm"><b>บัญชี 1: เลือก VAT และหัก ณ ที่จ่าย</b><div class="stack-sm" data-taxbox>${taxBox(v)}</div></div>`);
     if (v.canAct) {
       parts.push(`<div class="btn-row"><button type="button" class="btn btn-danger" data-act="reject">${icon('x')} ตีกลับ</button>
         <button type="button" class="btn btn-success" data-act="approve">${icon('check')} อนุมัติ${v.stepLabel ? ' (' + esc(v.stepLabel) + ')' : ''}</button></div>`);
     }
     if (v.canPay) {
-      parts.push(`<div class="stack-sm"><b>จ่ายเงิน</b><div class="flex wrap gap-8 items-end">
-        <div class="field" style="margin:0"><label for="pv-paydate">วันที่จ่าย</label><input type="date" class="input" id="pv-paydate" data-paydate value="${todayYMD()}" max="${todayYMD()}"></div>
-        <button type="button" class="btn btn-success" data-act="pay">${icon('banknote')} บันทึกจ่ายเงิน ${money(v.amount)} บาท</button></div>
-        <div class="hint">เงินออกจากกล่องเงินสด และขึ้นตาราง MSBC ทันที</div></div>`);
+      const d20 = v.payRound === 'D20', c = st.cash;
+      const short = !d20 && c && Number(c.cash) < Number(v.amount);
+      parts.push(`<div class="stack-sm"><b>${d20 ? 'โอนเงิน (รอบวันที่ 20)' : 'จ่ายเงิน'}</b>
+        ${short ? `<div class="alert bad">${icon('alert')}<div>เงินในกล่องเหลือ <b>${money(c.cash)}</b> บาท ไม่พอจ่ายใบนี้ — เติมเงินกล่อง หรือเปลี่ยนเป็นรอบวันที่ 20</div></div>` : ''}
+        <div class="flex wrap gap-8 items-end">
+          <div class="field" style="margin:0"><label for="pv-paydate">วันที่${d20 ? 'โอน' : 'จ่าย'}</label><input type="date" class="input" id="pv-paydate" data-paydate value="${todayYMD()}" max="${todayYMD()}"></div>
+          <button type="button" class="btn btn-success" data-act="pay">${icon('banknote')} บันทึก${d20 ? 'โอน' : 'จ่าย'}เงิน ${money(v.amount)} บาท</button></div>
+        <div class="field" style="margin:0"><label>สลิปโอนเงิน <span class="opt">ไม่บังคับ · คนเบิกเห็นในใบ</span></label><div data-slippick></div></div>
+        <div class="hint">${d20 ? 'โอนจากบัญชีบริษัท · ไม่หักเงินในกล่อง และไม่ขึ้นตาราง MSBC' : 'เงินออกจากกล่องเงินสด และขึ้นตาราง MSBC ทันที'}</div></div>`);
     }
     if (v.canClearAdv) {
       parts.push(`<div class="stack-sm"><b>เคลียร์ advance</b>
         <div class="form-grid two"><div class="field"><label class="req" for="pv-actual">ยอดที่ใช้จริง</label>
-          <div class="input-group has-suf"><input type="number" class="input" id="pv-actual" data-actual inputmode="decimal" step="0.01" min="0" placeholder="0.00"><span class="suf">บาท</span></div>
+          <div class="input-group has-suf"><input type="number" class="input" id="pv-actual" data-actual inputmode="decimal" step="0.01" min="0"><span class="suf">บาท</span></div>
           <div class="hint">เบิกไป ${money(v.amount)} บาท · ใช้น้อยกว่า = คืนเงินเข้ากล่อง · ใช้เกิน = ระบบสร้างใบเบิกส่วนเกินให้</div></div>
           <div class="field"><label for="pv-clrnote">หมายเหตุ <span class="opt">ไม่บังคับ</span></label><input class="input" id="pv-clrnote" data-clrnote maxlength="300"></div>
           <div class="field span-2"><label class="req">ใบเสร็จ</label><div data-clrpick></div></div></div>
@@ -141,8 +174,37 @@ export async function render(ctx) {
     return parts.length ? `<div class="card pad stack">${parts.join('<div class="divider"></div>')}</div>` : '';
   }
 
+  // ส่วนของบัญชี: รอบจ่าย · วันที่ + ID document ที่หัวใบ · แนบสลิปหลังจ่าย · แก้ไขใบ
+  function finCard(v) {
+    const parts = [];
+    if (v.canSetRound) {
+      const c = st.cash;
+      parts.push(`<div class="stack-sm"><div class="text-sm muted">รอบจ่าย <span class="opt">ทุกคนเห็นในสถานะ</span></div>
+        <div class="seg"><button type="button" data-round="PETTY" class="${v.payRound === 'PETTY' ? 'on' : ''}">Petty cash</button>
+          <button type="button" data-round="D20" class="${v.payRound === 'D20' ? 'on' : ''}">รอบ 20 · ${fmtDate(v.payRound === 'D20' && v.payDue ? v.payDue : v.nextD20, { year: false })}</button></div>
+        <div class="hint">Petty cash = จ่ายจากเงินในกล่อง · รอบ 20 = โอนจากบัญชีบริษัท (ไม่หักกล่อง ไม่ขึ้น MSBC)</div>
+        ${c?.over ? `<div class="alert warn">${icon('alert')}<div>ใบรอจ่ายรอบ Petty cash รวม <b>${money(c.pending)}</b> บาท เกินเงินในกล่อง (${money(c.cash)}) อยู่ ${money(c.short)} บาท</div></div>` : ''}</div>`);
+    }
+    if (v.canDocInfo) {
+      parts.push(`<div class="stack-sm"><div class="text-sm muted">หัวใบฟ้า (บัญชีกรอก · ว่างไว้ = ปริ้นแล้วเขียนมือ)</div>
+        <div class="flex wrap gap-8 items-end">
+          <div class="field" style="margin:0"><label for="pv-docdate">วันที่ / Date</label><input type="date" class="input" id="pv-docdate" data-docdate value="${esc(v.docDate || '')}"></div>
+          <div class="field" style="margin:0"><label for="pv-docid">ID document</label><input class="input" id="pv-docid" data-docid maxlength="50" value="${esc(v.docId || '')}"></div>
+          <button type="button" class="btn btn-secondary" data-act="docinfo">${icon('check', 'sm')} บันทึก</button></div>
+        ${!v.docDate ? '<div class="hint">ไม่ใส่วันที่ = ใช้วันที่จ่ายเงิน (หลังจ่ายแล้ว)</div>' : ''}</div>`);
+    }
+    if (v.canAddSlip) {
+      parts.push(`<div class="stack-sm"><div class="text-sm muted">แนบสลิปโอนเงินเพิ่ม</div><div data-slip2pick></div>
+        <div><button type="button" class="btn btn-secondary btn-sm" data-act="add-slip">${icon('paperclip', 'sm')} แนบสลิป</button></div></div>`);
+    }
+    if (v.canFinEdit) parts.push(`<div class="btn-row"><a class="btn btn-secondary" href="#/pv/new?id=${encodeURIComponent(v.id)}&fin=1">${icon('edit')} แก้ไขใบนี้ (บัญชี)</a>
+      <span class="text-xs muted">แก้ได้ทุกช่อง · ระบบบันทึกว่าแก้อะไร${v.status === 'Paid' ? ' · จ่ายแล้วแก้ยอดเงินไม่ได้' : ''}</span></div>`);
+    return parts.length ? `<div class="card pad stack"><b>${icon('wallet', 'sm')} ส่วนของบัญชี</b>${parts.join('<div class="divider"></div>')}</div>` : '';
+  }
+
   function filesCard(v) {
     const groups = DOCS.map(([k, label]) => [label, v.docs?.[k] || []]).filter(([, p]) => p.length);
+    if (v.docs?.slip?.length) groups.push(['สลิปโอนเงิน', v.docs.slip]);
     if (v.advClearPaths?.length && !v.canConfirmAdv) groups.push(['ใบเสร็จเคลียร์ advance', v.advClearPaths]);
     if (!groups.length) return '';
     return `<div class="card pad stack-sm"><b>${icon('paperclip', 'sm')} ไฟล์แนบ</b>${groups.map(([l, p]) => `<div><div class="text-sm muted mb-8">${esc(l)} (${p.length})</div>${thumbs(p)}</div>`).join('')}</div>`;
@@ -156,25 +218,55 @@ export async function render(ctx) {
       remark = await promptBox({ title: 'ตีกลับใบนี้', label: 'เหตุผล (คนก่อนหน้าจะเห็น)', hint: v.step === 0 ? 'ใบจะกลับไปให้คนเบิกแก้' : 'ใบจะถอยกลับไปขั้นก่อนหน้า 1 ขั้น', required: true, ok: 'ตีกลับ', danger: true });
       if (remark == null) return;
     }
-    if (action === 'approve' && v.isFin1Step && (st.vat ?? null) === null) { toast('เลือก VAT และหัก ณ ที่จ่ายก่อน', 'bad'); return; }
-    if (action === 'approve' && v.isFin1Step && (st.wht ?? null) === null) { toast('เลือกหัก ณ ที่จ่ายก่อน', 'bad'); return; }
+    if (action === 'approve' && v.isFin1Step) { const err = taxError(); if (err) { toast(err, 'bad'); return; } }
     await withBtn(btn, async () => {
       try {
-        const r = await api.rpc('pv_decide', { p_id: v.id, p_action: action, p_remark: remark, p_vat: st.vat, p_wht: st.wht });
+        const fin1 = action === 'approve' && v.isFin1Step;
+        const r = await api.rpc('pv_decide', { p_id: v.id, p_action: action, p_remark: remark, p_vat: fin1 ? st.vat : null,
+          p_wht_lines: fin1 ? st.wht.map((w) => ({ rate: w.rate, base: r2(w.base) })) : null });
         await after(action === 'approve' ? (r.status === 'Approved' ? 'อนุมัติครบแล้ว · รอจ่ายเงิน' : `อนุมัติแล้ว · ต่อไป ${r.waiting}`) : `ตีกลับแล้ว · ไปที่ ${r.waiting}`);
       } catch (e) { toastError(e); }
     });
   }
   async function pay(btn) {
-    const v = st.v, d = $('[data-paydate]', el)?.value || todayYMD();
-    if (!(await confirmBox({ title: 'ยืนยันจ่ายเงิน', message: `${v.id} · ${v.payee}\n${money(v.amount)} บาท · วันที่ ${fmtDate(d)}`, ok: 'จ่ายเงินแล้ว' }))) return;
+    const v = st.v, d = $('[data-paydate]', el)?.value || todayYMD(), d20 = v.payRound === 'D20';
+    const ns = st.slip?.count() || 0;
+    if (!(await confirmBox({ title: d20 ? 'ยืนยันโอนเงิน (รอบวันที่ 20)' : 'ยืนยันจ่ายเงิน', message: `${v.id} · ${v.payee}\n${money(v.amount)} บาท · วันที่ ${fmtDate(d)}${ns ? `\nแนบสลิป ${ns} ไฟล์` : ''}`, ok: d20 ? 'โอนแล้ว' : 'จ่ายเงินแล้ว' }))) return;
+    try {
+      const r = await busy('กำลังบันทึก…', async (set) => {
+        const slips = st.slip ? await st.slip.uploadAll((n, all) => set(`อัปโหลดสลิป (${n}/${all})`)) : [];
+        set('กำลังบันทึก…');
+        return api.rpc('pv_pay', { p_id: v.id, p_date: d, p_slips: slips });
+      });
+      await after(r?.round === 'D20' ? 'บันทึกโอนเงินแล้ว (ไม่หักเงินในกล่อง)' : `บันทึกจ่ายแล้ว · เงินในกล่อง ${money(r?.balance?.cash ?? 0)} บาท`);
+      if (r?.negative) setTimeout(() => toast('เงินในกล่องติดลบ — เคลียร์บิล / เติมเงินที่หน้ากล่องเงินสด', 'bad'), 600);
+    } catch (e) { toastError(e); }
+  }
+  async function setRound(btn, r) {
+    const v = st.v;
+    if (v.payRound === r) return;
+    await withBtn(btn, async () => {
+      try { await api.rpc('pv_set_round', { p_id: v.id, p_round: r }); await after(r === 'D20' ? 'ตั้งเป็นรอบวันที่ 20 แล้ว · คนเบิกเห็นสถานะ' : 'ตั้งเป็นรอบ Petty cash แล้ว'); }
+      catch (e) { toastError(e); }
+    });
+  }
+  async function saveDocInfo(btn) {
     await withBtn(btn, async () => {
       try {
-        const r = await api.rpc('pv_pay', { p_id: v.id, p_date: d });
-        await after(`บันทึกจ่ายแล้ว · เงินในกล่อง ${money(r?.balance?.cash ?? 0)} บาท`);
-        if (r?.negative) setTimeout(() => toast('เงินในกล่องติดลบ — เคลียร์บิล / เติมเงินที่หน้ากล่องเงินสด', 'bad'), 600);
+        await api.rpc('pv_set_docinfo', { p_id: st.v.id, p_doc_date: $('[data-docdate]', el)?.value || null, p_doc_id: $('[data-docid]', el)?.value.trim() || '' });
+        await after('บันทึกหัวใบแล้ว');
       } catch (e) { toastError(e); }
     });
+  }
+  async function addSlip() {
+    if (!st.slip2?.count()) { toast('เลือกไฟล์สลิปก่อน', 'bad'); return; }
+    try {
+      await busy('กำลังแนบสลิป…', async (set) => {
+        const paths = await st.slip2.uploadAll((n, all) => set(`อัปโหลดสลิป (${n}/${all})`));
+        await api.rpc('pv_add_slip', { p_id: st.v.id, p_paths: paths });
+      });
+      await after('แนบสลิปแล้ว · แจ้งคนเบิกแล้ว');
+    } catch (e) { toastError(e); }
   }
   async function clearAdv() {
     const v = st.v, a = Number($('[data-actual]', el)?.value);
@@ -229,12 +321,29 @@ export async function render(ctx) {
   el.innerHTML = skeleton(4);
   await load();
   const offs = [
-    on(el, 'click', '[data-vat]', (e, t) => pickTax('vat', Number(t.dataset.vat), t)),
-    on(el, 'click', '[data-wht]', (e, t) => pickTax('wht', Number(t.dataset.wht), t)),
+    on(el, 'click', '[data-vat]', (e, t) => { st.vat = Number(t.dataset.vat); repaintTax(); }),
+    on(el, 'click', '[data-whtmode]', (e, t) => {
+      if (t.dataset.whtmode === 'none') st.wht = [];
+      else if (!st.wht?.length) st.wht = [{ rate: 3, base: Number(st.v.base) || 0 }];
+      repaintTax();
+    }),
+    on(el, 'click', '[data-whtrate]', (e, t) => { const i = +t.closest('[data-whti]').dataset.whti; st.wht[i].rate = Number(t.dataset.whtrate); repaintTax(); }),
+    on(el, 'click', '[data-whtrm]', (e, t) => { st.wht.splice(+t.dataset.whtrm, 1); repaintTax(); }),
+    // พิมพ์ยอดฐาน: อัปเดตตัวเลขอย่างเดียว (ไม่วาดใหม่ เคอร์เซอร์ไม่หลุด)
+    on(el, 'input', '[data-whtbase]', (e, t) => {
+      const row = t.closest('[data-whti]'), w = st.wht[+row.dataset.whti];
+      w.base = Number(t.value) || 0;
+      row.querySelector('[data-whtamt]').textContent = money(r2(w.base * w.rate / 100));
+      const c = $('[data-vatcalc]', el); if (c) c.innerHTML = vatCalc(st.v);
+    }),
+    on(el, 'click', '[data-round]', (e, t) => setRound(t, t.dataset.round)),
     on(el, 'click', '[data-act]', (e, t) => {
       const a = t.dataset.act;
       if (a === 'approve' || a === 'reject') decide(t, a);
+      else if (a === 'wht-add') { st.wht.push({ rate: 1, base: Math.max(0, whtLeft()) }); repaintTax(); $$('[data-whtbase]', el).at(-1)?.focus(); }
       else if (a === 'pay') pay(t);
+      else if (a === 'docinfo') saveDocInfo(t);
+      else if (a === 'add-slip') addSlip();
       else if (a === 'adv-clear') clearAdv();
       else if (a === 'adv-ok') confirmAdv(t, true);
       else if (a === 'adv-back') confirmAdv(t, false);

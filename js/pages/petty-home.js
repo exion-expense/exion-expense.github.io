@@ -1,6 +1,6 @@
 // หน้าแรกเงินสดย่อย — เงินในกล่อง / ทางลัด / คำขอล่าสุด / งานที่รอ (ผู้อนุมัติ, คนถือกล่อง)
-import { api, money, fmtDate, esc, catName, statusBadge, loadPettyCategories } from '../core.js?v=10.1.7';
-import { icon, catIcon, empty, errorBox, skeleton, on } from '../ui.js?v=10.1.7';
+import { api, money, fmtDate, esc, catName, statusBadge, loadPettyCategories } from '../core.js?v=10.2.0';
+import { icon, catIcon, empty, errorBox, skeleton, on } from '../ui.js?v=10.2.0';
 
 // กล่องเงินที่เลือกไว้ (ใช้ร่วมทุกหน้าเงินสดย่อย) · ว่าง = กล่องหลัก
 const FUND_KEY = 'exion_petty_fund';
@@ -111,6 +111,7 @@ function paint(ctx, st) {
             ${d.toApprove || d.toPay || canFund ? `<a class="tile" href="#/petty/approve"><span class="row-icon c-amber">${icon('inbox')}</span>เติมเงิน / รายการแบบเดิม</a>` : ''}
             ${canFund || role.canViewAll ? `<a class="tile" href="#/petty/fund"><span class="row-icon c-green">${icon('wallet')}</span>กล่องเงิน</a>` : ''}
             ${showMsbc ? `<a class="tile" href="#/petty/msbc"><span class="row-icon c-teal">${icon('sheet')}</span>ตาราง MSBC</a>` : ''}
+            ${showMsbc ? `<a class="tile" href="#/pv/report"><span class="row-icon c-teal">${icon('file')}</span>รายการที่จ่ายแล้ว</a>` : ''}
             <a class="tile" href="#/"><span class="row-icon">${icon('receipt')}</span>เบิกค่าใช้จ่าย</a>
           </div></div>
       </div>

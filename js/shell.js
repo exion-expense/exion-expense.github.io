@@ -2,8 +2,8 @@
 //  shell.js — โครงหน้าแอป (เมนูข้าง / แถบล่าง / กระดิ่ง) + ตัวเปลี่ยนหน้า (hash router)
 //  เพิ่มหน้าใหม่: ใส่ใน ROUTES แล้วสร้างไฟล์ js/pages/<ชื่อ>.js ที่ export render(ctx)
 // ════════════════════════════════════════════════════════════════════
-import { api, auth, state, loadProfile, loadCategories, esc, initials, roleLabel, timeAgo, fmtDate, cfg, MOCK_MODE } from './core.js?v=10.1.7';
-import { icon, sheet, toast, errorBox, skeleton, $ } from './ui.js?v=10.1.7';
+import { api, auth, state, loadProfile, loadCategories, esc, initials, roleLabel, timeAgo, fmtDate, cfg, MOCK_MODE } from './core.js?v=10.2.0';
+import { icon, sheet, toast, errorBox, skeleton, $ } from './ui.js?v=10.2.0';
 
 const r = (p) => p || {};
 const isApprover = (p) => r(p.role).isManager || r(p.role).isSenior || r(p.role).isGM;
@@ -34,6 +34,7 @@ const ROUTES = [
   { path: '/pv/new', page: 'pv-new', title: 'แก้ไขใบสำคัญจ่าย', app: 'petty', nav: 'p-pv', back: '/pv' },
   { path: '/pv/dashboard', page: 'pv-dash', title: 'Dashboard ใบสำคัญจ่าย', app: 'petty', nav: 'p-dash', icon: 'chart',
     show: (p) => r(p.role).isAccountant || r(p.role).isGM || r(p.role).isCEO || r(p.role).canViewAll || r(p.role).isViewer },
+  { path: '/pv/report', page: 'pv-report', title: 'รายการที่จ่ายแล้ว', app: 'petty', nav: 'p-pv', back: '/pv' },
   { path: '/petty/list', page: 'petty-list', title: 'สมุดเงินสดย่อย', app: 'petty', nav: 'p-list', icon: 'list' },
   { path: '/petty/approve', page: 'petty-approve', title: 'เติมเงิน / รายการแบบเดิม', app: 'petty', nav: 'p-approve', icon: 'inbox',
     show: (p, b) => p.isPettyHolder || r(p.role).isGM || r(p.role).isAccountant || b.petty > 0 },
@@ -101,7 +102,7 @@ async function route() {
   const app = document.getElementById('app');
   if (!auth.user) {
     closeBell();
-    const m = await import('./pages/login.js?v=10.1.7');
+    const m = await import('./pages/login.js?v=10.2.0');
     if (seq !== renderSeq) return;
     document.title = 'เข้าสู่ระบบ · EXION Expense';
     return m.render({ el: app, query, go, onLoggedIn: () => { const back = sessionStorage.getItem('exion_after_login'); sessionStorage.removeItem('exion_after_login'); go(back && back !== '/login' ? back : '/'); } });
@@ -151,7 +152,7 @@ async function route() {
 
 // ─────────────── เวอร์ชันแอป ───────────────
 // เปลี่ยนพร้อม sw.js / index.html ทุกครั้งที่อัปเว็บ (ใช้ต่อท้ายไฟล์ทุกไฟล์ที่ import → ได้ไฟล์ชุดเดียวกันเสมอ)
-const APP_V = '10.1.7';
+const APP_V = '10.2.0';
 let verAt = 0, verNew = false;
 async function newerVersion() {
   if (verNew) return true;

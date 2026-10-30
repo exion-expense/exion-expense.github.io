@@ -1,6 +1,6 @@
 // โปรไฟล์ · ลายเซ็น · ขอเบิกรายเดือน (ใช้ทั้ง /profile และ /petty/profile — ฝั่งเงินสดย่อยไม่มีส่วนขอเบิกรายเดือน)
-import { api, auth, loadProfile, money, fmtDate, fmtDateTime, esc, initials, roleLabel, monthLabel, catName, exportStage, statusBadge } from '../core.js?v=10.1.7';
-import { icon, catIcon, toast, toastError, confirmBox, sheet, busy, withBtn, signaturePad, monthNav, shiftMonth, empty, on, debounce } from '../ui.js?v=10.1.7';
+import { api, auth, loadProfile, money, fmtDate, fmtDateTime, esc, initials, roleLabel, monthLabel, catName, exportStage, statusBadge } from '../core.js?v=10.2.0';
+import { icon, catIcon, toast, toastError, confirmBox, sheet, busy, withBtn, signaturePad, monthNav, shiftMonth, empty, on, debounce } from '../ui.js?v=10.2.0';
 
 export async function render(ctx) {
   const { el } = ctx;

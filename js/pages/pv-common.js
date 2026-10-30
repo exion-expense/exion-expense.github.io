@@ -1,14 +1,22 @@
 // ใช้ร่วมหน้าใบสำคัญจ่าย (ใบฟ้า): ป้ายสถานะ / แถวรายการ / ใบฟ้าสำหรับพิมพ์
-import { api, money, fmtDate, esc } from '../core.js?v=10.1.7';
-import { icon, catIcon } from '../ui.js?v=10.1.7';
+import { api, money, fmtDate, esc } from '../core.js?v=10.2.0';
+import { icon, catIcon } from '../ui.js?v=10.2.0';
 
 export const KIND = { PCJ: 'มี Job', PCN: 'ทั่วไป', ADV: 'Advance' };
 /** ใบทดลอง (ลบทิ้งทีหลัง) */
 export const isTest = (id) => String(id || '').startsWith('TEST-');
 export const DOCS = [['costSheet', 'Cost sheet'], ['po', 'PO'], ['invoice', 'Invoice'], ['receipt', 'ใบเสร็จ']];
+/** รอบจ่าย: Petty cash (เงินออกจากกล่อง) / รอบวันที่ 20 (โอนจากบัญชีบริษัท) */
+export const ROUND = { PETTY: 'รอบ Petty cash', D20: 'รอบวันที่ 20' };
+const dm = (d) => { if (!d) return ''; const t = new Date(d); return `${t.getDate()} ${['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'][t.getMonth()]}`; };
+export function roundLabel(x) { return x.payRound === 'D20' ? `รอบวันที่ 20${x.payDue ? ' (' + dm(x.payDue) + ')' : ''}` : x.payRound === 'PETTY' ? 'รอบ Petty cash' : ''; }
+export function roundBadge(x) {
+  if (!x.payRound || ['cancelled', 'returned'].includes(x.stage)) return '';
+  return `<span class="badge ${x.payRound === 'D20' ? 'b-info' : 'b-neutral'} plain">${esc(roundLabel(x))}</span>`;
+}
 export const STAGES = [
   ['', 'ทั้งหมด'], ['dept', 'รออนุมัติ'], ['fin1', 'บัญชี 1'], ['fin2', 'บัญชี 2'], ['fin3', 'บัญชี 3'],
-  ['pay', 'รอจ่าย'], ['adv_open', 'Advance ค้าง'], ['adv_check', 'รอตรวจเคลียร์'], ['returned', 'ตีกลับ'], ['paid', 'จ่ายแล้ว'], ['cancelled', 'ยกเลิก'],
+  ['pay', 'รอจ่าย'], ['d20', 'รอบวันที่ 20'], ['adv_open', 'Advance ค้าง'], ['adv_check', 'รอตรวจเคลียร์'], ['returned', 'ตีกลับ'], ['paid', 'จ่ายแล้ว'], ['cancelled', 'ยกเลิก'],
 ];
 
 const daysSince = (t) => Math.max(0, Math.floor((Date.now() - new Date(t).getTime()) / 86400e3));
@@ -18,7 +26,7 @@ export function stageBadge(x) {
   const s = x.stage;
   if (s === 'dept') return `<span class="badge b-pending">รอ ${esc(x.waiting || x.stepLabel)}</span>`;
   if (s === 'fin1' || s === 'fin2' || s === 'fin3') return `<span class="badge b-info">รอบัญชี ${s.slice(3)}</span>`;
-  if (s === 'pay') return '<span class="badge b-violet">รอจ่ายเงิน</span>';
+  if (s === 'pay') return x.payRound === 'D20' ? `<span class="badge b-violet">รอโอนรอบวันที่ 20${x.payDue ? ' · ' + esc(dm(x.payDue)) : ''}</span>` : '<span class="badge b-violet">รอจ่ายเงิน</span>';
   if (s === 'paid') return '<span class="badge b-paid">จ่ายแล้ว</span>';
   if (s === 'adv_open') return x.advOverdue ? '<span class="badge b-rejected">เลยกำหนดเคลียร์</span>' : '<span class="badge b-pending">รอเคลียร์ advance</span>';
   if (s === 'adv_check') return '<span class="badge b-info">รอบัญชีตรวจเคลียร์</span>';
@@ -36,9 +44,9 @@ export function pvRow(x, { select = false, checked = false } = {}) {
   return `<a class="row ${checked ? 'selected' : ''}" href="#/pv/view?id=${encodeURIComponent(x.id)}">
     ${select ? `<label class="check"><input type="checkbox" data-sel="${esc(x.id)}" ${checked ? 'checked' : ''} aria-label="เลือก ${esc(x.id)}"></label>` : ''}
     ${catIcon(x.category)}
-    <div class="row-main"><div class="row-title"><span class="mono">${esc(x.id)}</span> · ${esc(x.payee)}${isTest(x.id) ? ' <span class="badge b-pending plain">ทดลอง</span>' : ''}</div>
+    <div class="row-main"><div class="row-title"><span class="mono">${esc(x.id)}</span> · ${esc(x.supplier || x.payee)}${isTest(x.id) ? ' <span class="badge b-pending plain">ทดลอง</span>' : ''}</div>
       <div class="row-sub">${esc(x.requesterName)}${x.department ? ' · ' + esc(x.department) : ''}${x.jobNo ? ' · Job ' + esc(x.jobNo) : ''}${x.onBehalfBy ? ' · กรอกโดย ' + esc(x.onBehalfBy) : ''}</div></div>
-    <div class="row-end"><span class="amount">${money(x.amount)}</span>${stageBadge(x)}<span class="text-xs muted">${wait}</span></div>
+    <div class="row-end"><span class="amount">${money(x.amount)}</span>${stageBadge(x)}${x.stage === 'pay' ? '' : roundBadge(x)}<span class="text-xs muted">${wait}</span></div>
   </a>`;
 }
 
@@ -59,7 +67,7 @@ export function signers(v) {
   const checked = dept.length ? by(dept.length > 1 ? dept[dept.length - 2] : dept[0]) : by(f('fin2'));
   const auth = dept.length ? by(dept[dept.length - 1]) : by(f('fin3'));
   return [
-    ['ผู้จัดทำ', 'PREPARED BY', { name: v.requesterName, sig: v.requesterSignature, at: v.createdAt }],
+    ['ผู้จัดทำ', 'PREPARED BY', { name: v.requesterName, sig: v.requesterSignature, at: v.expenseDate || v.createdAt }],   // วันที่ที่คนเบิกกรอก อยู่ที่ลายเซ็นเท่านั้น
     ['ผู้ตรวจสอบ', 'CHECKED BY', checked],
     ['ผู้อนุมัติ', 'AUTHORIZED BY', auth],
     ['ผู้รับเอกสาร', 'RECEIVER BILL BY', by(f('fin1'))],
@@ -78,6 +86,16 @@ export function printPrefs() {
 }
 export function savePrintPrefs(p) { try { localStorage.setItem(PRINT_KEY, JSON.stringify(p)); } catch { /* */ } }
 
+/** หัก ณ ที่จ่ายหลายบรรทัด (ใบเก่าที่มีอัตราเดียว → 1 บรรทัด) */
+export function whtLines(v) {
+  if (v.whtLines?.length) return v.whtLines;
+  return Number(v.whtAmount) ? [{ rate: Number(v.whtRate), base: Number(v.base), amount: Number(v.whtAmount) }] : [];
+}
+/** หมายเหตุ + วันที่ต้องใช้เงิน (ต่อท้าย) */
+export function remarkText(v) {
+  return [v.note, v.needDate ? `ต้องการใช้เงินวันที่ ${thd(v.needDate)}` : ''].filter(Boolean).join(' · ');
+}
+
 /** HTML ใบฟ้า (ใช้ทั้งดูตัวอย่างและพิมพ์) */
 export function voucherHtml(v, { size = 'half', color = 'blue' } = {}) {
   const lines = v.lines || [];
@@ -91,8 +109,10 @@ export function voucherHtml(v, { size = 'half', color = 'blue' } = {}) {
       <img src="brand/logo.png" alt="EXION Thailand">
       <div class="pv-co"><b>บริษัท เอ็กซิออน (ประเทศไทย) จำกัด</b>EXION (THAILAND) CO., LTD.</div>
       <div><div class="pv-ttl">ใบสำคัญจ่าย<br>PAYMENT VOUCHER</div>
-        <div class="pv-meta"><span>เลขที่ / No.</span><b>${esc(v.id)}</b><span>วันที่ / Date</span><b>${thd(v.createdAt)}</b></div></div>
+        <div class="pv-meta"><span>เลขที่ / No.</span><b>${esc(v.id)}</b><span>วันที่ / Date</span><b class="pen">${thd(v.docDate || v.paidAt)}</b>
+          <span>ID document</span><b class="pen">${esc(v.docId || '')}</b></div></div>
     </div>
+    <div class="pv-supplier"><small>ผู้ขาย / SUPPLIER</small><span class="pen">${esc(v.supplier || v.payee || '')}</span></div>
     <div class="pv-payto">
       <div><small>จ่ายให้ / PAY TO</small><span class="pen">${esc(v.payee)}</span></div>
       <div><small>ธนาคาร / BANK</small><span class="pen">${esc(v.payBank || '')}</span></div>
@@ -104,17 +124,17 @@ export function voucherHtml(v, { size = 'half', color = 'blue' } = {}) {
         ${lines.map((l, i) => `<tr><td class="c">${i + 1}</td><td class="pen">${esc(l.description)}</td><td class="r pen">${money(l.amount)}</td></tr>`).join('')}
         ${'<tr><td>&nbsp;</td><td></td><td></td></tr>'.repeat(pad)}
         ${Number(v.vatAmount) ? `<tr><td></td><td class="r">VAT ${Number(v.vatRate)}%</td><td class="r pen">${money(v.vatAmount)}</td></tr>` : ''}
-        ${Number(v.whtAmount) ? `<tr><td></td><td class="r">หัก ณ ที่จ่าย ${Number(v.whtRate)}% / WHT</td><td class="r pen">(${money(v.whtAmount)})</td></tr>` : ''}
+        ${whtLines(v).map((w) => `<tr><td></td><td class="r">หัก ณ ที่จ่าย ${Number(w.rate)}% / WHT${Math.abs(Number(w.base) - Number(v.base)) > 0.004 ? ` (ฐาน ${money(w.base)})` : ''}</td><td class="r pen">(${money(w.amount)})</td></tr>`).join('')}
         <tr class="tot"><td></td><td class="r">รวมทั้งสิ้น / TOTAL</td><td class="r">${money(v.amount)}</td></tr>
       </tbody>
     </table>
     <div class="pv-foot">
-      <div><small>แผนก / DEPARTMENT</small><span class="pen">${esc(v.department || '')}</span></div>
+      <div><small>แผนก / DEPARTMENT</small><span class="pen">${esc(v.deptName || v.department || '')}</span></div>
       <div><small>ใบสั่งซื้อ / PO NO.</small><span class="pen">${esc(v.poNo || '')}</span></div>
       <div><small>โครงการ / JOB NO.</small><span class="pen">${esc(v.jobNo || '')}</span></div>
       <div><small>ใบประมาณต้นทุน / COST SHEET NO.</small><span class="pen">${esc(v.costSheetNo || '')}</span></div>
       <div><small>วันที่จัดส่งสินค้า / DELIVERY DATE</small><span class="pen">${thd(v.deliveryDate)}</span></div>
-      <div class="w3"><small>หมายเหตุ / REMARK</small><span class="pen">${esc([v.kind === 'ADV' ? 'Advance entertain' : '', v.isOffice ? 'Office expenses' : '', v.note].filter(Boolean).join(' · '))}</span></div>
+      <div class="w3"><small>หมายเหตุ / REMARK</small><span class="pen">${esc([v.kind === 'ADV' ? 'Advance entertain' : '', v.isOffice ? 'Office expenses' : '', remarkText(v)].filter(Boolean).join(' · '))}</span></div>
     </div>
     <div class="pv-sigs">${signers(v).map(([th, en, s]) => `<div class="pv-sig"><div class="lab">${th}<br>${en}</div>
       <div class="ink">${s ? (s.sig ? `<img data-sig="${esc(s.sig)}" alt=""><span class="nm-ink hidden">${esc(s.name)}</span>` : `<span class="nm-ink">${esc(s.name)}</span>`) : ''}</div>

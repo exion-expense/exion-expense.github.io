@@ -1,8 +1,8 @@
 // ════════════════════════════════════════════════════════════════════
 //  ui.js — ชิ้นส่วนหน้าจอที่ใช้ร่วมกัน (dialog / toast / รูปใบเสร็จ / ลายเซ็น / ช่องว่าง)
 // ════════════════════════════════════════════════════════════════════
-import { icon, catIcon } from './icons.js?v=10.1.7';
-import { api, esc, money, fmtDate, catName, requestBadge } from './core.js?v=10.1.7';
+import { icon, catIcon } from './icons.js?v=10.2.0';
+import { api, esc, money, fmtDate, catName, requestBadge } from './core.js?v=10.2.0';
 export { icon, catIcon, esc };
 
 /** html`...` — ค่าที่แทรกถูก escape อัตโนมัติ · array ต่อกันให้ · raw(x) = ไม่ escape */

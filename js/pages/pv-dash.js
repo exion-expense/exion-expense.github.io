@@ -1,7 +1,7 @@
 // Dashboard ใบสำคัญจ่าย (บัญชี / ผู้บริหาร) — งานค้างแต่ละขั้น · กล่องเงิน · advance · ยอดแยกแผนก/Job · ใบค้างนาน
-import { api, money, esc, ymd, todayYMD } from '../core.js?v=10.1.7';
-import { icon, bars, empty, errorBox, skeleton, on, $ } from '../ui.js?v=10.1.7';
-import { pvRow } from './pv-common.js?v=10.1.7';
+import { api, money, esc, ymd, todayYMD } from '../core.js?v=10.2.0';
+import { icon, bars, empty, errorBox, skeleton, on, $ } from '../ui.js?v=10.2.0';
+import { pvRow } from './pv-common.js?v=10.2.0';
 
 const TILES = [['dept', 'รออนุมัติแผนก'], ['fin1', 'รอบัญชี 1'], ['fin2', 'รอบัญชี 2'], ['fin3', 'รอบัญชี 3'], ['pay', 'รอจ่ายเงิน'], ['returned', 'ตีกลับให้แก้']];
 
@@ -33,6 +33,9 @@ export async function render(ctx) {
           <div class="flex between wrap"><span class="muted text-sm">เงินในกล่อง</span><b class="amount text-lg ${cash < 0 ? 'bad-text' : ''}">${money(cash)} / ${money(lim, 0)}</b></div>
           <div class="meter pv-meter" role="img" aria-label="ใช้ไปแล้วจากวงเงิน"><i style="width:${usedPct}%" class="u"></i><i style="width:${advPct}%" class="a"></i></div>
           <div class="pv-mkey"><span><b class="u"></b>จ่ายแล้ว</span><span><b class="a"></b>Advance ค้าง ${money(a.amount, 0)}</span><span><b></b>คงเหลือ</span></div>
+          ${d.cashCheck ? `<div class="flex between wrap"><span class="muted text-sm">ใบรอจ่ายรอบ Petty cash (${d.cashCheck.count} ใบ)</span><b class="amount ${d.cashCheck.over ? 'bad-text' : ''}">${money(d.cashCheck.pending)}</b></div>
+            ${Number(d.cashCheck.d20) ? `<div class="flex between wrap"><span class="muted text-sm">รอโอนรอบวันที่ 20 (ไม่หักกล่อง)</span><b class="amount">${money(d.cashCheck.d20)}</b></div>` : ''}
+            ${d.cashCheck.over ? `<div class="alert warn">${icon('alert')}<div>ยอดรอจ่ายเกินเงินในกล่อง ${money(d.cashCheck.short)} บาท — เติมเงิน หรือย้ายบางใบไปรอบวันที่ 20</div></div>` : ''}` : ''}
           ${cash < 0 ? `<div class="alert bad">${icon('alert')}<div>เงินในกล่องติดลบ — เคลียร์บิล / เติมเงินที่หน้า <a href="#/petty/fund">กล่องเงินสด</a></div></div>` : ''}
         </div>
         <div class="card pad stack-sm">
@@ -62,6 +65,7 @@ export async function render(ctx) {
       <div class="field" style="margin:0"><label for="pd-to" class="text-sm">ถึง</label><input type="date" class="input" id="pd-to" data-to value="${st.to}"></div>
       <a class="btn btn-secondary" href="#/pv?scope=all">${icon('list')} ใบทั้งหมด</a>
       <a class="btn btn-secondary" href="#/petty/msbc">${icon('sheet')} MSBC</a>
+      <a class="btn btn-secondary" href="#/pv/report">${icon('file')} รายการที่จ่ายแล้ว</a>
     </div>
     <div class="stack" data-body>${skeleton(4)}</div></div>`;
   await load();

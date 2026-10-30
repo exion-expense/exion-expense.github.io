@@ -633,3 +633,36 @@ a.stat { text-decoration: none; color: inherit; display: block; }
   body.printing-pv .pv-sheet { width: 718px; border-radius: 0; margin: 0 auto; }
   @page { size: A4 portrait; margin: 10mm; }
 }
+/* ── ใบสำคัญจ่าย รอบปรับ 2: supplier · หัก ณ ที่จ่ายหลายอัตรา · การ์ดหมวด · รายงานที่จ่ายแล้ว ── */
+.pv-supplier { border-bottom: 1px solid var(--pv-line); padding-bottom: 2px; min-height: 30px; margin-top: 14px; }
+.pv-supplier small { display: block; font-size: 10px; opacity: .75; }
+.pv-supplier + .pv-payto { margin-top: 8px; }
+.pv-sheet.pv-full .pv-supplier { min-height: 38px; }
+.pv-meta .pen { min-width: 90px; }
+.seg.sm button { padding: 5px 10px; font-size: 12.5px; }
+.pv-wht { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.pv-wht-row { display: grid; grid-template-columns: auto minmax(120px, 180px) minmax(80px, auto) 36px; gap: 8px; align-items: center; }
+.pv-wht-row .input-group.has-pre .input { padding-left: 46px; }
+@media (max-width: 560px) { .pv-wht-row { grid-template-columns: auto minmax(0, 1fr) 36px; } .pv-wht-row .amount { grid-column: 1 / span 2; } }
+.cat-tip { position: fixed; z-index: 60; max-width: 300px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 10px 30px rgba(23, 24, 28, .16);
+  padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+.pv-catwarn { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--r-sm); background: var(--warn-bg); color: var(--warn); font-size: 13.5px; flex-wrap: wrap; }
+.pv-catwarn b { color: var(--ink); }
+.pv-rep-wrap { overflow-x: auto; background: var(--line-2); border-radius: var(--r); padding: 8px; }
+.pv-rep { background: #fff; color: #17181C; padding: 18px 20px; min-width: 760px; font-size: 11.5px; }
+.pv-rep-hd { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 8px; }
+.pv-rep-hd img { height: 40px; width: auto; }
+.pv-rep-t1 { font-weight: 700; font-style: italic; font-size: 13px; }
+.pv-rep-t2 { font-weight: 700; font-style: italic; font-size: 12px; margin-top: 2px; }
+.pv-rep-tbl { width: 100%; border-collapse: collapse; }
+.pv-rep-tbl th { background: #4A4F58; color: #fff; font-weight: 700; padding: 5px 6px; border: 1px solid #4A4F58; text-align: center; }
+.pv-rep-tbl td { border: 1px solid #C9CDD4; padding: 4px 6px; vertical-align: top; }
+.pv-rep-tbl tbody tr:nth-child(even) td { background: #F3F4F6; }
+.pv-rep-tbl .r { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; } .pv-rep-tbl .c { text-align: center; white-space: nowrap; }
+.pv-rep-tbl tfoot td { font-weight: 700; border-top: 2px solid #4A4F58; }
+.pv-rep-wrap tbody tr[data-id] { cursor: pointer; } .pv-rep-wrap tbody tr[data-id]:hover td { background: #FFF6CF; }
+@media print {
+  body.printing-pv .pv-rep { min-width: 0; width: 718px; padding: 0; margin: 0 auto; font-size: 9.5px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body.printing-pv .pv-rep-tbl thead { display: table-header-group; }
+  body.printing-pv .pv-rep-tbl tr { break-inside: avoid; }
+}

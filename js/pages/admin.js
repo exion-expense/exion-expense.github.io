@@ -1,7 +1,7 @@
 // ผู้ดูแลระบบ (ADMIN_EMAIL) — ดูคนที่ขอรีเซ็ตรหัส · ออกรหัสชั่วคราว · ล้างรหัสให้ตั้งเอง (ทุกครั้งบันทึกประวัติ + แจ้งเจ้าของบัญชีและ GM)
-import { api, esc, timeAgo, fmtDateTime } from '../core.js?v=10.1.7';
-import { icon, toast, toastError, confirmBox, withBtn, empty, errorBox, skeleton, on, debounce } from '../ui.js?v=10.1.7';
-import { issueCode } from './team.js?v=10.1.7';
+import { api, esc, timeAgo, fmtDateTime } from '../core.js?v=10.2.0';
+import { icon, toast, toastError, confirmBox, withBtn, empty, errorBox, skeleton, on, debounce } from '../ui.js?v=10.2.0';
+import { issueCode } from './team.js?v=10.2.0';
 
 export async function render(ctx) {
   const { el } = ctx;
