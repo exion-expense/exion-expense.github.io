@@ -1,6 +1,6 @@
 // ใช้ร่วมหน้าใบสำคัญจ่าย (ใบฟ้า): ป้ายสถานะ / แถวรายการ / ใบฟ้าสำหรับพิมพ์
-import { api, money, fmtDate, esc } from '../core.js?v=10.4.4';
-import { icon, catIcon } from '../ui.js?v=10.4.4';
+import { api, money, fmtDate, esc } from '../core.js?v=10.4.5';
+import { icon, catIcon } from '../ui.js?v=10.4.5';
 
 export const KIND = { PCJ: 'มี Job', PCN: 'ทั่วไป', ADV: 'Advance' };
 /** ใบทดลอง (ลบทิ้งทีหลัง) */
@@ -75,14 +75,16 @@ export function signers(v) {
   ];
 }
 
-/** ตัวเลือกพิมพ์: ขนาด (ครึ่ง / เต็ม A4) + สีกระดาษ · จำไว้ในเครื่อง */
+/** ตัวเลือกพิมพ์: ขนาด (ครึ่ง / เต็ม A4) + แนวกระดาษ + สีกระดาษ · จำไว้ในเครื่อง */
 export const PRINT_SIZES = [['half', 'ครึ่ง A4'], ['full', 'เต็ม A4']];
+export const PRINT_ORIENTS = [['portrait', 'แนวตั้ง'], ['landscape', 'แนวนอน']];
 export const PRINT_COLORS = [['blue', 'ฟ้า', '#DCEFEF'], ['white', 'ขาว', '#FFFFFF'], ['yellow', 'เหลือง', '#FFF6CF'], ['pink', 'ชมพู', '#FCE6EC'], ['green', 'เขียว', '#E3F4E5']];
 const PRINT_KEY = 'exion_pv_print';
 export function printPrefs() {
   let p = {};
   try { p = JSON.parse(localStorage.getItem(PRINT_KEY) || '{}'); } catch { /* */ }
-  return { size: PRINT_SIZES.some(([k]) => k === p.size) ? p.size : 'half', color: PRINT_COLORS.some(([k]) => k === p.color) ? p.color : 'blue' };
+  return { size: PRINT_SIZES.some(([k]) => k === p.size) ? p.size : 'half', color: PRINT_COLORS.some(([k]) => k === p.color) ? p.color : 'blue',
+    orient: p.orient === 'landscape' ? 'landscape' : 'portrait' };
 }
 export function savePrintPrefs(p) { try { localStorage.setItem(PRINT_KEY, JSON.stringify(p)); } catch { /* */ } }
 
@@ -125,10 +127,10 @@ export function deptInfo(v) {
 }
 
 /** HTML ใบฟ้า (ใช้ทั้งดูตัวอย่างและพิมพ์) · No. = เลขของบัญชี (กรอกเอง) · ID document = เลขใบในระบบ */
-export function voucherHtml(v, { size = 'half', color = 'blue' } = {}) {
+export function voucherHtml(v, { size = 'half', color = 'blue', rows = 0 } = {}) {
   const lines = v.lines || [];
   const dpt = deptInfo(v), adj = roundAdj(v);
-  const pad = Math.max(0, (size === 'full' ? 12 : 4) - lines.length);
+  const pad = Math.max(0, (rows || (size === 'full' ? 12 : 4)) - lines.length);   // rows = จำนวนบรรทัดขั้นต่ำ (แนวนอนเต็มแผ่นใช้น้อยลง)
   const others = (v.steps || []).filter((s) => s.k === 'fin2' || s.k === 'fin3').filter((s) => s.state === 'done')
     .map((s) => `${s.label}: ${esc(s.byName)} ${thd(s.at)}`);
   if (v.paidAt) others.push(`จ่ายแล้ว ${thd(v.paidAt)}`);
@@ -183,25 +185,41 @@ export function hydrateSigs(root) {
     } catch { fallback(); }
   });
 }
+/** ตั้งแนวกระดาษตอนพิมพ์ (แนวตั้ง / แนวนอน) · คืนฟังก์ชันล้างค่า */
+export function setPrintOrient(orient) {
+  document.getElementById('pv-page-orient')?.remove();
+  const s = document.createElement('style');
+  s.id = 'pv-page-orient';
+  s.textContent = `@media print { @page { size: A4 ${orient === 'landscape' ? 'landscape' : 'portrait'}; margin: 10mm; } }`;
+  document.head.appendChild(s);
+  return () => s.remove();
+}
 /** พิมพ์ใบฟ้า: วางใบลงชั้นพิมพ์ แล้วเรียกหน้าพิมพ์ของเบราว์เซอร์ */
-// พื้นที่พิมพ์บน A4 (ขอบ 10 มม.) เป็นพิกเซล: กว้าง 190 มม. · ครึ่งแผ่น ≈ 128 มม. (เผื่อเส้นตัด) · เต็มแผ่น 277 มม.
-const PAGE_W = 718, PAGE_H = { half: 484, full: 1040 };
-export function printVoucher(v, { size = 'half', color = 'blue' } = {}) {
+// พื้นที่พิมพ์บน A4 (ขอบ 10 มม.) เป็นพิกเซล · แนวตั้ง: กว้าง 190 มม. · ครึ่งแผ่น ≈ 128 มม. (เผื่อเส้นตัด) · เต็มแผ่น 277 มม.
+// แนวนอน: เต็มแผ่น 277 × 190 มม. · ครึ่งแผ่น = ซีกซ้าย ≈ 132 มม. (เผื่อเส้นตัด) ย่อใบให้พอดี
+const SHEET_W = 718;
+const BOX = { portrait: { half: [718, 484], full: [718, 1040] }, landscape: { half: [498, 710], full: [1040, 710] } };
+export function printVoucher(v, { size = 'half', color = 'blue', orient = 'portrait' } = {}) {
   document.querySelector('.pv-print-root')?.remove();
+  const land = orient === 'landscape', [bw, bh] = BOX[land ? 'landscape' : 'portrait'][size] || BOX.portrait.half;
+  const w = Math.max(SHEET_W, bw);   // ใบกว้างอย่างน้อยเท่าแบบเดิม · ช่องแคบกว่า = ย่อลง
   const root = document.createElement('div');
   root.className = 'pv-print-root';
-  root.innerHTML = voucherHtml(v, { size, color }) + (size === 'half' ? '<div class="pv-cut">✂ ตัดตามเส้นนี้ (ครึ่ง A4)</div>' : '');
+  const cut = size === 'half' ? `<div class="pv-cut">✂ ตัดตามเส้นนี้ (ครึ่ง A4)</div>` : '';
+  root.innerHTML = land && size === 'half' ? `<div class="pv-lhalf">${voucherHtml(v, { size, color })}<div class="pv-cut">✂ ตัดตามเส้นด้านขวา (ครึ่ง A4)</div></div>`
+    : voucherHtml(v, { size, color, rows: land && size === 'full' ? 5 : 0 }) + cut;
   document.body.appendChild(root);
   // ย่อให้พอดีพื้นที่: วัดขนาดจริงนอกจอก่อน แล้วตั้ง zoom
   const sheet = root.querySelector('.pv-sheet');
-  root.style.cssText = `display:block;position:fixed;left:-99999px;top:0;width:${PAGE_W}px`;
-  sheet.style.width = PAGE_W + 'px';
-  const z = Math.min(1, PAGE_H[size] / sheet.offsetHeight);
-  sheet.style.width = ''; root.style.cssText = '';
+  root.style.cssText = `display:block;position:fixed;left:-99999px;top:0;width:${w}px`;
+  sheet.style.width = w + 'px';
+  const z = Math.min(1, bw / w, bh / sheet.offsetHeight);
+  root.style.cssText = '';
   if (z < 1) sheet.style.zoom = String(Math.floor(z * 100) / 100);
   hydrateSigs(root);
+  const unOrient = setPrintOrient(orient);
   document.body.classList.add('printing-pv');
-  const done = () => { document.body.classList.remove('printing-pv'); root.remove(); window.removeEventListener('afterprint', done); };
+  const done = () => { document.body.classList.remove('printing-pv'); root.remove(); unOrient(); window.removeEventListener('afterprint', done); };
   window.addEventListener('afterprint', done);
   // รอรูปลายเซ็นโหลด (หรือสูงสุด 4 วินาที) ก่อนเปิดหน้าพิมพ์
   const wait = () => Promise.all([...root.querySelectorAll('img[data-sig]')].map((im) => (im.complete && im.src ? Promise.resolve()

@@ -675,3 +675,15 @@ a.stat { text-decoration: none; color: inherit; display: block; }
 .row:has(+ .row-act) { border-bottom: 0; padding-bottom: 4px; }
 .row-act { display: flex; justify-content: flex-end; align-items: center; gap: 4px; flex-wrap: wrap; padding: 0 12px 8px; border-bottom: 1px solid var(--line-2); }
 .row-act:last-child { border-bottom: 0; }
+/* ── 0052: พิมพ์แนวนอน (ใบฟ้า / รายงาน) · คอลัมน์เฉพาะบนจอ · รอบเติมเงิน ── */
+.pv-lhalf { width: 136mm; height: 184mm; box-sizing: border-box; padding-right: 4mm; border-right: 1.5px dashed #9AA0AE; position: relative; }
+.pv-lhalf .pv-sheet { margin: 0 !important; }
+.pv-lhalf .pv-cut { border-top: 0; margin: 0; position: absolute; left: 0; right: 4mm; bottom: 0; }
+.pv-rep .scr-only { color: #4A4F58; }
+.pv-rep-tbl th.scr-only { background: #6B7280; border-color: #6B7280; }
+.pv-round-bar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+@media print {
+  body.printing-pv .scr-only { display: none !important; }
+  body.printing-pv .pv-land .pv-rep { width: 1040px; font-size: 10.5px; }
+}
+.pv-rep .scr-only { white-space: nowrap; }

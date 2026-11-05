@@ -1,8 +1,8 @@
 // ใบสำคัญจ่าย 1 ใบ — ขั้นอนุมัติ / กดอนุมัติ-ตีกลับ / บัญชี 1 เลือก VAT + หัก ณ ที่จ่ายหลายอัตรา / ส่วนของบัญชี (รอบจ่าย · วันที่ + No. ของบัญชี · แก้ไข · สลิป)
 // จ่ายเงิน (+ สลิปโอน) / เคลียร์ advance / พิมพ์ใบฟ้า
-import { api, money, fmtDate, fmtDateTime, esc, todayYMD, catName, loadPettyCategories } from '../core.js?v=10.4.4';
-import { icon, catIcon, toast, toastError, confirmBox, promptBox, busy, withBtn, sheet, thumbs, hydrateThumbs, receiptPicker, errorBox, skeleton, on, $, $$ } from '../ui.js?v=10.4.4';
-import { DOCS, KIND, isTest, stageBadge, kindBadge, roundBadge, roundLabel, whtLines, remarkText, deptInfo, lineDept, roundNet, roundAdj, roundText, roundSeg, voucherHtml, hydrateSigs, printVoucher, PRINT_SIZES, PRINT_COLORS, printPrefs, savePrintPrefs } from './pv-common.js?v=10.4.4';
+import { api, money, fmtDate, fmtDateTime, esc, todayYMD, catName, loadPettyCategories } from '../core.js?v=10.4.5';
+import { icon, catIcon, toast, toastError, confirmBox, promptBox, busy, withBtn, sheet, thumbs, hydrateThumbs, receiptPicker, errorBox, skeleton, on, $, $$ } from '../ui.js?v=10.4.5';
+import { DOCS, KIND, isTest, stageBadge, kindBadge, roundBadge, roundLabel, whtLines, remarkText, deptInfo, lineDept, roundNet, roundAdj, roundText, roundSeg, voucherHtml, hydrateSigs, printVoucher, PRINT_SIZES, PRINT_ORIENTS, PRINT_COLORS, printPrefs, savePrintPrefs } from './pv-common.js?v=10.4.5';
 
 const ACT = { submit: 'ส่งใบเบิก', resubmit: 'แก้แล้วส่งใหม่', approve: 'อนุมัติ', reject: 'ตีกลับ', pay: 'จ่ายเงิน', cancel: 'ยกเลิก',
   adv_clear: 'ส่งเคลียร์', adv_back: 'ตีกลับการเคลียร์', adv_ok: 'เคลียร์เรียบร้อย', edit: 'แก้ไขใบ', round: 'เลือกรอบจ่าย', slip: 'แนบสลิป' };
@@ -304,6 +304,7 @@ export async function render(ctx) {
     sheet({ title: 'ใบสำคัญจ่าย ' + v.id, wide: true,
       body: `<div class="pv-printopts">
           <div class="flex gap-8" style="align-items:center"><span class="text-sm muted">ขนาด</span><div class="seg">${PRINT_SIZES.map(([k, l]) => `<button type="button" data-size="${k}" class="${pr.size === k ? 'on' : ''}">${l}</button>`).join('')}</div></div>
+          <div class="flex gap-8" style="align-items:center"><span class="text-sm muted">แนว</span><div class="seg">${PRINT_ORIENTS.map(([k, l]) => `<button type="button" data-orient="${k}" class="${pr.orient === k ? 'on' : ''}">${l}</button>`).join('')}</div></div>
           <div class="flex gap-8" style="align-items:center"><span class="text-sm muted">สีกระดาษ</span><div class="pv-swatches">${PRINT_COLORS.map(([k, l, c]) => `<button type="button" class="pv-swatch ${pr.color === k ? 'on' : ''}" data-color="${k}" style="background:${c}" title="${l}" aria-label="สี${l}"></button>`).join('')}</div></div>
         </div><div class="pv-preview" data-pvprev>${voucherHtml(v, pr)}</div>`,
       foot: `<button class="btn btn-secondary" data-x>ปิด</button><button class="btn btn-primary" data-print>${icon('file')} พิมพ์</button>`,
@@ -312,7 +313,8 @@ export async function render(ctx) {
           const z = Math.min(1, (box.clientWidth - 8) / 780); sheetEl.style.zoom = z < 1 ? String(Math.floor(z * 100) / 100) : ''; };
         const redraw = () => { sh.querySelector('[data-pvprev]').innerHTML = voucherHtml(v, pr); hydrateSigs(sh); savePrintPrefs(pr); fit(); };
         sh.addEventListener('click', (e) => {
-          const sz = e.target.closest('[data-size]'), co = e.target.closest('[data-color]');
+          const sz = e.target.closest('[data-size]'), co = e.target.closest('[data-color]'), or = e.target.closest('[data-orient]');
+          if (or) { pr.orient = or.dataset.orient; sh.querySelectorAll('[data-orient]').forEach((b) => b.classList.toggle('on', b === or)); savePrintPrefs(pr); }
           if (sz) { pr.size = sz.dataset.size; sh.querySelectorAll('[data-size]').forEach((b) => b.classList.toggle('on', b === sz)); redraw(); }
           if (co) { pr.color = co.dataset.color; sh.querySelectorAll('[data-color]').forEach((b) => b.classList.toggle('on', b === co)); redraw(); }
         });

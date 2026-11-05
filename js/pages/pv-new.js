@@ -1,9 +1,9 @@
 // ขอเบิก Petty Cash (ใบสำคัญจ่าย) — ค่าใช้จ่าย / Advance entertain · เลือกหมวดทุกบรรทัด · HR กรอกแทนได้ · แก้ใบที่ถูกตีกลับ (?id=)
 // บัญชีแก้ไขใบ (?id=&fin=1): แก้ได้ทุกช่อง + VAT / หัก ณ ที่จ่าย + รหัสแผนก · ไม่เริ่มสายอนุมัติใหม่
 // บัญชี (ทั้งตอนเบิกเอง / กรอกแทน / แก้ไข) เลือกแผนกรายบรรทัดได้ = ลงต้นทุนแยกทีม
-import { api, money, esc, todayYMD, loadPettyCategories } from '../core.js?v=10.4.4';
-import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.4.4';
-import { DOCS, whtLines, roundNet, roundAdj, roundText, roundSeg } from './pv-common.js?v=10.4.4';
+import { api, money, esc, todayYMD, loadPettyCategories } from '../core.js?v=10.4.5';
+import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.4.5';
+import { DOCS, whtLines, roundNet, roundAdj, roundText, roundSeg } from './pv-common.js?v=10.4.5';
 
 // คำอธิบายหมวด: อะไรเข้าหมวดนี้บ้าง (การ์ดตอนชี้ที่ปุ่มหมวด + ใต้หมวดที่เลือก)
 const CAT_HINT = {
@@ -106,9 +106,9 @@ export async function render(ctx) {
           <div class="flex gap-8"><input class="input grow" id="pv-payee" data-f="payee" maxlength="150" list="pv-payees" autocomplete="off" value="${esc(src.payee || '')}">
             <button type="button" class="btn btn-ghost btn-sm nowrap" data-act="payee-same">เหมือน Supplier</button></div>
           <datalist id="pv-payees"></datalist><div class="hint hidden" data-payeehint></div></div>
-        <div class="field"><label for="pv-bank">ธนาคาร <span class="opt">ไม่บังคับ</span></label>
+        <div class="field"><label class="${fin ? '' : 'req'}" for="pv-bank">ธนาคาร</label>
           <input class="input" id="pv-bank" data-f="payBank" maxlength="100" value="${esc(src.payBank || '')}"></div>
-        <div class="field"><label for="pv-acc">เลขบัญชี <span class="opt">ไม่บังคับ</span></label>
+        <div class="field"><label class="${fin ? '' : 'req'}" for="pv-acc">เลขบัญชี</label>
           <input class="input" id="pv-acc" data-f="payAccount" maxlength="50" inputmode="numeric" value="${esc(src.payAccount || '')}"></div>
         <div class="field"><label class="req" for="pv-date" data-datelabel>วันที่</label>
           <input type="date" class="input" id="pv-date" data-f="expenseDate" value="${esc(src.expenseDate || todayYMD())}">
@@ -130,9 +130,12 @@ export async function render(ctx) {
     ${tax ? `<div class="card pad stack-sm"><b>VAT / หัก ณ ที่จ่าย</b><div class="stack-sm" data-taxbox></div></div>` : ''}
 
     <div class="card pad stack-sm" data-jobbox>
-      <b>ข้อมูล Job <span class="opt" data-jopt>ไม่บังคับ · กรอกแล้วขึ้นในใบฟ้า</span></b>
+      <b>ข้อมูล Job <span class="opt" data-jopt>Job No. บังคับ (ไม่มี Job กด Z-NONE) · PO / Cost sheet ไม่บังคับ</span></b>
       <div class="form-grid two">
-        <div class="field"><label data-jreq for="pv-job">Job No.</label><input class="input" id="pv-job" data-f="jobNo" maxlength="50" value="${esc(src.jobNo || '')}"></div>
+        <div class="field"><label class="${fin ? '' : 'req'}" for="pv-job">Job No.</label>
+          <div class="flex gap-8"><input class="input grow" id="pv-job" data-f="jobNo" maxlength="50" value="${esc(src.jobNo || '')}">
+            ${fin ? '' : '<button type="button" class="btn btn-ghost btn-sm nowrap" data-act="job-none" title="ไม่มี Job · ใช้ Job กลาง">ไม่มี Job (Z-NONE)</button>'}</div>
+          <div class="hint hidden" data-jobhint>ซื้อของหน้างาน ต้องใช้ Job No. จริง</div></div>
         <div class="field"><label data-jreq for="pv-po">PO No.</label><input class="input" id="pv-po" data-f="poNo" maxlength="50" value="${esc(src.poNo || '')}"></div>
         <div class="field"><label data-jreq for="pv-cs">Cost sheet No.</label><input class="input" id="pv-cs" data-f="costSheetNo" maxlength="50" value="${esc(src.costSheetNo || '')}"></div>
         <div class="field"><label for="pv-dd">วันที่จัดส่งสินค้า <span class="opt">ไม่บังคับ</span></label><input type="date" class="input" id="pv-dd" data-f="deliveryDate" value="${esc(src.deliveryDate || '')}"></div>
@@ -237,6 +240,8 @@ export async function render(ctx) {
     // ข้อมูล Job: เซลล์ซื้อของหน้างานบังคับ · อื่นๆ กรอกได้ (ไม่บังคับ) กรอกแล้วขึ้นในใบฟ้า
     $$('[data-jreq]', el).forEach((l) => l.classList.toggle('req', job && !adv));
     $('[data-jopt]', el).classList.toggle('hidden', job && !adv);
+    $('[data-act=job-none]', el)?.classList.toggle('hidden', job && !adv);   // ซื้อของหน้างานใช้ Z-NONE ไม่ได้
+    $('[data-jobhint]', el)?.classList.toggle('hidden', !(job && !adv));
     $('[data-filebox]', el).classList.toggle('hidden', adv && !fin);
     $$('[data-doc]', el).forEach((d) => {
       // ซื้อของหน้างาน: Cost sheet / PO / Invoice บังคับ · อื่นๆ: ใบเสร็จตามกฎหมวด + แนบ Cost sheet / PO / Invoice เพิ่มได้
@@ -300,6 +305,10 @@ export async function render(ctx) {
       if (paid && Math.abs(taxTotals().net - Number(old.amount)) > 0.004) return `ใบนี้จ่ายแล้ว ยอดสุทธิต้องเท่าเดิม (${money(old.amount)} บาท)`;
       return '';
     }
+    if (!val('payBank')) return 'กรุณาใส่ธนาคาร';
+    if (!val('payAccount')) return 'กรุณาใส่เลขบัญชี';
+    if (!val('jobNo')) return 'กรุณาใส่ Job No. (ไม่มี Job กด "ไม่มี Job (Z-NONE)")';
+    if (!adv && st.needJob && val('jobNo').toUpperCase() === 'Z-NONE') return 'ซื้อของหน้างาน ต้องใช้ Job No. จริง (ใช้ Z-NONE ไม่ได้)';
     if (!adv && st.needJob) {
       if (!val('jobNo') || !val('poNo') || !val('costSheetNo')) return 'กรุณากรอก Job No., PO No. และ Cost sheet No.';
       if (!pickers.costSheet.count() || !pickers.po.count() || !pickers.invoice.count()) return 'กรุณาแนบ Cost sheet, PO และ Invoice ให้ครบ';
@@ -479,6 +488,7 @@ export async function render(ctx) {
       else if (a === 'who-open') { st.whoOpen = !st.whoOpen; paintWho(); if (st.whoOpen) $('[data-whoq]', el)?.focus(); }
       else if (a === 'draft-clear') { saveJSON(DRAFT_KEY, null); ctx.go('/petty/request?r=' + Date.now()); }
       else if (a === 'rm-line') { t.closest('.pv-line-card').remove(); renumber(); recalc(); layout(); preview(); saveDraft(); if (tax) paintTax(); }
+      else if (a === 'job-none') { const j = $('[data-f=jobNo]', el); j.value = 'Z-NONE'; j.dispatchEvent(new Event('input', { bubbles: true })); }
       else if (a === 'payee-same') { const p = $('[data-f=payee]', el); p.value = val('supplier'); fillPayee(); }
       else if (a === 'wht-add') { const left = r2(total() - st.wht.reduce((s, w) => s + Number(w.base || 0), 0)); st.wht.push({ rate: 3, base: Math.max(0, left) }); paintTax(); }
       else if (a === 'submit') submit();
