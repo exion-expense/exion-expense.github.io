@@ -1,13 +1,13 @@
 // รายการที่จ่ายแล้ว "ตามรอบเติมเงิน" (ใบสำคัญจ่าย) — คอลัมน์ตามไฟล์ของบัญชี · สรุป PAID / Pending ท้ายตาราง · พิมพ์ได้ (แนวตั้ง / แนวนอน) · ก๊อปไปวาง Excel
 // รอบ = ตั้งแต่เติมเงินเข้ากล่องครั้งก่อน ถึงครั้งถัดไป · กด "จ่ายเงินเติมกล่อง" = ปิดรอบ (ระบบเดียวกับ "เคลียร์บิล" หน้ากล่องเงินสด)
 // รวมทั้งรอบ Petty cash และรอบวันที่ 20 · แผนกเป็น EXION CODE · Description = ชื่อหมวดภาษาอังกฤษ
-// PO / Cost sheet / Job แสดงบนจอ + ก๊อป Excel เท่านั้น (ไม่ออกตอนพิมพ์)
-import { api, money, esc } from '../core.js?v=10.4.7';
-import { icon, toast, toastError, empty, errorBox, skeleton, on, $, confirmBox } from '../ui.js?v=10.4.7';
-import { PRINT_ORIENTS, setPrintOrient } from './pv-common.js?v=10.4.7';
+// Doc ID / PO / Cost sheet / Job แสดงบนจอ + ก๊อป Excel เท่านั้น (ไม่ออกตอนพิมพ์)
+import { api, money, esc } from '../core.js?v=10.4.8';
+import { icon, toast, toastError, empty, errorBox, skeleton, on, $, confirmBox } from '../ui.js?v=10.4.8';
+import { PRINT_ORIENTS, setPrintOrient } from './pv-common.js?v=10.4.8';
 
 const COLS = ['No.', 'Suppliers', 'Description', 'Amount', 'Department', 'Prepared By', 'Status', 'Payment date'];
-const XCOLS = ['PO No.', 'Cost sheet No.', 'Job No.'];   // เฉพาะบนจอ / Excel
+const XCOLS = ['Doc ID', 'PO No.', 'Cost sheet No.', 'Job No.'];   // เฉพาะบนจอ / Excel
 const TKEY = 'exion_pv_report_title', OKEY = 'exion_pv_report_orient';
 const loadT = () => { try { return JSON.parse(localStorage.getItem(TKEY) || '{}'); } catch { return {}; } };
 const saveT = (v) => { try { localStorage.setItem(TKEY, JSON.stringify(v)); } catch { /* */ } };
@@ -33,8 +33,8 @@ export async function render(ctx) {
       <table class="pv-rep-tbl"><thead><tr>${COLS.map((c) => `<th>${c}</th>`).join('')}${XCOLS.map((c) => `<th class="scr-only">${c}</th>`).join('')}</tr></thead><tbody>
         ${d.items.map((x, i) => `<tr data-id="${esc(x.id)}"><td class="c">${i + 1}</td><td>${esc(x.supplier)}</td><td>${esc(x.description)}</td><td class="r">${money(x.amount)}</td>
           <td>${esc(x.department)}</td><td>${esc(x.preparedBy)}</td><td class="c"><b>${esc(x.status)}</b></td><td class="c">${esc(x.paymentDate)}</td>
-          <td class="scr-only">${esc(x.poNo || '')}</td><td class="scr-only">${esc(x.costSheetNo || '')}</td><td class="scr-only">${esc(x.jobNo || '')}</td></tr>`).join('')}
-      </tbody><tfoot><tr><td></td><td></td><td class="r">TOTAL</td><td class="r">${money(d.total)}</td><td colspan="4"></td><td class="scr-only" colspan="3"></td></tr></tfoot></table>
+          <td class="scr-only">${esc(x.id || '')}</td><td class="scr-only">${esc(x.poNo || '')}</td><td class="scr-only">${esc(x.costSheetNo || '')}</td><td class="scr-only">${esc(x.jobNo || '')}</td></tr>`).join('')}
+      </tbody><tfoot><tr><td></td><td></td><td class="r">TOTAL</td><td class="r">${money(d.total)}</td><td colspan="4"></td><td class="scr-only" colspan="4"></td></tr></tfoot></table>
       <table class="pv-rep-sum"><tbody>
         <tr><td>PAID</td><td class="r">${money(d.paidTotal ?? d.total)}</td></tr>
         <tr><td>Pending</td><td class="r">${Number(d.pendingTotal) ? money(d.pendingTotal) : '-'}</td></tr>
@@ -76,7 +76,7 @@ export async function render(ctx) {
           <div class="field"><label for="rp-t1">หัวรายงาน บรรทัด 1</label><input class="input" id="rp-t1" data-t="t1" maxlength="150" value="${esc(t.t1)}"></div>
           <div class="field"><label for="rp-t2">หัวรายงาน บรรทัด 2</label><input class="input" id="rp-t2" data-t="t2" maxlength="150" value="${esc(t.t2)}"></div>
         </div>
-        <div class="flex between wrap"><span class="text-sm muted">${d.items.length} รายการ · กดแถวเพื่อเปิดใบ · PO / Cost sheet / Job ไม่ออกตอนพิมพ์</span><span class="text-sm">รวม <b class="amount">${money(d.total)}</b> บาท</span></div>` : ''}
+        <div class="flex between wrap"><span class="text-sm muted">${d.items.length} รายการ · กดแถวเพื่อเปิดใบ · Doc ID / PO / Cost sheet / Job ไม่ออกตอนพิมพ์</span><span class="text-sm">รวม <b class="amount">${money(d.total)}</b> บาท</span></div>` : ''}
       </div>
       ${d.items.length ? `<div class="pv-rep-wrap" data-sheet>${sheetHtml(t)}</div>` : `<div class="card">${empty({ ic: 'receipt', title: cur ? 'รอบนี้ยังไม่มีรายการที่จ่าย' : 'รอบนี้ไม่มีรายการ' })}</div>`}`;
   }
@@ -99,7 +99,7 @@ export async function render(ctx) {
     // กันช่องแตก + ข้อความขึ้นต้นด้วย = + - @ กลายเป็นสูตรใน Excel (แทรก ' นำหน้า · ตัวเลขติดลบปล่อยตามเดิม)
     const t = titles(), clean = (s) => { const v = String(s ?? '').replace(/[\t\r\n]+/g, ' ').trim(); return /^[=+\-@]/.test(v) && !/^-?[\d,.]+$/.test(v) ? "'" + v : v; };
     const rows = [[t.t1], [t.t2], [...COLS, ...XCOLS], ...st.d.items.map((x, i) => [i + 1, x.supplier, x.description, Number(x.amount).toFixed(2), x.department, x.preparedBy, x.status, x.paymentDate,
-        x.poNo || '', x.costSheetNo || '', x.jobNo || '']),
+        x.id || '', x.poNo || '', x.costSheetNo || '', x.jobNo || '']),
       ['', '', 'TOTAL', Number(st.d.total).toFixed(2)], [], ['', '', 'PAID', Number(st.d.paidTotal ?? st.d.total).toFixed(2)],
       ['', '', 'Pending', Number(st.d.pendingTotal) ? Number(st.d.pendingTotal).toFixed(2) : '-'], ['', '', '', Number(st.d.total).toFixed(2)]];
     try { await navigator.clipboard.writeText(rows.map((r) => r.map(clean).join('\t')).join('\n')); toast('ก๊อปแล้ว · ไปวางใน Excel ได้เลย'); }

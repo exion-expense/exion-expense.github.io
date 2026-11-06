@@ -1,6 +1,6 @@
 // ใช้ร่วมหน้าใบสำคัญจ่าย (ใบฟ้า): ป้ายสถานะ / แถวรายการ / ใบฟ้าสำหรับพิมพ์
-import { api, money, fmtDate, esc } from '../core.js?v=10.4.7';
-import { icon, catIcon } from '../ui.js?v=10.4.7';
+import { api, money, fmtDate, esc } from '../core.js?v=10.4.8';
+import { icon, catIcon } from '../ui.js?v=10.4.8';
 
 export const KIND = { PCJ: 'มี Job', PCN: 'ทั่วไป', ADV: 'Advance' };
 /** ใบทดลอง (ลบทิ้งทีหลัง) */
@@ -75,8 +75,8 @@ export function signers(v) {
   ];
 }
 
-/** ตัวเลือกพิมพ์: ขนาด (ครึ่ง / เต็ม A4) + แนวกระดาษ + สีกระดาษ · จำไว้ในเครื่อง */
-export const PRINT_SIZES = [['half', 'ครึ่ง A4'], ['full', 'เต็ม A4']];
+/** ตัวเลือกพิมพ์: ขนาด (ครึ่ง / เต็ม A4 / กระดาษ A5) + แนวกระดาษ + สีกระดาษ · จำไว้ในเครื่อง */
+export const PRINT_SIZES = [['half', 'ครึ่ง A4'], ['full', 'เต็ม A4'], ['a5', 'A5']];
 export const PRINT_ORIENTS = [['portrait', 'แนวตั้ง'], ['landscape', 'แนวนอน']];
 export const PRINT_COLORS = [['blue', 'ฟ้า', '#DCEFEF'], ['white', 'ขาว', '#FFFFFF'], ['yellow', 'เหลือง', '#FFF6CF'], ['pink', 'ชมพู', '#FCE6EC'], ['green', 'เขียว', '#E3F4E5']];
 const PRINT_KEY = 'exion_pv_print';
@@ -130,11 +130,12 @@ export function deptInfo(v) {
 export function voucherHtml(v, { size = 'half', color = 'blue', rows = 0 } = {}) {
   const lines = v.lines || [];
   const dpt = deptInfo(v), adj = roundAdj(v);
-  const pad = Math.max(0, (rows || (size === 'full' ? 12 : 4)) - lines.length);   // rows = จำนวนบรรทัดขั้นต่ำ (แนวนอนเต็มแผ่นใช้น้อยลง)
+  const lay = size === 'a5' ? 'half' : size;   // A5 = หน้าตาแบบครึ่ง A4 พิมพ์ลงกระดาษ A5 ตรง ๆ
+  const pad = Math.max(0, (rows || (lay === 'full' ? 12 : 4)) - lines.length);   // rows = จำนวนบรรทัดขั้นต่ำ (แนวนอนเต็มแผ่นใช้น้อยลง)
   const others = (v.steps || []).filter((s) => s.k === 'fin2' || s.k === 'fin3').filter((s) => s.state === 'done')
     .map((s) => `${s.label}: ${esc(s.byName)} ${thd(s.at)}`);
   if (v.paidAt) others.push(`จ่ายแล้ว ${thd(v.paidAt)}`);
-  return `<div class="pv-sheet pv-${size} pv-c-${color}">
+  return `<div class="pv-sheet pv-${lay} pv-c-${color}">
     ${isTest(v.id) ? '<div class="pv-watermark" aria-hidden="true">ตัวอย่าง · ไม่ใช่เอกสารจริง</div>' : ''}
     <div class="pv-hd">
       <img src="brand/logo.png" alt="EXION Thailand">
@@ -186,11 +187,11 @@ export function hydrateSigs(root) {
   });
 }
 /** ตั้งแนวกระดาษตอนพิมพ์ (แนวตั้ง / แนวนอน) · คืนฟังก์ชันล้างค่า */
-export function setPrintOrient(orient) {
+export function setPrintOrient(orient, paper = 'A4') {
   document.getElementById('pv-page-orient')?.remove();
   const s = document.createElement('style');
   s.id = 'pv-page-orient';
-  s.textContent = `@media print { @page { size: A4 ${orient === 'landscape' ? 'landscape' : 'portrait'}; margin: 10mm; } }`;
+  s.textContent = `@media print { @page { size: ${paper === 'A5' ? 'A5' : 'A4'} ${orient === 'landscape' ? 'landscape' : 'portrait'}; margin: 10mm; } }`;
   document.head.appendChild(s);
   return () => s.remove();
 }
@@ -198,7 +199,8 @@ export function setPrintOrient(orient) {
 // พื้นที่พิมพ์บน A4 (ขอบ 10 มม.) เป็นพิกเซล · แนวตั้ง: กว้าง 190 มม. · ครึ่งแผ่น ≈ 128 มม. (เผื่อเส้นตัด) · เต็มแผ่น 277 มม.
 // แนวนอน: เต็มแผ่น 277 × 190 มม. · ครึ่งแผ่น = ซีกซ้าย ≈ 132 มม. (เผื่อเส้นตัด) ย่อใบให้พอดี
 const SHEET_W = 718;
-const BOX = { portrait: { half: [718, 484], full: [718, 1040] }, landscape: { half: [498, 710], full: [1040, 710] } };
+// A5 (ขอบ 10 มม.): แนวตั้ง 128 × 190 มม. · แนวนอน 190 × 128 มม. · ไม่มีเส้นตัด
+const BOX = { portrait: { half: [718, 484], full: [718, 1040], a5: [484, 718] }, landscape: { half: [498, 710], full: [1040, 710], a5: [718, 484] } };
 export function printVoucher(v, { size = 'half', color = 'blue', orient = 'portrait' } = {}) {
   document.querySelector('.pv-print-root')?.remove();
   const land = orient === 'landscape', [bw, bh] = BOX[land ? 'landscape' : 'portrait'][size] || BOX.portrait.half;
@@ -217,7 +219,7 @@ export function printVoucher(v, { size = 'half', color = 'blue', orient = 'portr
   root.style.cssText = '';
   if (z < 1) sheet.style.zoom = String(Math.floor(z * 100) / 100);
   hydrateSigs(root);
-  const unOrient = setPrintOrient(orient);
+  const unOrient = setPrintOrient(orient, size === 'a5' ? 'A5' : 'A4');
   document.body.classList.add('printing-pv');
   const done = () => { document.body.classList.remove('printing-pv'); root.remove(); unOrient(); window.removeEventListener('afterprint', done); };
   window.addEventListener('afterprint', done);
