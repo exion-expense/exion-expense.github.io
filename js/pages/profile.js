@@ -1,6 +1,6 @@
 // โปรไฟล์ · ลายเซ็น · ขอเบิกรายเดือน (ใช้ทั้ง /profile และ /petty/profile — ฝั่งเงินสดย่อยไม่มีส่วนขอเบิกรายเดือน)
-import { api, auth, loadProfile, money, fmtDate, fmtDateTime, esc, initials, roleLabel, monthLabel, catName, exportStage, statusBadge } from '../core.js?v=10.4.5';
-import { icon, catIcon, toast, toastError, confirmBox, sheet, busy, withBtn, signaturePad, monthNav, shiftMonth, empty, on, debounce } from '../ui.js?v=10.4.5';
+import { api, auth, loadProfile, money, fmtDate, fmtDateTime, esc, initials, roleLabel, monthLabel, catName, exportStage, statusBadge } from '../core.js?v=10.4.6';
+import { icon, catIcon, toast, toastError, confirmBox, sheet, busy, withBtn, signaturePad, monthNav, shiftMonth, empty, on, debounce } from '../ui.js?v=10.4.6';
 
 export async function render(ctx) {
   const { el } = ctx;
@@ -13,16 +13,17 @@ export async function render(ctx) {
 
   // ฝั่งเบิกค่าใช้จ่าย: ขอเบิกรายเดือนอยู่บนสุด (งานหลักของหน้านี้) · ข้อมูลส่วนตัวไว้ข้างขวา
   el.innerHTML = `<div class="stack">
-    ${petty ? `<div id="pf-prof"></div><div class="split"><div class="stack"><div id="pf-sig"></div></div><div class="stack"><div id="pf-acc"></div></div></div>`
+    ${petty ? `<div id="pf-prof"></div><div class="split"><div class="stack"><div id="pf-sig"></div></div><div class="stack"><div id="pf-line"></div><div id="pf-acc"></div></div></div>`
       : `<div class="split">
         <div class="stack"><div id="pf-claim"></div><div id="pf-hist"></div></div>
-        <div class="stack"><div id="pf-prof"></div><div id="pf-sig"></div><div id="pf-acc"></div></div>
+        <div class="stack"><div id="pf-prof"></div><div id="pf-sig"></div><div id="pf-line"></div><div id="pf-acc"></div></div>
       </div>`}
   </div>`;
   const $ = (id) => el.querySelector('#' + id);
 
   paintProfile(ctx, $('pf-prof'));
   paintAccount($('pf-acc'), petty);
+  paintLine(ctx, $('pf-line'));
   const sigJob = loadSig();
 
   // ─────────── ลายเซ็น ───────────
@@ -301,6 +302,51 @@ function paintProfile(ctx, box) {
     <div class="divider"></div>
     <dl class="kv">${kv.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
   </div>`;
+}
+
+// แจ้งเตือน LINE: เชื่อมด้วยรหัส 6 หลัก (พิมพ์ในแชต OA) · ซ่อนการ์ดถ้ายังไม่เปิดใช้ (LINE_NOTIFY)
+async function paintLine(ctx, box) {
+  if (!box) return;
+  let s;
+  try { s = await api.rpc('line_status', {}, { quiet: true }); } catch { box.innerHTML = ''; return; }
+  if (!ctx.alive() || !s?.enabled) { box.innerHTML = ''; return; }
+  const head = `<div class="card-head"><h3>${icon('bell')} แจ้งเตือนผ่าน LINE</h3>${s.linked ? statusBadge('Approved', 'เชื่อมแล้ว') : ''}</div>`;
+  const what = '<p class="hint">ส่งเฉพาะเรื่องสำคัญ: ไม่อนุมัติ / ตีกลับให้แก้ · โอนเงิน / จ่ายเงินแล้ว · สรุปงานรออนุมัติ — เรื่องอื่นยังอยู่ที่กระดิ่งในแอป</p>';
+  box.innerHTML = s.linked
+    ? `<div class="card">${head}<div class="pad stack-sm">
+        <p class="text-sm">เชื่อมกับ LINE <b>${esc(s.displayName || '(ไม่มีชื่อ)')}</b>${s.linkedAt ? ` · ${esc(fmtDate(s.linkedAt))}` : ''}</p>${what}
+        <button class="btn btn-secondary btn-block" data-line="unlink">${icon('x', 'sm')} ยกเลิกการเชื่อม LINE</button></div></div>`
+    : `<div class="card">${head}<div class="pad stack-sm">${what}
+        <button class="btn btn-primary btn-block" data-line="start">${icon('bell', 'sm')} เชื่อม LINE</button></div></div>`;
+  box.onclick = async (e) => {
+    const b = e.target.closest('[data-line]'); if (!b) return;
+    if (b.dataset.line === 'unlink') {
+      if (!(await confirmBox({ title: 'ยกเลิกการเชื่อม LINE', message: 'จะไม่ได้รับแจ้งเตือนทาง LINE อีก (กระดิ่งในแอปยังใช้ได้ตามปกติ)', ok: 'ยกเลิกการเชื่อม', danger: true }))) return;
+      try { await api.rpc('line_unlink'); toast('ยกเลิกการเชื่อม LINE แล้ว'); paintLine(ctx, box); } catch (err) { toastError(err); }
+      return;
+    }
+    let c;
+    try { b.disabled = true; c = await api.rpc('line_link_start'); } catch (err) { toastError(err); b.disabled = false; return; }
+    b.disabled = false;
+    const sh = sheet({
+      title: 'เชื่อม LINE',
+      body: `<div class="stack-sm">
+        <p><b>1.</b> แอดเพื่อน LINE OA ของบริษัท${s.oaId ? ` <b>${esc(s.oaId)}</b>` : ''}</p>
+        ${s.addUrl ? `<a class="btn btn-secondary btn-block" href="${esc(s.addUrl)}" target="_blank" rel="noopener">${icon('external', 'sm')} แอดเพื่อน LINE</a>` : ''}
+        <p><b>2.</b> พิมพ์รหัสนี้ส่งในแชต OA</p>
+        <div class="text-center mono" style="font-size:34px;font-weight:700;letter-spacing:6px">${esc(c.code)}</div>
+        <button class="btn btn-ghost btn-sm" data-copy>${icon('copy', 'sm')} คัดลอกรหัส</button>
+        <p class="hint">รหัสใช้ได้ 15 นาที · OA จะตอบกลับว่า “เชื่อมบัญชีแล้ว” · ห้ามส่งรหัสนี้ให้คนอื่น</p>
+      </div>`,
+      foot: `<button class="btn btn-secondary" data-x>ปิด</button><button class="btn btn-primary" data-ok>${icon('refresh')} เช็กว่าเชื่อมแล้ว</button>`,
+      onMount: (el, close) => {
+        el.querySelector('[data-copy]').onclick = () => navigator.clipboard?.writeText(c.code).then(() => toast('คัดลอกรหัสแล้ว')).catch(() => {});
+        el.querySelector('[data-ok]').onclick = () => close(true);
+      },
+    });
+    await sh.done;
+    paintLine(ctx, box);
+  };
 }
 
 function paintAccount(box, petty) {
