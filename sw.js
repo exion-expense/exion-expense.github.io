@@ -1,5 +1,5 @@
 // Service worker — แคชเฉพาะไฟล์หน้าเว็บ · ไม่แตะข้อมูล Supabase (ข้อมูลสดเสมอ)
-const VERSION = 'exion-v10.4.6';
+const VERSION = 'exion-v10.4.7';
 const SHELL = ['./', './index.html', './css/app.css', './config.js', './manifest.webmanifest', './icons/favicon-64.png', './icons/icon-192.png', './brand/logo.png', './brand/mark.png', './brand/plant.svg',
   './js/main.js', './js/core.js', './js/ui.js', './js/shell.js', './js/icons.js', './js/csp.js', './vendor/supabase-2.117.2.js'];
 self.addEventListener('install', (e) => {
@@ -17,7 +17,7 @@ self.addEventListener('fetch', (e) => {
   // ไฟล์ของแอป: ถามเซิร์ฟเวอร์ทุกครั้งว่ามีใหม่ไหม (ไม่ใช้ไฟล์ที่เบราว์เซอร์จำไว้ 10 นาที) · หน้าเว็บหลักส่งตามเดิม
   const req = e.request.mode === 'navigate' ? e.request : new Request(e.request, { cache: 'no-cache' });
   e.respondWith(fetch(req).then((r) => {
-    if (r.ok && r.type === 'basic') { const cp = r.clone(); caches.open(VERSION).then((c) => c.put(e.request, cp)); }
+    if (r.ok && r.type === 'basic' && !url.searchParams.has('vc')) { const cp = r.clone(); caches.open(VERSION).then((c) => c.put(e.request, cp)); }
     return r;
   }).catch(() => caches.match(e.request, { ignoreSearch: true }).then((r) => r || caches.match('./index.html'))));
 });

@@ -1,9 +1,9 @@
 // ขอเบิก Petty Cash (ใบสำคัญจ่าย) — ค่าใช้จ่าย / Advance entertain · เลือกหมวดทุกบรรทัด · HR กรอกแทนได้ · แก้ใบที่ถูกตีกลับ (?id=)
 // บัญชีแก้ไขใบ (?id=&fin=1): แก้ได้ทุกช่อง + VAT / หัก ณ ที่จ่าย + รหัสแผนก · ไม่เริ่มสายอนุมัติใหม่
 // บัญชี (ทั้งตอนเบิกเอง / กรอกแทน / แก้ไข) เลือกแผนกรายบรรทัดได้ = ลงต้นทุนแยกทีม
-import { api, money, esc, todayYMD, loadPettyCategories } from '../core.js?v=10.4.6';
-import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.4.6';
-import { DOCS, whtLines, roundNet, roundAdj, roundText, roundSeg } from './pv-common.js?v=10.4.6';
+import { api, money, esc, todayYMD, loadPettyCategories, state } from '../core.js?v=10.4.7';
+import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.4.7';
+import { DOCS, whtLines, roundNet, roundAdj, roundText, roundSeg } from './pv-common.js?v=10.4.7';
 
 // คำอธิบายหมวด: อะไรเข้าหมวดนี้บ้าง (การ์ดตอนชี้ที่ปุ่มหมวด + ใต้หมวดที่เลือก)
 const CAT_HINT = {
@@ -42,7 +42,8 @@ const guessCat = (text) => {
   return Object.keys(CAT_WORDS).find((k) => CAT_WORDS[k].some((w) => t.includes(w))) || '';
 };
 
-const DRAFT_KEY = 'exion_pv_draft', RECENT_KEY = 'exion_pv_recent_who';
+const RECENT_KEY = 'exion_pv_recent_who';
+let DRAFT_KEY = 'exion_pv_draft';   // ตั้งใหม่ตามผู้ใช้ใน render() · กันคนถัดไปในเครื่องเดียวกันเห็นร่าง (เลขบัญชี ฯลฯ)
 const pettyFund = () => { try { return localStorage.getItem('exion_petty_fund') || ''; } catch { return ''; } };   // กล่องที่เลือกไว้ในหน้าแรกเงินสดย่อย
 const loadJSON = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || 'null') ?? d; } catch { return d; } };
 const saveJSON = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch { /* */ } };
@@ -50,6 +51,8 @@ const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
 export async function render(ctx) {
   const { el, query } = ctx;
+  DRAFT_KEY = 'exion_pv_draft_' + String(ctx.profile?.email || state.session?.email || '').toLowerCase();
+  try { localStorage.removeItem('exion_pv_draft'); } catch { /* ร่างแบบเก่า (ไม่แยกคน) */ }
   let meta, old = null, cats = [];
   try {
     [meta, old, cats] = await Promise.all([api.rpc('get_pv_form_meta', {}, { ttl: 60 }), query.id ? api.rpc('get_pv', { p_id: query.id }) : null, loadPettyCategories()]);

@@ -1,6 +1,6 @@
 // โปรไฟล์ · ลายเซ็น · ขอเบิกรายเดือน (ใช้ทั้ง /profile และ /petty/profile — ฝั่งเงินสดย่อยไม่มีส่วนขอเบิกรายเดือน)
-import { api, auth, loadProfile, money, fmtDate, fmtDateTime, esc, initials, roleLabel, monthLabel, catName, exportStage, statusBadge } from '../core.js?v=10.4.6';
-import { icon, catIcon, toast, toastError, confirmBox, sheet, busy, withBtn, signaturePad, monthNav, shiftMonth, empty, on, debounce } from '../ui.js?v=10.4.6';
+import { api, auth, loadProfile, money, fmtDate, fmtDateTime, esc, initials, roleLabel, monthLabel, catName, exportStage, statusBadge } from '../core.js?v=10.4.7';
+import { icon, catIcon, toast, toastError, confirmBox, sheet, busy, withBtn, signaturePad, monthNav, shiftMonth, empty, on, debounce } from '../ui.js?v=10.4.7';
 
 export async function render(ctx) {
   const { el } = ctx;
@@ -332,7 +332,7 @@ async function paintLine(ctx, box) {
       title: 'เชื่อม LINE',
       body: `<div class="stack-sm">
         <p><b>1.</b> แอดเพื่อน LINE OA ของบริษัท${s.oaId ? ` <b>${esc(s.oaId)}</b>` : ''}</p>
-        ${s.addUrl ? `<a class="btn btn-secondary btn-block" href="${esc(s.addUrl)}" target="_blank" rel="noopener">${icon('external', 'sm')} แอดเพื่อน LINE</a>` : ''}
+        ${/^https:\/\/(line\.me|lin\.ee)\//.test(s.addUrl || '') ? `<a class="btn btn-secondary btn-block" href="${esc(s.addUrl)}" target="_blank" rel="noopener">${icon('external', 'sm')} แอดเพื่อน LINE</a>` : ''}
         <p><b>2.</b> พิมพ์รหัสนี้ส่งในแชต OA</p>
         <div class="text-center mono" style="font-size:34px;font-weight:700;letter-spacing:6px">${esc(c.code)}</div>
         <button class="btn btn-ghost btn-sm" data-copy>${icon('copy', 'sm')} คัดลอกรหัส</button>

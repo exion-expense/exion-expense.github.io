@@ -2,9 +2,9 @@
 // รอบ = ตั้งแต่เติมเงินเข้ากล่องครั้งก่อน ถึงครั้งถัดไป · กด "จ่ายเงินเติมกล่อง" = ปิดรอบ (ระบบเดียวกับ "เคลียร์บิล" หน้ากล่องเงินสด)
 // รวมทั้งรอบ Petty cash และรอบวันที่ 20 · แผนกเป็น EXION CODE · Description = ชื่อหมวดภาษาอังกฤษ
 // PO / Cost sheet / Job แสดงบนจอ + ก๊อป Excel เท่านั้น (ไม่ออกตอนพิมพ์)
-import { api, money, esc } from '../core.js?v=10.4.6';
-import { icon, toast, toastError, empty, errorBox, skeleton, on, $, confirmBox } from '../ui.js?v=10.4.6';
-import { PRINT_ORIENTS, setPrintOrient } from './pv-common.js?v=10.4.6';
+import { api, money, esc } from '../core.js?v=10.4.7';
+import { icon, toast, toastError, empty, errorBox, skeleton, on, $, confirmBox } from '../ui.js?v=10.4.7';
+import { PRINT_ORIENTS, setPrintOrient } from './pv-common.js?v=10.4.7';
 
 const COLS = ['No.', 'Suppliers', 'Description', 'Amount', 'Department', 'Prepared By', 'Status', 'Payment date'];
 const XCOLS = ['PO No.', 'Cost sheet No.', 'Job No.'];   // เฉพาะบนจอ / Excel
@@ -96,7 +96,8 @@ export async function render(ctx) {
   }
   async function copyExcel() {
     if (!st.d?.items.length) return;
-    const t = titles(), clean = (s) => String(s ?? '').replace(/[\t\r\n]+/g, ' ');
+    // กันช่องแตก + ข้อความขึ้นต้นด้วย = + - @ กลายเป็นสูตรใน Excel (แทรก ' นำหน้า · ตัวเลขติดลบปล่อยตามเดิม)
+    const t = titles(), clean = (s) => { const v = String(s ?? '').replace(/[\t\r\n]+/g, ' ').trim(); return /^[=+\-@]/.test(v) && !/^-?[\d,.]+$/.test(v) ? "'" + v : v; };
     const rows = [[t.t1], [t.t2], [...COLS, ...XCOLS], ...st.d.items.map((x, i) => [i + 1, x.supplier, x.description, Number(x.amount).toFixed(2), x.department, x.preparedBy, x.status, x.paymentDate,
         x.poNo || '', x.costSheetNo || '', x.jobNo || '']),
       ['', '', 'TOTAL', Number(st.d.total).toFixed(2)], [], ['', '', 'PAID', Number(st.d.paidTotal ?? st.d.total).toFixed(2)],
