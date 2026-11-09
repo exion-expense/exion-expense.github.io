@@ -1,7 +1,7 @@
 // คำขอของฉัน — กรองตามสถานะ / ค้นหา / จัดกลุ่มรายเดือน · แตะดูรายละเอียด แก้ไข ลบ
-import { api, state, money, kmText, esc, fmtDate, fmtDateTime, catName, catInfo, monthLabel, requestBadge, loadCategories } from '../core.js?v=10.4.9';
-import { icon, catIcon, requestRow, toast, toastError, confirmBox, promptBox, sheet, busy, empty, skeleton, thumbs, hydrateThumbs, receiptPicker, on, debounce, $, $$ } from '../ui.js?v=10.4.9';
-import { catPickerHtml, fieldsHtml, applyCat, validateItem, showErrors, clearError, catFlags, fuelBox, pickFields, loadVisitRules, entWarn } from './submit.js?v=10.4.9';
+import { api, state, money, kmText, esc, fmtDate, fmtDateTime, catName, catInfo, monthLabel, requestBadge, loadCategories } from '../core.js?v=10.4.11';
+import { icon, catIcon, requestRow, toast, toastError, confirmBox, promptBox, sheet, busy, empty, skeleton, thumbs, hydrateThumbs, receiptPicker, on, debounce, $, $$ } from '../ui.js?v=10.4.11';
+import { catPickerHtml, fieldsHtml, applyCat, validateItem, showErrors, clearError, catFlags, fuelBox, pickFields, loadVisitRules, entWarn, isPrinciple, useJobNone } from './submit.js?v=10.4.11';
 
 const FILTERS = [['all', 'ทั้งหมด'], ['pending', 'รออนุมัติ'], ['approved', 'อนุมัติแล้ว'], ['rejected', 'ไม่อนุมัติ'], ['pre', 'งบล่วงหน้า']];
 
@@ -297,12 +297,14 @@ export async function render(ctx) {
         applyCat(root, it, fuel);
         return;
       }
+      const jn = e.target.closest('[data-act="job-none"]'); if (jn) { useJobNone(jn); return; }
       if (e.target.closest('[data-save]')) save(e.target.closest('[data-save]'));
     });
     root.addEventListener('input', (e) => {
       const t = e.target.closest('[data-f]'); if (!t) return;
       it[t.dataset.f] = t.value; clearError(root, t.dataset.f);
       if (['occasion', 'venue', 'customer'].includes(t.dataset.f)) entWarn(root, it);
+      if (t.dataset.f === 'customer') applyCat(root, it, fuel);   // Principle → ซ่อนช่อง Job
       if (t.dataset.f === 'mileageKm') { const fc = $('[data-g="fuelcalc"]', root); if (fc) fc.innerHTML = fuelBox(it, fuel); }
     });
 
@@ -321,7 +323,7 @@ export async function render(ctx) {
       if ((f.travel && !f.fuel) || f.ent || f.visit) u.customer_contact = t('customerContact');
       if (f.ent || f.visit) u.occasion = t('occasion');
       if (f.ent) u.attendees = t('attendees');
-      if (f.job) u.job_no = t('jobNo');
+      if (f.job && !(f.ent && isPrinciple(it.customer))) u.job_no = t('jobNo');   // Principle: เลข Job ระบบจัดการ (ไม่ส่ง = คงค่าเดิม)
       btn.disabled = true;
       try {
         const removed = rp.kept().length < (r.receipt_paths || []).length;

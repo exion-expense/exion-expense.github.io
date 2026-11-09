@@ -1,7 +1,7 @@
 // ขออนุมัติงบล่วงหน้า (ค่ารับรอง / กอล์ฟ) — ส่งก่อนใช้จ่าย แล้วค่อยส่งบิลจริงทีหลัง
-import { api, money, esc, catName, todayYMD, addDays, loadCategories } from '../core.js?v=10.4.9';
-import { icon, catIcon, toast, toastError, withBtn, on, $, $$ } from '../ui.js?v=10.4.9';
-import { VISIT, loadVisitRules } from './submit.js?v=10.4.9';
+import { api, money, esc, catName, todayYMD, addDays, loadCategories } from '../core.js?v=10.4.11';
+import { icon, catIcon, toast, toastError, withBtn, on, $, $$ } from '../ui.js?v=10.4.11';
+import { VISIT, loadVisitRules, isPrinciple, useJobNone } from './submit.js?v=10.4.11';
 
 const CUST_TYPES = [['Customer', 'ลูกค้า'], ['Principle', 'Principle'], ['Other Customer', 'ลูกค้าอื่น'], ['Other Principle', 'Principle อื่น']];
 const ENT_CATS = ['ENT', 'GOLF'];
@@ -40,7 +40,10 @@ export async function render(ctx) {
             <div class="field span-2"><label class="req">Purpose of entertainment (โอกาส / วัตถุประสงค์)</label><textarea class="input" data-f="occasion" placeholder="เช่น เลี้ยงขอบคุณทีมจัดซื้อ SCG หลังปิดงาน เพื่อเพิ่มโอกาส Bidding โครงการปีหน้า" maxlength="500"></textarea>
               <div class="hint">อธิบายให้ละเอียด${need ? ` อย่างน้อย ${VISIT.minLen} ตัวอักษร` : ''} — พบใคร เพื่ออะไร คาดหวังอะไร (เช่น เพิ่มโอกาสขาย / Bidding งาน)</div>${err('occasion')}</div>
             <div class="field span-2"><label ${need ? 'class="req"' : ''}>ผู้ร่วม (คาดการณ์)${need ? '' : ' <span class="opt">ไม่บังคับ</span>'}</label><textarea class="input" data-f="attendees" placeholder="ชื่อ + บริษัท เช่น คุณสมชาย (SCG), คุณเอ (EXION)" maxlength="500"></textarea>${err('attendees')}</div>
-            <div class="field"><label ${VISIT.entJobRequired ? 'class="req">เลข Job' : '>เลข Job <span class="opt">ไม่บังคับ</span>'}</label><input class="input" data-f="jobNo" placeholder="เช่น J2026-0142" maxlength="60">${err('jobNo')}</div>
+            <div class="field" data-g="jobNo"><label ${VISIT.entJobRequired ? 'class="req">เลข Job' : '>เลข Job <span class="opt">ไม่บังคับ</span>'}</label>
+              <div class="flex gap-8"><input class="input grow" data-f="jobNo" placeholder="เช่น J2026-0142" maxlength="60">
+                <button type="button" class="btn btn-ghost btn-sm nowrap" data-act="job-none" title="ไม่มี Job · ใช้ Job กลาง">ไม่มี Job (Z-NONE)</button></div>${err('jobNo')}</div>
+            <div class="field hidden" data-g="jobPrinciple"><label>เลข Job</label><div class="hint" style="margin:0">Principle ไม่ต้องใส่ — ระบบใส่เลข Job ของ Principle ให้</div></div>
           </div>
         </div></div>
 
@@ -77,6 +80,11 @@ export async function render(ctx) {
     F.custType = v;
     $$('[data-act="ctype"]', el).forEach((b) => { b.classList.toggle('on', b.dataset.v === v); b.setAttribute('aria-pressed', String(b.dataset.v === v)); });
     showErr('custType', '');
+    // Principle / Principle อื่น: ไม่ต้องใส่เลข Job (ระบบใส่ให้)
+    const pr = isPrinciple(`[${v}]`);
+    $('[data-g="jobNo"]', el)?.classList.toggle('hidden', pr);
+    $('[data-g="jobPrinciple"]', el)?.classList.toggle('hidden', !pr);
+    if (pr) showErr('jobNo', '');
     fillCust();
   }
   function showErr(k, m) {
@@ -96,7 +104,7 @@ export async function render(ctx) {
       occasion: !val('occasion') ? 'ใส่ Purpose of entertainment — เลี้ยง/พบใคร เพื่ออะไร'
         : need && val('occasion').length < VISIT.minLen && `อธิบายให้ละเอียดกว่านี้ (อย่างน้อย ${VISIT.minLen} ตัวอักษร) — พบใคร เพื่ออะไร`,
       attendees: need && !val('attendees') && 'ใส่ผู้ร่วม (คาดการณ์) — ชื่อ + บริษัท',
-      jobNo: VISIT.entJobRequired && !val('jobNo') && 'ใส่เลข Job (บังคับสำหรับค่ารับรอง / กอล์ฟ)',
+      jobNo: VISIT.entJobRequired && !isPrinciple(`[${F.custType}]`) && !val('jobNo') && 'ใส่เลข Job (บังคับสำหรับค่ารับรอง / กอล์ฟ) · ไม่มี Job กด Z-NONE',
       budget: budget <= 0 ? 'ใส่งบประมาณ' : budget > 500000 && 'งบประมาณเกิน 500,000 บาท',
     };
     Object.entries(errs).forEach(([k, m]) => showErr(k, m || ''));
@@ -111,7 +119,7 @@ export async function render(ctx) {
     try {
       await withBtn(btn, () => api.rpc('submit_preapprove', { p: {
         category: F.category, expenseDate: d, budget, venue: val('venue'), customer: `[${F.custType}] ${name}`,
-        customerContact: val('customerContact'), occasion: val('occasion'), attendees: val('attendees'), jobNo: val('jobNo'),
+        customerContact: val('customerContact'), occasion: val('occasion'), attendees: val('attendees'), jobNo: isPrinciple(`[${F.custType}]`) ? '' : val('jobNo'),
       } }));
       toast(`ส่งขออนุมัติงบแล้ว${profile?.managerFullName ? ` — รอ ${profile.managerFullName} พิจารณา` : ''}`);
       ctx.refreshBadges?.();
@@ -127,6 +135,7 @@ export async function render(ctx) {
         $$('[data-act="cat"]', el).forEach((b) => { b.classList.toggle('on', b === t); b.setAttribute('aria-pressed', String(b === t)); });
         showErr('category', '');
       } else if (a === 'ctype') setType(t.dataset.v);
+      else if (a === 'job-none') useJobNone(t);
       else if (a === 'submit') submit(t);
     }),
     on(el, 'input', '[data-f]', (e, t) => {

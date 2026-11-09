@@ -1,11 +1,18 @@
 // ขอเบิกค่าใช้จ่าย — กรอกได้หลายรายการในครั้งเดียว · เซฟร่างอัตโนมัติ · กันส่งซ้ำด้วย batchId
 // ส่วนช่องกรอกตามหมวด (export ด้านล่าง) ใช้ร่วมกับหน้าแก้ไขใน requests.js
-import { api, state, money, esc, fmtDate, catName, catInfo, todayYMD, addDays, loadCategories, timeAgo } from '../core.js?v=10.4.9';
-import { html, icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, on, debounce, $, $$ } from '../ui.js?v=10.4.9';
+import { api, state, money, esc, fmtDate, catName, catInfo, todayYMD, addDays, loadCategories, timeAgo } from '../core.js?v=10.4.11';
+import { html, icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, on, debounce, $, $$ } from '../ui.js?v=10.4.11';
 
 const NO_JOB = [];                                      // ทุกหมวดใส่เลข Job ได้ (ไม่บังคับ · ค่ารับรอง/กอล์ฟบังคับ) → ลงช่อง Job ใน Excel
 const ENT_CATS = ['ENT', 'GOLF'];
 const ALLOW_CATS = ['CAR', 'MOBILE', 'APT'];             // ค่าเหมาจ่ายอัตโนมัติ
+/** ลูกค้าประเภท Principle / Principle อื่น → ไม่ต้องใส่เลข Job (ระบบใส่เลข Job ของ Principle ให้ · ค่า PRINCIPLE_JOB_NO) */
+export const isPrinciple = (customer) => /^\[(other\s+)?principle\]/i.test(String(customer || '').trim());
+/** ปุ่ม "ไม่มี Job (Z-NONE)" — ใช้ Job กลางแบบเดียวกับ Petty cash */
+export function useJobNone(btn) {
+  const j = btn.closest('.field')?.querySelector('[data-f="jobNo"]'); if (!j) return;
+  j.value = 'Z-NONE'; j.dispatchEvent(new Event('input', { bubbles: true }));
+}
 export const FIELDS = ['category', 'expenseDate', 'mileageKm', 'amount', 'venue', 'occasion', 'attendees', 'origin', 'destination', 'customer', 'customerContact', 'jobNo'];
 const RATE_TYPE = { 'With Depreciation': 'รวมค่าเสื่อม', 'No Depreciation': 'ไม่รวมค่าเสื่อม' };
 const DRAFT_DAYS = 7;
@@ -82,7 +89,9 @@ export function fieldsHtml(it, { listId = 'exCustList' } = {}) {
     <div class="field span-2" data-g="attendees"><label class="req">ผู้ร่วม</label>
       <textarea class="input" data-f="attendees" placeholder="ชื่อ + บริษัท เช่น คุณสมชาย (SCG), คุณเอ (EXION)" maxlength="500">${v('attendees')}</textarea>${err('attendees')}</div>
     <div class="field" data-g="jobNo"><label data-lbl="jobNo">เลข Job <span class="opt">ไม่บังคับ</span></label>
-      <input class="input" data-f="jobNo" value="${v('jobNo')}" placeholder="เช่น J2026-0142" maxlength="60">${err('jobNo')}</div>
+      <div class="flex gap-8"><input class="input grow" data-f="jobNo" value="${v('jobNo')}" placeholder="เช่น J2026-0142" maxlength="60">
+        <button type="button" class="btn btn-ghost btn-sm nowrap" data-act="job-none" title="ไม่มี Job · ใช้ Job กลาง">ไม่มี Job (Z-NONE)</button></div>${err('jobNo')}</div>
+    <div class="field hidden" data-g="jobPrinciple"><label>เลข Job</label><div class="hint" style="margin:0">Principle ไม่ต้องใส่ — ระบบใส่เลข Job ของ Principle ให้</div></div>
   </div>
   <div class="field mt-16" data-g="rcpt"><label data-lbl="rcpt">ใบเสร็จ</label><div data-rslot></div>
     <div class="hint" data-hint="rcpt"></div>${err('receipts')}</div>`);
@@ -124,7 +133,8 @@ export function applyCat(root, it, fuel) {
   const show = {
     km: f.fuel, amt: !f.fuel, fuelcalc: f.fuel, venue: !f.fuel,
     origin: f.travel, destination: f.travel, customer: f.travel || f.ent || f.visit,
-    customerContact: (f.travel && !f.fuel) || f.ent || f.visit, occasion: f.ent || f.visit, attendees: f.ent, jobNo: f.job, rcpt: f.rcpt !== 'NO',
+    customerContact: (f.travel && !f.fuel) || f.ent || f.visit, occasion: f.ent || f.visit, attendees: f.ent,
+    jobNo: f.job && !(f.ent && isPrinciple(it.customer)), jobPrinciple: f.job && f.ent && isPrinciple(it.customer), rcpt: f.rcpt !== 'NO',
   };
   for (const [g, on_] of Object.entries(show)) $$(`[data-g="${g}"]`, root).forEach((x) => x.classList.toggle('hidden', !on_));
   const lv = $('[data-lbl="venue"]', root);
@@ -177,7 +187,7 @@ export function validateItem(it, rcptCount = 0) {
     if (!String(it.venue || '').trim()) e.venue = 'ใส่สถานที่';
     if (!String(it.occasion || '').trim()) e.occasion = 'ใส่โอกาส / วัตถุประสงค์';
     if (!String(it.attendees || '').trim()) e.attendees = 'ใส่ชื่อผู้ร่วม';
-    if (VISIT.entJobRequired && !String(it.jobNo || '').trim()) e.jobNo = 'ใส่เลข Job (บังคับสำหรับค่ารับรอง / กอล์ฟ)';
+    if (VISIT.entJobRequired && !isPrinciple(it.customer) && !String(it.jobNo || '').trim()) e.jobNo = 'ใส่เลข Job (บังคับสำหรับค่ารับรอง / กอล์ฟ) · ไม่มี Job กด Z-NONE';
   }
   if (f.visit) {
     const pur = String(it.occasion || '').trim();
@@ -484,7 +494,8 @@ export async function render(ctx) {
         S.items.splice(S.items.indexOf(it), 1);
         cardOf(it)?.remove();
         renumber(); saveDraft();
-      } else if (a === 'submit') submit(t);
+      } else if (a === 'job-none') useJobNone(t);
+      else if (a === 'submit') submit(t);
       else if (a === 'draft-restore') {
         const d = readDraft(); closeDraft();
         if (d) { setItems(d.items); toast(`กู้คืนแล้ว ${d.items.length} รายการ${d.files ? ' — อย่าลืมแนบใบเสร็จใหม่' : ''}`); }

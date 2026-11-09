@@ -1,7 +1,7 @@
 // โปรไฟล์ · ลายเซ็น · ขอเบิกรายเดือน (ใช้ทั้ง /profile และ /petty/profile — ฝั่งเงินสดย่อยไม่มีส่วนขอเบิกรายเดือน)
-import { api, auth, loadProfile, money, fmtDate, fmtDateTime, esc, initials, roleLabel, monthLabel, catName, exportStage, statusBadge } from '../core.js?v=10.4.9';
-import { icon, catIcon, toast, toastError, confirmBox, sheet, busy, withBtn, signaturePad, monthNav, shiftMonth, empty, on, debounce } from '../ui.js?v=10.4.9';
-import { showSheetPreview } from './sheet-preview.js?v=10.4.9';
+import { api, auth, loadProfile, money, fmtDate, fmtDateTime, esc, initials, roleLabel, monthLabel, catName, exportStage, statusBadge } from '../core.js?v=10.4.11';
+import { icon, catIcon, toast, toastError, confirmBox, sheet, busy, withBtn, signaturePad, monthNav, shiftMonth, empty, on, debounce } from '../ui.js?v=10.4.11';
+import { showSheetPreview } from './sheet-preview.js?v=10.4.11';
 
 export async function render(ctx) {
   const { el } = ctx;
@@ -145,7 +145,7 @@ export async function render(ctx) {
         </div>
       </div>
       <div class="card-foot"><div class="btn-row">
-        <button class="btn btn-secondary" data-act="peek" data-busy="กำลังสร้างตัวอย่าง…" ${st.pv && st.pv.count > 0 ? '' : 'disabled'}>${icon('eye')} ดูตัวอย่าง Excel</button>
+        <button class="btn btn-secondary" data-act="peek" data-busy="กำลังสร้างตัวอย่าง…">${icon('eye')} ดูตัวอย่าง Excel</button>
         <button class="btn btn-secondary" data-act="draft" data-busy="กำลังสร้างไฟล์…">${icon('download')} ร่าง Excel</button>
         <button class="btn btn-primary" data-act="request" ${st.pv && st.pv.count > 0 ? '' : 'disabled'}>${icon('send')} ส่งขออนุมัติ</button>
       </div></div></div>`;
@@ -157,7 +157,7 @@ export async function render(ctx) {
     const sendBtn = el.querySelector('[data-act=request]');
     if (sendBtn) sendBtn.disabled = !(st.pv && st.pv.count > 0) || st.pvLoading;
     const peekBtn = el.querySelector('[data-act=peek]');
-    if (peekBtn) peekBtn.disabled = !(st.pv && st.pv.count > 0) || st.pvLoading;
+    if (peekBtn) peekBtn.disabled = st.pvLoading;   // ไม่มีบิลก็ดูฟอร์มเปล่าได้ (เหมือนปุ่มร่าง Excel)
     if (st.pvErr) { box.innerHTML = `<div class="alert bad">${icon('alert')}<div>${esc(st.pvErr)}</div></div>`; return; }
     if (!st.pv) { box.innerHTML = `<div class="flex"><span class="spin"></span><span class="muted text-sm">กำลังคำนวณยอด…</span></div>`; return; }
     const pv = st.pv;
