@@ -1,19 +1,20 @@
 // ใบสำคัญจ่าย 1 ใบ — ขั้นอนุมัติ / กดอนุมัติ-ตีกลับ / บัญชี 1 เลือก VAT + หัก ณ ที่จ่ายหลายอัตรา / ส่วนของบัญชี (รอบจ่าย · วันที่ + No. ของบัญชี · แก้ไข · สลิป)
 // จ่ายเงิน (+ สลิปโอน) / เคลียร์ advance / พิมพ์ใบฟ้า
-import { api, money, fmtDate, fmtDateTime, esc, todayYMD, catName, loadPettyCategories } from '../core.js?v=10.4.8';
-import { icon, catIcon, toast, toastError, confirmBox, promptBox, busy, withBtn, sheet, thumbs, hydrateThumbs, receiptPicker, errorBox, skeleton, on, $, $$ } from '../ui.js?v=10.4.8';
-import { DOCS, KIND, isTest, stageBadge, kindBadge, roundBadge, roundLabel, whtLines, remarkText, deptInfo, lineDept, roundNet, roundAdj, roundText, roundSeg, voucherHtml, hydrateSigs, printVoucher, PRINT_SIZES, PRINT_ORIENTS, PRINT_COLORS, printPrefs, savePrintPrefs } from './pv-common.js?v=10.4.8';
+import { api, money, fmtDate, fmtDateTime, esc, todayYMD, catName, loadPettyCategories } from '../core.js?v=10.4.9';
+import { icon, catIcon, toast, toastError, confirmBox, promptBox, busy, withBtn, sheet, thumbs, hydrateThumbs, receiptPicker, errorBox, skeleton, on, $, $$ } from '../ui.js?v=10.4.9';
+import { DOCS, KIND, isTest, stageBadge, kindBadge, roundBadge, roundLabel, whtLines, remarkText, deptInfo, lineDept, roundNet, roundAdj, roundText, roundSeg, voucherHtml, hydrateSigs, printVoucher, PRINT_SIZES, PRINT_ORIENTS, PRINT_COLORS, printPrefs, savePrintPrefs } from './pv-common.js?v=10.4.9';
 
 const ACT = { submit: 'ส่งใบเบิก', resubmit: 'แก้แล้วส่งใหม่', approve: 'อนุมัติ', reject: 'ตีกลับ', pay: 'จ่ายเงิน', cancel: 'ยกเลิก',
   adv_clear: 'ส่งเคลียร์', adv_back: 'ตีกลับการเคลียร์', adv_ok: 'เคลียร์เรียบร้อย', edit: 'แก้ไขใบ', round: 'เลือกรอบจ่าย', slip: 'แนบสลิป' };
 const WHT_RATES = [1, 3, 5];
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
-// พิมพ์ใบฟ้าได้ตั้งแต่ถึงขั้นบัญชี 1 (ลายเซ็นเติมตามคนที่อนุมัติแล้ว)
+// พิมพ์ใบฟ้าได้ตั้งแต่ถึงขั้นบัญชี (ลายเซ็นเติมตามคนที่อนุมัติแล้ว)
+// ขั้นบัญชีแรกในสาย = บัญชี 1 ตามปกติ · ใบที่บัญชี 2 / บัญชี 1 กรอกเอง (ข้ามบัญชี 1) = ขั้นบัญชี 2 / 3 แรกที่เจอ
 function canPrint(v) {
   if (['Approved', 'Paid'].includes(v.status)) return true;
-  const f1 = (v.steps || []).findIndex((s) => s.k === 'fin1');
-  return v.status === 'Pending' && f1 >= 0 && v.step >= f1;
+  const f = (v.steps || []).findIndex((s) => ['fin1', 'fin2', 'fin3'].includes(s.k));
+  return v.status === 'Pending' && f >= 0 && v.step >= f;
 }
 
 export async function render(ctx) {

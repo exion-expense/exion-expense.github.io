@@ -259,6 +259,12 @@ export const api = {
     } finally { progress(-1); }
   },
 
+  /** ดูตัวอย่างไฟล์ Excel บนจอ (ไม่โหลดไฟล์) → {filename, meta, sheet} */
+  async excelPreview(body) {
+    progress(1);
+    try { return await callFn('excel', { ...body, preview: true }); } finally { progress(-1); }
+  },
+
   /** แจ้งเตือนเด้งทันที (Realtime) · คืนฟังก์ชันยกเลิก */
   onNotification(cb) {
     if (MOCK) { window.__mockNotify = cb; return () => { window.__mockNotify = null; }; }   // โหมดทดสอบ: ยิงแจ้งเตือนเองได้
@@ -317,7 +323,7 @@ export async function loadPettyCategories() {
   state.pettyCats = await api.rpc('get_petty_categories', {}, { ttl: 3600 });
   return state.pettyCats;
 }
-const CAT_TH = { FUEL: 'ค่าน้ำมัน', ENT: 'ค่ารับรอง', GOLF: 'ค่ากอล์ฟ', TOLL: 'ค่าทางด่วน', PARK: 'ค่าที่จอดรถ', HOTEL: 'ค่าที่พัก', EXPRESS: 'ค่าส่งเอกสาร',
+const CAT_TH = { FUEL: 'ค่าน้ำมัน', ENT: 'ค่ารับรอง', GOLF: 'ค่ากอล์ฟ', TOLL: 'ค่าทางด่วน', PARK: 'ค่าที่จอดรถ', HOTEL: 'ค่าที่พัก', EXPRESS: 'ค่าทางด่วน',
   MILE: 'ค่าระยะทาง', CAR: 'ค่ารถ', MOBILE: 'ค่าโทรศัพท์', OVERSEAS: 'ค่าโทรต่างประเทศ', APT: 'ค่าเช่าที่พัก', TRAVEL: 'ค่าเดินทาง', OTHER: 'อื่นๆ',
   TOPUP: 'เติมเงินสดย่อย', CLEAR: 'เคลียร์บิล', COUNT: 'ปรับยอดจากการนับ' };
 export function catName(code) {

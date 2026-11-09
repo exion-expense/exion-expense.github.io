@@ -1,6 +1,6 @@
 // จุดเริ่มแอป
-import { initClient, cfg } from './core.js?v=10.4.8';
-import { start } from './shell.js?v=10.4.8';
+import { initClient, cfg } from './core.js?v=10.4.9';
+import { start } from './shell.js?v=10.4.9';
 
 (async () => {
   // กันเว็บอื่นเอาหน้านี้ไปฝังหลอกให้กด (clickjacking)

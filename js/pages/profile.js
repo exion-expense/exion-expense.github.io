@@ -1,6 +1,7 @@
 // โปรไฟล์ · ลายเซ็น · ขอเบิกรายเดือน (ใช้ทั้ง /profile และ /petty/profile — ฝั่งเงินสดย่อยไม่มีส่วนขอเบิกรายเดือน)
-import { api, auth, loadProfile, money, fmtDate, fmtDateTime, esc, initials, roleLabel, monthLabel, catName, exportStage, statusBadge } from '../core.js?v=10.4.8';
-import { icon, catIcon, toast, toastError, confirmBox, sheet, busy, withBtn, signaturePad, monthNav, shiftMonth, empty, on, debounce } from '../ui.js?v=10.4.8';
+import { api, auth, loadProfile, money, fmtDate, fmtDateTime, esc, initials, roleLabel, monthLabel, catName, exportStage, statusBadge } from '../core.js?v=10.4.9';
+import { icon, catIcon, toast, toastError, confirmBox, sheet, busy, withBtn, signaturePad, monthNav, shiftMonth, empty, on, debounce } from '../ui.js?v=10.4.9';
+import { showSheetPreview } from './sheet-preview.js?v=10.4.9';
 
 export async function render(ctx) {
   const { el } = ctx;
@@ -144,6 +145,7 @@ export async function render(ctx) {
         </div>
       </div>
       <div class="card-foot"><div class="btn-row">
+        <button class="btn btn-secondary" data-act="peek" data-busy="กำลังสร้างตัวอย่าง…" ${st.pv && st.pv.count > 0 ? '' : 'disabled'}>${icon('eye')} ดูตัวอย่าง Excel</button>
         <button class="btn btn-secondary" data-act="draft" data-busy="กำลังสร้างไฟล์…">${icon('download')} ร่าง Excel</button>
         <button class="btn btn-primary" data-act="request" ${st.pv && st.pv.count > 0 ? '' : 'disabled'}>${icon('send')} ส่งขออนุมัติ</button>
       </div></div></div>`;
@@ -154,6 +156,8 @@ export async function render(ctx) {
     const box = $('pf-pv'); if (!box) return;
     const sendBtn = el.querySelector('[data-act=request]');
     if (sendBtn) sendBtn.disabled = !(st.pv && st.pv.count > 0) || st.pvLoading;
+    const peekBtn = el.querySelector('[data-act=peek]');
+    if (peekBtn) peekBtn.disabled = !(st.pv && st.pv.count > 0) || st.pvLoading;
     if (st.pvErr) { box.innerHTML = `<div class="alert bad">${icon('alert')}<div>${esc(st.pvErr)}</div></div>`; return; }
     if (!st.pv) { box.innerHTML = `<div class="flex"><span class="spin"></span><span class="muted text-sm">กำลังคำนวณยอด…</span></div>`; return; }
     const pv = st.pv;
@@ -242,6 +246,22 @@ export async function render(ctx) {
       if (a === 'draft') {
         const meta = await withBtn(t, () => api.excel({ type: 'staff_form', kind: 'draft', staffEmail: me(), year: st.y, month: st.m, periodStart: st.start, periodEnd: st.end }));
         if (meta) toast(`ดาวน์โหลดร่างแล้ว · ${meta.filename}`);
+        return;
+      }
+      // ดูตัวอย่าง Excel บนจอ (ร่างก่อนส่ง / ฟอร์มตัวจริงที่อนุมัติแล้ว) — ไฟล์เดียวกับที่โหลด
+      if (a === 'peek' || a === 'peek-final') {
+        const body = a === 'peek'
+          ? { type: 'staff_form', kind: 'draft', staffEmail: me(), year: st.y, month: st.m, periodStart: st.start, periodEnd: st.end }
+          : { type: 'staff_form', kind: 'final', exportId: t.dataset.id };
+        const data = await withBtn(t, () => api.excelPreview(body));
+        if (!data?.sheet) return;
+        showSheetPreview(data, {
+          title: a === 'peek' ? `ตัวอย่างฟอร์มขอเบิก · ${monthLabel(st.y, st.m, true)}` : 'ตัวอย่างฟอร์มตัวจริง',
+          onDownload: async (btn) => {
+            const meta = await withBtn(btn, () => api.excel(body));
+            if (meta) toast(`ดาวน์โหลดแล้ว · ${meta.filename}`);
+          },
+        });
         return;
       }
       if (a === 'final') {
@@ -382,7 +402,7 @@ function exportCard(e) {
       ${stage === 'rejected' ? `<div class="alert bad">${icon('alert')}<div><b>เหตุผล:</b> ${esc(e.approver_remark || 'ไม่ได้ระบุ')}</div></div>` : ''}
       ${stage === 'approved' && e.approver_remark ? `<p class="hint">${esc(e.approver_remark)}</p>` : ''}
       <dl class="kv tight">${kv.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
-      ${stage === 'approved' || stage === 'paid' ? `<button class="btn btn-secondary btn-block" data-act="final" data-id="${esc(e.id)}" data-busy="กำลังสร้างไฟล์…">${icon('download')} ดาวน์โหลดฟอร์มตัวจริง</button>` : ''}
+      ${stage === 'approved' || stage === 'paid' ? `<div class="btn-row"><button class="btn btn-secondary" data-act="peek-final" data-id="${esc(e.id)}" data-busy="กำลังสร้างตัวอย่าง…">${icon('eye')} ดูตัวอย่าง</button><button class="btn btn-secondary" data-act="final" data-id="${esc(e.id)}" data-busy="กำลังสร้างไฟล์…">${icon('download')} ดาวน์โหลดฟอร์มตัวจริง</button></div>` : ''}
       ${stage === 'waiting' ? `<p class="hint">รอ ${esc(e.approver_name || 'ผู้อนุมัติ')} อนุมัติ — ระบบจะแจ้งเตือนเมื่อมีผล</p>` : ''}
     </div></div>`;
 }
