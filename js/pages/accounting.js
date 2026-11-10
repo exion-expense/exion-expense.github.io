@@ -58,6 +58,7 @@ export async function render(ctx) {
       <div class="flex wrap mt-16">
         <button class="btn btn-white" data-act="sum" data-mode="print">${icon('sheet')} พิมพ์สรุป (เลือกแผนก)</button>
         ${canAct() ? `<button class="btn btn-glass" data-act="sum" data-mode="ceo">${icon('crown')} ส่งสรุปให้ CEO</button>` : ''}
+        <button class="btn btn-glass" data-act="msbc-exp" data-busy="กำลังสร้างไฟล์…" title="ไฟล์ลงบัญชี MSBC (STAFFEXP) จากใบขอเบิกที่อนุมัติแล้วของเดือนนี้">${icon('download')} MSBC Expense</button>
       </div>
     </section>`;
   }
@@ -397,6 +398,12 @@ export async function render(ctx) {
       if (a === 'dept-xls' || a === 'dept-ceo') return deptAct(a, t);
       if (a === 'items') return openItems(t.dataset.email, t.dataset.ym || ymOf(st.y, st.m), t.dataset.name);
       if (a === 'sum') { if (!st.board.ceoConfigured && t.dataset.mode === 'ceo') { toast('ยังไม่ได้ตั้งค่าอีเมล CEO (CEO_EMAIL)', 'bad'); return; } return openSummarySheet(t.dataset.mode); }
+      if (a === 'msbc-exp') {
+        // MSBC ฝั่ง Expense: ใบขอเบิกที่อนุมัติแล้วของเดือนที่เลือก · แถวที่ต้องตรวจเป็นสีเหลือง (ดูชีต Check)
+        const meta = await withBtn(t, () => api.excel({ type: 'msbc_expense', ym: ymOf(st.y, st.m) }));
+        if (meta) toast(`ดาวน์โหลดแล้ว · ${money(meta.count || 0, 0)} แถว · ${money(meta.total || 0)} บาท${meta.issues ? ` · ต้องตรวจ ${meta.issues} แถว (สีเหลือง)` : ''}`);
+        return;
+      }
       if (a === 'xls') {
         const meta = await withBtn(t, () => api.excel({ type: 'staff_form', kind: 'final', exportId: t.dataset.id }));
         if (meta) toast(`ดาวน์โหลดแล้ว · ${meta.filename}`);
