@@ -1,7 +1,7 @@
 // บัญชี · โอนเงิน — บอร์ดรายคนต่อเดือน: ยังไม่ขอ → รออนุมัติ → รอโอน → โอนแล้ว + ส่งสรุปให้ CEO
 // แถบแผนก (ซ้าย/บน) เลือกแผนกแล้วดูยอด · ส่ง CEO ทีละแผนก · VIEWER เปิดได้แบบดูอย่างเดียว (canAct = false)
-import { api, money, compact, fmtDate, fmtDateTime, esc, initials, monthLabel, catName, statusBadge, loadCategories } from '../core.js?v=10.4.12';
-import { icon, catIcon, requestRow, toast, toastError, confirmBox, promptBox, sheet, withBtn, monthNav, shiftMonth, empty, errorBox, lightbox, on, debounce } from '../ui.js?v=10.4.12';
+import { api, money, compact, fmtDate, fmtDateTime, esc, initials, monthLabel, catName, statusBadge, loadCategories } from '../core.js?v=10.4.13';
+import { icon, catIcon, requestRow, toast, toastError, confirmBox, promptBox, sheet, withBtn, monthNav, shiftMonth, empty, errorBox, lightbox, on, debounce } from '../ui.js?v=10.4.13';
 
 const STAGE = {
   ready: ['รอโอน', 'b-approved'], export: ['รออนุมัติ', 'b-pending'], bills: ['บิลรออนุมัติ', 'b-violet'],
@@ -59,6 +59,7 @@ export async function render(ctx) {
         <button class="btn btn-white" data-act="sum" data-mode="print">${icon('sheet')} พิมพ์สรุป (เลือกแผนก)</button>
         ${canAct() ? `<button class="btn btn-glass" data-act="sum" data-mode="ceo">${icon('crown')} ส่งสรุปให้ CEO</button>` : ''}
         <button class="btn btn-glass" data-act="msbc-exp" data-busy="กำลังสร้างไฟล์…" title="ไฟล์ลงบัญชี MSBC (STAFFEXP) จากใบขอเบิกที่อนุมัติแล้วของเดือนนี้">${icon('download')} MSBC Expense</button>
+        <button class="btn btn-glass" data-act="humansoft" data-busy="กำลังสร้างไฟล์…" title="ตาราง Humansoft (นำเข้าข้อมูลรายการงวดพิเศษ) จากใบขอเบิกที่อนุมัติแล้วของเดือนนี้">${icon('download')} ตาราง Humansoft</button>
       </div>
     </section>`;
   }
@@ -398,6 +399,12 @@ export async function render(ctx) {
       if (a === 'dept-xls' || a === 'dept-ceo') return deptAct(a, t);
       if (a === 'items') return openItems(t.dataset.email, t.dataset.ym || ymOf(st.y, st.m), t.dataset.name);
       if (a === 'sum') { if (!st.board.ceoConfigured && t.dataset.mode === 'ceo') { toast('ยังไม่ได้ตั้งค่าอีเมล CEO (CEO_EMAIL)', 'bad'); return; } return openSummarySheet(t.dataset.mode); }
+      if (a === 'humansoft') {
+        // ตาราง Humansoft: เติมยอดลงแม่แบบนำเข้างวดพิเศษ ตามรหัสพนักงาน · คนที่หารหัสไม่เจออยู่ชีต "ตรวจ"
+        const meta = await withBtn(t, () => api.excel({ type: 'humansoft', ym: ymOf(st.y, st.m) }));
+        if (meta) toast(`ดาวน์โหลดแล้ว · ${money(meta.people || 0, 0)} คน · ${money(meta.total || 0)} บาท${meta.missing ? ` · หารหัสไม่เจอ ${meta.missing} คน (ดูชีต "ตรวจ")` : ''}`, meta.missing ? 'bad' : 'ok');
+        return;
+      }
       if (a === 'msbc-exp') {
         // MSBC ฝั่ง Expense: ใบขอเบิกที่อนุมัติแล้วของเดือนที่เลือก · แถวที่ต้องตรวจเป็นสีเหลือง (ดูชีต Check)
         const meta = await withBtn(t, () => api.excel({ type: 'msbc_expense', ym: ymOf(st.y, st.m) }));
