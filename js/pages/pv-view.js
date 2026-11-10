@@ -221,7 +221,7 @@ export async function render(ctx) {
     const v = st.v;
     let remark = '';
     if (action === 'reject') {
-      remark = await promptBox({ title: 'ตีกลับใบนี้', label: 'เหตุผล (คนก่อนหน้าจะเห็น)', hint: v.step === 0 ? 'ใบจะกลับไปให้คนเบิกแก้' : 'ใบจะถอยกลับไปขั้นก่อนหน้า 1 ขั้น', required: true, ok: 'ตีกลับ', danger: true });
+      remark = await promptBox({ title: 'ตีกลับใบนี้', label: 'เหตุผล (คนเบิกจะเห็น)', hint: 'ใบจะกลับไปให้คนเบิกแก้ แล้วส่งใหม่ (อนุมัติใหม่ตั้งแต่ขั้นแรก)', required: true, ok: 'ตีกลับ', danger: true });
       if (remark == null) return;
     }
     if (action === 'approve' && v.isFin1Step) { const err = taxError(); if (err) { toast(err, 'bad'); return; } }
