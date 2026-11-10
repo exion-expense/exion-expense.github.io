@@ -695,3 +695,8 @@ a.stat { text-decoration: none; color: inherit; display: block; }
   body.printing-pv .pv-land .pv-rep { width: 1040px; font-size: 10.5px; }
 }
 .pv-rep .scr-only { white-space: nowrap; }
+/* ── 0063: ช่อง เลขที่ / วันที่ ในใบฟ้า กว้าง-สูงพอปั๊มตรายางวันที่ · Description รายงานที่จ่ายแล้วกว้างขึ้น ── */
+.pv-meta { align-items: end; gap: 3px 10px; }
+.pv-meta .pen { min-width: 165px; min-height: 34px; border-bottom: 1px dotted var(--pv-line); display: flex; align-items: flex-end; padding-bottom: 1px; }
+.pv-sheet.pv-full .pv-meta .pen { min-width: 190px; min-height: 42px; }
+.pv-rep-tbl td:nth-child(3) { min-width: 170px; }
