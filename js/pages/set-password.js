@@ -1,6 +1,6 @@
 // ตั้งรหัสผ่านใหม่ หลังกดลิงก์ "ตั้งรหัสผ่านใหม่" ในอีเมล (มี session ชั่วคราวจากลิงก์แล้ว)
-import { auth, esc, passwordProblem, loadProfile } from '../core.js?v=10.4.11';
-import { icon, toast, withBtn } from '../ui.js?v=10.4.11';
+import { auth, esc, passwordProblem, loadProfile } from '../core.js?v=10.4.12';
+import { icon, toast, withBtn } from '../ui.js?v=10.4.12';
 
 export function render(ctx) {
   const { el, go } = ctx;

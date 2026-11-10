@@ -490,6 +490,10 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
 /* ═══════════ บัญชี · แถบแผนก (มือถือ = ปุ่มเลื่อนแนวนอน · จอกว้าง = คอลัมน์ซ้าย) ═══════════ */
 .ac-layout { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
 .ac-layout > * { min-width: 0; }
+.ac-bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.ac-bulk .ac-all { font-weight: 600; cursor: pointer; margin-right: 4px; }
+.ac-check { width: 22px; height: 22px; flex: none; accent-color: var(--ok); cursor: pointer; margin: 0; }
+.row .ac-check { margin-right: 2px; align-self: center; }
 .dept-nav { display: flex; gap: 6px; overflow-x: auto; padding: 6px; scrollbar-width: none; }
 .dept-nav::-webkit-scrollbar { display: none; }
 .dept-item { flex: none; display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px;

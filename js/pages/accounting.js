@@ -1,7 +1,7 @@
 // บัญชี · โอนเงิน — บอร์ดรายคนต่อเดือน: ยังไม่ขอ → รออนุมัติ → รอโอน → โอนแล้ว + ส่งสรุปให้ CEO
 // แถบแผนก (ซ้าย/บน) เลือกแผนกแล้วดูยอด · ส่ง CEO ทีละแผนก · VIEWER เปิดได้แบบดูอย่างเดียว (canAct = false)
-import { api, money, compact, fmtDate, fmtDateTime, esc, initials, monthLabel, catName, statusBadge, loadCategories } from '../core.js?v=10.4.11';
-import { icon, catIcon, requestRow, toast, toastError, confirmBox, promptBox, sheet, withBtn, monthNav, shiftMonth, empty, errorBox, lightbox, on, debounce } from '../ui.js?v=10.4.11';
+import { api, money, compact, fmtDate, fmtDateTime, esc, initials, monthLabel, catName, statusBadge, loadCategories } from '../core.js?v=10.4.12';
+import { icon, catIcon, requestRow, toast, toastError, confirmBox, promptBox, sheet, withBtn, monthNav, shiftMonth, empty, errorBox, lightbox, on, debounce } from '../ui.js?v=10.4.12';
 
 const STAGE = {
   ready: ['รอโอน', 'b-approved'], export: ['รออนุมัติ', 'b-pending'], bills: ['บิลรออนุมัติ', 'b-violet'],
@@ -20,7 +20,7 @@ const SUM_ST = { Pending: ['รอ CEO อนุมัติ', 'b-pending'], App
 export async function render(ctx) {
   const { el } = ctx;
   const now = new Date();
-  const st = { y: now.getFullYear(), m: now.getMonth() + 1, board: null, unpaid: [], filter: null, dept: loadDept(), q: '' };
+  const st = { y: now.getFullYear(), m: now.getMonth() + 1, board: null, unpaid: [], filter: null, dept: loadDept(), q: '', sel: new Set() };
   const canAct = () => st.board?.canAct !== false;
   // ค่าเริ่มต้น: เดือนก่อน ถ้าวันนี้ยังต้นเดือน (บัญชีมักโอนของรอบที่แล้ว)
   if (now.getDate() <= 10) [st.y, st.m] = shiftMonth(st.y, st.m, -1);
@@ -115,6 +115,10 @@ export async function render(ctx) {
     const cards = (b.cards || []).filter((c) => st.dept === '*' || c.department === st.dept);
     const cnt = (k) => { const f = FILTERS.find((x) => x[0] === k)[2]; return f ? cards.filter((c) => f.includes(c.stage)).length : cards.length; };
     const rows = visibleCards();
+    // ติ๊กเลือกหลายคน → ยืนยันโอนแล้วครั้งเดียว (เฉพาะบัญชี / GM · เฉพาะใบรอโอนที่เห็นอยู่)
+    const ready = canAct() ? rows.filter((c) => c.stage === 'ready' && c.export?.id) : [];
+    const keep = new Set(ready.map((c) => c.export.id));
+    for (const id of [...st.sel]) if (!keep.has(id)) st.sel.delete(id);
     $('ac-list').innerHTML = `<div class="ac-layout">
       <nav class="card dept-nav" aria-label="แผนก">${deptNav(b)}</nav>
       <div class="stack-sm">
@@ -123,9 +127,55 @@ export async function render(ctx) {
       <div class="toolbar">
         <div class="search">${icon('search')}<input class="input" id="ac-q" placeholder="ค้นหาชื่อ / ทีม" value="${esc(st.q)}" aria-label="ค้นหา"></div>
       </div>
-      <div class="card">${rows.length ? `<div class="list">${rows.map((c) => cardRow(c, canAct())).join('')}</div>`
+      <div class="card">${ready.length ? `<div class="ac-bulk" id="ac-bulk">
+          <input type="checkbox" class="ac-check" id="ac-all" data-act="selall">
+          <label for="ac-all" class="ac-all">เลือกรอโอนทั้งหมด (${ready.length})</label>
+          <span class="muted text-sm">ติ๊กหน้าชื่อคนที่โอนแล้ว แล้วกดยืนยันครั้งเดียว</span>
+        </div>` : ''}${rows.length ? `<div class="list">${rows.map((c) => cardRow(c, canAct(), st.sel)).join('')}</div>`
         : empty({ ic: st.filter === 'ready' ? 'check-circle' : 'users', title: st.filter === 'ready' ? 'ไม่มีรายการรอโอน' : 'ไม่มีพนักงานในกลุ่มนี้', sub: 'ลองเลือกชิปอื่นหรือเดือนอื่น' })}</div>
+      <div id="ac-bar" data-bar></div>
     </div></div>`;
+    syncBulk();
+  }
+
+  // ใบรอโอนที่ติ๊กไว้ (ตามลำดับที่เห็น)
+  const picked = () => visibleCards().filter((c) => c.stage === 'ready' && st.sel.has(c.export?.id));
+  function syncBulk() {
+    const all = [...el.querySelectorAll('[data-act="sel"]')];
+    const p = picked(), sum = p.reduce((s, c) => s + (Number(c.export.total_amount) || 0), 0);
+    all.forEach((x) => { x.checked = st.sel.has(x.dataset.id); });
+    const box = $('ac-all');
+    if (box) { box.checked = all.length > 0 && p.length === all.length; box.indeterminate = p.length > 0 && p.length < all.length; }
+    const bar = $('ac-bar'); if (!bar) return;
+    bar.innerHTML = p.length ? `<div class="action-bar">
+      <button class="btn-icon sm" style="color:#fff" data-act="selclear" aria-label="ล้างที่เลือก">${icon('x')}</button>
+      <div class="grow">เลือก <b>${p.length}</b> คน<div class="text-sm amount" style="opacity:.85">${money(sum)} บาท</div></div>
+      <button class="btn btn-success" data-act="paid-bulk" data-busy="กำลังบันทึก…">${icon('check', 'sm')} ยืนยันโอนแล้ว ${p.length} คน</button>
+    </div>` : '';
+  }
+
+  async function paidBulk(btn) {
+    const p = picked(); if (!p.length) return;
+    const sum = p.reduce((s, c) => s + (Number(c.export.total_amount) || 0), 0);
+    const sums = st.board?.summaries || [];
+    const noCeo = [...new Set(p.map((c) => c.department || '-'))]
+      .filter((d) => !sums.some((s) => s.status === 'Approved' && (s.department === '*' || s.department === d)));
+    const lines = p.slice(0, 15).map((c) => `• ${c.fullName || c.name} · ${money(c.export.total_amount)}`);
+    if (p.length > 15) lines.push(`… และอีก ${p.length - 15} คน`);
+    const msg = `${p.length} คน · รวม ${money(sum)} บาท\n\n${lines.join('\n')}\n\nระบบจะแจ้งพนักงานทุกคนทันที และย้อนกลับไม่ได้`
+      + (noCeo.length ? `\n\n⚠️ CEO ยังไม่อนุมัติสรุปของ: ${noCeo.join(', ')}` : '');
+    if (!(await confirmBox({ title: 'ยืนยันโอนแล้วหลายคน', message: msg, ok: `ยืนยันโอนแล้ว ${p.length} คน` }))) return;
+    const r = await withBtn(btn, () => api.rpc('mark_exports_paid', { p_ids: p.map((c) => c.export.id) }));
+    if (!r) return;
+    st.sel.clear();
+    if (r.paid) toast(`บันทึกการโอนแล้ว ${r.paid} คน · ${money(r.total)} บาท`);
+    if ((r.skipped || []).length) {
+      sheet({ title: `ข้าม ${r.skipped.length} ใบ (ยังไม่บันทึก)`,
+        body: `<p class="muted text-sm">ใบเหล่านี้ไม่ได้บันทึกว่าโอนแล้ว — ใบอื่นบันทึกเรียบร้อย</p><div class="list">${r.skipped.map((x) => `<div class="row"><div class="row-main"><div class="row-title">${esc(x.name || x.id)}</div><div class="row-sub">${esc(x.reason || '')}</div></div></div>`).join('')}</div>`,
+        foot: '<button class="btn btn-primary" data-x>รับทราบ</button>' });
+    }
+    ctx.refreshBadges();
+    load();
   }
 
   function paintOld() {
@@ -352,6 +402,14 @@ export async function render(ctx) {
         if (meta) toast(`ดาวน์โหลดแล้ว · ${meta.filename}`);
         return;
       }
+      if (a === 'sel') { if (t.checked) st.sel.add(t.dataset.id); else st.sel.delete(t.dataset.id); return syncBulk(); }
+      if (a === 'selall') {
+        const ids = [...el.querySelectorAll('[data-act="sel"]')].map((x) => x.dataset.id);
+        if (t.checked) ids.forEach((id) => st.sel.add(id)); else ids.forEach((id) => st.sel.delete(id));
+        return syncBulk();
+      }
+      if (a === 'selclear') { st.sel.clear(); return syncBulk(); }
+      if (a === 'paid-bulk' && canAct()) return paidBulk(t);
       if (a === 'paid' && canAct()) {
         // เตือนถ้า CEO ยังไม่อนุมัติสรุปของเดือนนี้ (ไม่บล็อก)
         const sums = st.board?.summaries || [];
@@ -386,7 +444,7 @@ export async function render(ctx) {
 }
 
 // แถวพนักงาน 1 คน
-function cardRow(c, canAct = true) {
+function cardRow(c, canAct = true, sel = null) {
   const e = c.export || {};
   const [stl, stc] = STAGE[c.stage] || [c.stage, 'b-neutral'];
   let detail = '', amt = null, actions = '';
@@ -412,8 +470,10 @@ function cardRow(c, canAct = true) {
   const extra = [];
   if (c.stage !== 'bills' && c.pendingCount > 0 && c.stage !== 'none') extra.push(`มีบิลรออนุมัติอีก ${c.pendingCount} รายการ`);
   if (c.olderCount > 0) extra.push(`บิลเก่าค้าง ${c.olderCount} รายการ (${money(c.olderAmount, 0)})`);
+  const pick = sel && canAct && c.stage === 'ready' && e.id
+    ? `<input type="checkbox" class="ac-check" data-act="sel" data-id="${esc(e.id)}" ${sel.has(e.id) ? 'checked' : ''} aria-label="เลือก ${esc(c.fullName || c.name)}">` : '';
   return `<div class="row click" data-act="items" data-email="${esc(c.staffEmail)}" data-name="${esc(c.fullName || c.name)}">
-    <span class="avatar sm">${esc(initials(c.name))}</span>
+    ${pick}<span class="avatar sm">${esc(initials(c.name))}</span>
     <div class="row-main"><div class="row-title">${esc(c.fullName || c.name)} <span class="muted text-sm">· ${esc(c.department || '-')}</span></div>
       <div class="row-sub">${esc(detail)}</div>
       ${extra.length ? `<div class="row-sub warn-text">${esc(extra.join(' · '))}</div>` : ''}</div>
