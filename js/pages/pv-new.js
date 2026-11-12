@@ -1,9 +1,9 @@
 // ขอเบิก Petty Cash (ใบสำคัญจ่าย) — ค่าใช้จ่าย / Advance entertain · เลือกหมวดทุกบรรทัด · HR กรอกแทนได้ · แก้ใบที่ถูกตีกลับ (?id=)
 // บัญชีแก้ไขใบ (?id=&fin=1): แก้ได้ทุกช่อง + VAT / หัก ณ ที่จ่าย + รหัสแผนก · ไม่เริ่มสายอนุมัติใหม่
 // บัญชี (ทั้งตอนเบิกเอง / กรอกแทน / แก้ไข) เลือกแผนกรายบรรทัดได้ = ลงต้นทุนแยกทีม
-import { api, money, esc, todayYMD, loadPettyCategories, state } from '../core.js?v=10.4.14';
-import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.4.14';
-import { DOCS, whtLines, roundNet, roundAdj, roundText, roundSeg } from './pv-common.js?v=10.4.14';
+import { api, money, esc, todayYMD, loadPettyCategories, state } from '../core.js?v=10.4.15';
+import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.4.15';
+import { DOCS, whtLines, roundNet, roundAdj, roundText, roundSeg } from './pv-common.js?v=10.4.15';
 
 // คำอธิบายหมวด: อะไรเข้าหมวดนี้บ้าง (การ์ดตอนชี้ที่ปุ่มหมวด + ใต้หมวดที่เลือก)
 const CAT_HINT = {
@@ -247,16 +247,17 @@ export async function render(ctx) {
     $('[data-jopt]', el).classList.toggle('hidden', job && !adv);
     $('[data-act=job-none]', el)?.classList.toggle('hidden', job && !adv);   // ซื้อของหน้างานใช้ Z-NONE ไม่ได้
     $('[data-jobhint]', el)?.classList.toggle('hidden', !(job && !adv));
-    $('[data-filebox]', el).classList.toggle('hidden', adv && !fin);
+    $('[data-filebox]', el).classList.remove('hidden');   // 0066: advance แนบ Budget form ได้
     $$('[data-doc]', el).forEach((d) => {
       // ซื้อของหน้างาน: Cost sheet / PO / Invoice บังคับ · อื่นๆ: ใบเสร็จตามกฎหมวด + แนบ Cost sheet / PO / Invoice เพิ่มได้
-      const k = d.dataset.doc, show = job ? k !== 'receipt' : true;
+      // advance: แนบเฉพาะ Budget form (ไม่บังคับ) · ใบอื่นไม่มีช่อง Budget form
+      const k = d.dataset.doc, show = adv ? k === 'budget' : k !== 'budget' && (job ? k !== 'receipt' : true);
       d.classList.toggle('hidden', !show);
       d.querySelector('label').classList.toggle('req', !fin && show && !adv && (job || (k === 'receipt' && needReceipt())));
     });
   }
   // แนบใบเสร็จตามกฎหมวด: มีบรรทัดไหนเป็นหมวดที่ต้องแนบ → ต้องแนบ
-  function needReceipt() { return lines().some((l) => (catOf(l.category)?.need_receipt || 'YES') === 'YES'); }
+  function needReceipt() { return lines().some((l) => l.category && (catOf(l.category)?.need_receipt || 'YES') === 'YES'); }   // ยังไม่เลือกหมวด = ยังไม่บังคับ
   function recalc() {
     $('[data-count]', el).textContent = `${lineRows().length} บรรทัด · ${tax ? 'ยอดจ่ายสุทธิ' : 'ยอดก่อน VAT'}`;
     $('[data-total]', el).textContent = money(tax ? taxTotals().net : total()) + ' บาท';

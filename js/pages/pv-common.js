@@ -1,11 +1,11 @@
 // ใช้ร่วมหน้าใบสำคัญจ่าย (ใบฟ้า): ป้ายสถานะ / แถวรายการ / ใบฟ้าสำหรับพิมพ์
-import { api, money, fmtDate, esc } from '../core.js?v=10.4.14';
-import { icon, catIcon } from '../ui.js?v=10.4.14';
+import { api, money, fmtDate, esc } from '../core.js?v=10.4.15';
+import { icon, catIcon } from '../ui.js?v=10.4.15';
 
 export const KIND = { PCJ: 'มี Job', PCN: 'ทั่วไป', ADV: 'Advance' };
 /** ใบทดลอง (ลบทิ้งทีหลัง) */
 export const isTest = (id) => String(id || '').startsWith('TEST-');
-export const DOCS = [['costSheet', 'Cost sheet'], ['po', 'PO'], ['invoice', 'Invoice'], ['receipt', 'ใบเสร็จ']];
+export const DOCS = [['costSheet', 'Cost sheet'], ['po', 'PO'], ['invoice', 'Invoice'], ['receipt', 'ใบเสร็จ'], ['budget', 'Budget form']];   // budget = เฉพาะใบ advance (0066)
 /** รอบจ่าย: Petty cash (เงินออกจากกล่อง) / รอบวันที่ 20 (โอนจากบัญชีบริษัท) */
 export const ROUND = { PETTY: 'รอบ Petty cash', D20: 'รอบวันที่ 20' };
 const dm = (d) => { if (!d) return ''; const t = new Date(d); return `${t.getDate()} ${['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'][t.getMonth()]}`; };

@@ -1,8 +1,8 @@
 // ดูตัวอย่างไฟล์ Excel บนจอ (ไม่ต้องโหลด) — ข้อมูลมาจาก Edge Function excel {preview: true}
 // สร้างจาก workbook เดียวกับไฟล์ที่ดาวน์โหลด → ช่อง / ยอด / ความกว้าง ตรงกับไฟล์จริง
 // ทุกช่องผ่าน esc() · สี / เส้นขอบ / รูป ต้องตรงรูปแบบที่กำหนดเท่านั้น (กันข้อมูลแปลกแทรกสไตล์)
-import { esc, money } from '../core.js?v=10.4.14';
-import { icon, sheet } from '../ui.js?v=10.4.14';
+import { esc, money } from '../core.js?v=10.4.15';
+import { icon, sheet } from '../ui.js?v=10.4.15';
 
 const COLOR = /^#[0-9A-F]{6}$/i;
 const BORDER = /^[1-3]px (solid|dashed|dotted|double) #[0-9A-F]{6}$/i;
