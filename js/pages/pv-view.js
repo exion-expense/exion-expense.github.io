@@ -1,11 +1,11 @@
 // ใบสำคัญจ่าย 1 ใบ — ขั้นอนุมัติ / กดอนุมัติ-ตีกลับ / บัญชี 1 เลือก VAT + หัก ณ ที่จ่ายหลายอัตรา / ส่วนของบัญชี (รอบจ่าย · วันที่ + No. ของบัญชี · แก้ไข · สลิป)
 // จ่ายเงิน (+ สลิปโอน) / เคลียร์ advance / พิมพ์ใบฟ้า
-import { api, money, fmtDate, fmtDateTime, esc, todayYMD, catName, loadPettyCategories } from '../core.js?v=10.4.15';
-import { icon, catIcon, toast, toastError, confirmBox, promptBox, busy, withBtn, sheet, thumbs, hydrateThumbs, receiptPicker, errorBox, skeleton, on, $, $$ } from '../ui.js?v=10.4.15';
-import { DOCS, KIND, isTest, stageBadge, kindBadge, roundBadge, roundLabel, whtLines, remarkText, deptInfo, lineDept, roundNet, roundAdj, roundText, roundSeg, voucherHtml, hydrateSigs, printVoucher, PRINT_SIZES, PRINT_ORIENTS, PRINT_COLORS, printPrefs, savePrintPrefs } from './pv-common.js?v=10.4.15';
+import { api, money, fmtDate, fmtDateTime, esc, todayYMD, catName, loadPettyCategories } from '../core.js?v=10.4.17';
+import { icon, catIcon, toast, toastError, confirmBox, promptBox, busy, withBtn, sheet, thumbs, hydrateThumbs, receiptPicker, errorBox, skeleton, on, $, $$ } from '../ui.js?v=10.4.17';
+import { DOCS, KIND, isTest, stageBadge, kindBadge, roundBadge, roundLabel, whtLines, remarkText, deptInfo, lineDept, roundNet, roundAdj, roundText, roundSeg, voucherHtml, hydrateSigs, printVoucher, PRINT_SIZES, PRINT_ORIENTS, PRINT_COLORS, printPrefs, savePrintPrefs } from './pv-common.js?v=10.4.17';
 
 const ACT = { submit: 'ส่งใบเบิก', resubmit: 'แก้แล้วส่งใหม่', approve: 'อนุมัติ', reject: 'ตีกลับ', pay: 'จ่ายเงิน', cancel: 'ยกเลิก',
-  adv_clear: 'ส่งเคลียร์', adv_back: 'ตีกลับการเคลียร์', adv_ok: 'เคลียร์เรียบร้อย', edit: 'แก้ไขใบ', round: 'เลือกรอบจ่าย', slip: 'แนบสลิป' };
+  adv_clear: 'ส่งเคลียร์', adv_back: 'ตีกลับการเคลียร์', adv_ok: 'เคลียร์เรียบร้อย', edit: 'แก้ไขใบ', receipt: 'แนบใบเสร็จ', round: 'เลือกรอบจ่าย', slip: 'แนบสลิป' };
 const WHT_RATES = [1, 3, 5];
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
@@ -22,7 +22,7 @@ export async function render(ctx) {
   const id = query.id;
   if (!id) { ctx.go('/pv'); return; }
   // vat: null = ยังไม่เลือก · wht: null = ยังไม่เลือก / [] = ไม่หัก / [{rate, base}]
-  const st = { v: null, vat: null, wht: null, rnd: '', clr: null, slip: null, slip2: null, cash: null };   // rnd: ปัดเศษ '' / DOWN / UP
+  const st = { v: null, vat: null, wht: null, rnd: '', clr: null, slip: null, slip2: null, rcpt2: null, cash: null };   // rnd: ปัดเศษ '' / DOWN / UP
 
   async function load() {
     try {
@@ -98,7 +98,7 @@ export async function render(ctx) {
     </div>`;
     hydrateThumbs(el);
     const pick = (sel) => { const n = $(sel, el); return n ? receiptPicker(n, { max: 10 }) : null; };
-    st.clr = pick('[data-clrpick]'); st.slip = pick('[data-slippick]'); st.slip2 = pick('[data-slip2pick]');
+    st.clr = pick('[data-clrpick]'); st.slip = pick('[data-slippick]'); st.slip2 = pick('[data-slip2pick]'); st.rcpt2 = pick('[data-rcpt2pick]');
   }
 
   // ─────────────── VAT / หัก ณ ที่จ่าย (บัญชี 1) ───────────────
@@ -174,6 +174,8 @@ export async function render(ctx) {
         <button type="button" class="btn btn-success" data-act="adv-ok">${icon('check')} ยืนยันเคลียร์</button></div></div>`);
     }
     if (v.canEdit) parts.push(`<div class="btn-row"><a class="btn btn-primary" href="#/pv/new?id=${encodeURIComponent(v.id)}">${icon('edit')} แก้ไขแล้วส่งใหม่</a></div>`);
+    if (v.canAddReceipt) parts.push(`<div class="stack-sm"><b>แนบใบเสร็จเพิ่ม</b><div class="text-sm muted">ได้ใบเสร็จมาทีหลัง แนบที่นี่ได้เลย · ไม่ต้องส่งใบใหม่ · สถานะใบไม่เปลี่ยน</div><div data-rcpt2pick></div>
+      <div><button type="button" class="btn btn-secondary btn-sm" data-act="add-rcpt">${icon('paperclip', 'sm')} แนบใบเสร็จ</button></div></div>`);
     if (v.canCancel) parts.push(`<div class="btn-row"><button type="button" class="btn btn-ghost btn-sm" data-act="cancel">${icon('trash', 'sm')} ยกเลิกใบนี้</button></div>`);
     if (v.advExtraId) parts.push(`<div class="alert">${icon('info')}<div>ส่วนที่ใช้เกินอยู่ในใบ <a href="#/pv/view?id=${encodeURIComponent(v.advExtraId)}"><b>${esc(v.advExtraId)}</b></a></div></div>`);
     if (v.advReturnId) parts.push(`<div class="alert ok">${icon('check')}<div>คืนเงิน ${money(Number(v.amount) - Number(v.advActual))} บาทเข้ากล่องแล้ว</div></div>`);
@@ -263,6 +265,16 @@ export async function render(ctx) {
         await after('บันทึกหัวใบแล้ว');
       } catch (e) { toastError(e); }
     });
+  }
+  async function addReceipt() {
+    if (!st.rcpt2?.count()) { toast('เลือกไฟล์ใบเสร็จก่อน', 'bad'); return; }
+    try {
+      await busy('กำลังแนบใบเสร็จ…', async (set) => {
+        const paths = await st.rcpt2.uploadAll((n, all) => set(`อัปโหลดใบเสร็จ (${n}/${all})`));
+        await api.rpc('pv_add_receipt', { p_id: st.v.id, p_paths: paths });
+      });
+      await after('แนบใบเสร็จแล้ว');
+    } catch (e) { toastError(e); }
   }
   async function addSlip() {
     if (!st.slip2?.count()) { toast('เลือกไฟล์สลิปก่อน', 'bad'); return; }
@@ -354,6 +366,7 @@ export async function render(ctx) {
       else if (a === 'pay') pay(t);
       else if (a === 'docinfo') saveDocInfo(t);
       else if (a === 'add-slip') addSlip();
+      else if (a === 'add-rcpt') addReceipt();
       else if (a === 'adv-clear') clearAdv();
       else if (a === 'adv-ok') confirmAdv(t, true);
       else if (a === 'adv-back') confirmAdv(t, false);

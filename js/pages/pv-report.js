@@ -2,9 +2,9 @@
 // รอบ = ตั้งแต่เติมเงินเข้ากล่องครั้งก่อน ถึงครั้งถัดไป · กด "จ่ายเงินเติมกล่อง" = ปิดรอบ (ระบบเดียวกับ "เคลียร์บิล" หน้ากล่องเงินสด)
 // รวมทั้งรอบ Petty cash และรอบวันที่ 20 · แผนกเป็น EXION CODE · Description = ชื่อหมวดภาษาอังกฤษ
 // Doc ID / PO / Cost sheet / Job แสดงบนจอ + ก๊อป Excel เท่านั้น (ไม่ออกตอนพิมพ์)
-import { api, money, esc } from '../core.js?v=10.4.15';
-import { icon, toast, toastError, empty, errorBox, skeleton, on, $, confirmBox } from '../ui.js?v=10.4.15';
-import { PRINT_ORIENTS, setPrintOrient } from './pv-common.js?v=10.4.15';
+import { api, money, esc } from '../core.js?v=10.4.17';
+import { icon, toast, toastError, empty, errorBox, skeleton, on, $, confirmBox } from '../ui.js?v=10.4.17';
+import { PRINT_ORIENTS, setPrintOrient } from './pv-common.js?v=10.4.17';
 
 const COLS = ['No.', 'Suppliers', 'Description', 'Amount', 'Department', 'Prepared By', 'Status', 'Payment date'];
 const XCOLS = ['Doc ID', 'PO No.', 'Cost sheet No.', 'Job No.'];   // เฉพาะบนจอ / Excel

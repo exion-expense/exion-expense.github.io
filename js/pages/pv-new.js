@@ -1,9 +1,9 @@
 // ขอเบิก Petty Cash (ใบสำคัญจ่าย) — ค่าใช้จ่าย / Advance entertain · เลือกหมวดทุกบรรทัด · HR กรอกแทนได้ · แก้ใบที่ถูกตีกลับ (?id=)
 // บัญชีแก้ไขใบ (?id=&fin=1): แก้ได้ทุกช่อง + VAT / หัก ณ ที่จ่าย + รหัสแผนก · ไม่เริ่มสายอนุมัติใหม่
 // บัญชี (ทั้งตอนเบิกเอง / กรอกแทน / แก้ไข) เลือกแผนกรายบรรทัดได้ = ลงต้นทุนแยกทีม
-import { api, money, esc, todayYMD, loadPettyCategories, state } from '../core.js?v=10.4.15';
-import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.4.15';
-import { DOCS, whtLines, roundNet, roundAdj, roundText, roundSeg } from './pv-common.js?v=10.4.15';
+import { api, money, esc, todayYMD, loadPettyCategories, state } from '../core.js?v=10.4.17';
+import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.4.17';
+import { DOCS, whtLines, roundNet, roundAdj, roundText, roundSeg } from './pv-common.js?v=10.4.17';
 
 // คำอธิบายหมวด: อะไรเข้าหมวดนี้บ้าง (การ์ดตอนชี้ที่ปุ่มหมวด + ใต้หมวดที่เลือก)
 const CAT_HINT = {
@@ -149,6 +149,7 @@ export async function render(ctx) {
 
     <div class="card pad stack-sm" data-filebox>
       <b>ไฟล์แนบ</b> <span class="text-sm muted">ถ่ายรูปหรือเลือกไฟล์ (รูป / PDF)</span>
+      <div class="hint" data-docmin>ต้องแนบอย่างน้อย 1 อย่าง (ช่องไหนก็ได้)</div>
       ${DOCS.map(([k, label]) => `<div class="field" data-doc="${k}"><label>${label}</label><div data-picker="${k}"></div></div>`).join('')}
     </div>
 
@@ -237,7 +238,7 @@ export async function render(ctx) {
     const adv = st.type === 'ADV', job = st.needJob && !fin;
     const th = $('[data-typehint]', el);
     if (th) th.innerHTML = adv
-      ? `ขอเงินล่วงหน้าไปเลี้ยงรับรอง · รับเงินแล้วต้องเคลียร์ใบเสร็จภายใน <b>${Number(meta.advDays) || 15} วัน</b>`
+      ? `ขอเงินล่วงหน้าไปเลี้ยงรับรอง · รับเงินแล้วต้องเคลียร์ใบเสร็จภายใน <b>${Number(meta.advDays) || 15} วัน</b> · ต้องแนบ <b>Budget form</b>`
       : job ? 'ซื้อของหน้างาน: ต้องกรอก <b>Job No., PO No., Cost sheet No.</b> และแนบ <b>Cost sheet, PO, Invoice</b>' : 'แนบใบเสร็จตามหมวดที่เลือก';
     $('[data-datelabel]', el).textContent = adv ? 'วันที่จะใช้' : 'วันที่';
     $$('[data-catwrap]', el).forEach((c) => c.classList.toggle('hidden', adv));
@@ -248,12 +249,13 @@ export async function render(ctx) {
     $('[data-act=job-none]', el)?.classList.toggle('hidden', job && !adv);   // ซื้อของหน้างานใช้ Z-NONE ไม่ได้
     $('[data-jobhint]', el)?.classList.toggle('hidden', !(job && !adv));
     $('[data-filebox]', el).classList.remove('hidden');   // 0066: advance แนบ Budget form ได้
+    $('[data-docmin]', el).classList.toggle('hidden', fin || adv);   // 0068: petty cash ต้องแนบอย่างน้อย 1 อย่าง · advance ต้องแนบ Budget form
     $$('[data-doc]', el).forEach((d) => {
       // ซื้อของหน้างาน: Cost sheet / PO / Invoice บังคับ · อื่นๆ: ใบเสร็จตามกฎหมวด + แนบ Cost sheet / PO / Invoice เพิ่มได้
-      // advance: แนบเฉพาะ Budget form (ไม่บังคับ) · ใบอื่นไม่มีช่อง Budget form
-      const k = d.dataset.doc, show = adv ? k === 'budget' : k !== 'budget' && (job ? k !== 'receipt' : true);
+      // advance: Budget form (บังคับ · 0068) + เอกสารอื่นๆ · ใบอื่นไม่มีช่อง Budget form
+      const k = d.dataset.doc, show = k === 'other' || (adv ? k === 'budget' : k !== 'budget' && (job ? k !== 'receipt' : true));   // 0068: เอกสารอื่นๆ ทุกใบ
       d.classList.toggle('hidden', !show);
-      d.querySelector('label').classList.toggle('req', !fin && show && !adv && (job || (k === 'receipt' && needReceipt())));
+      d.querySelector('label').classList.toggle('req', !fin && show && (adv ? k === 'budget' : (job && k !== 'other') || (k === 'receipt' && needReceipt())));
     });
   }
   // แนบใบเสร็จตามกฎหมวด: มีบรรทัดไหนเป็นหมวดที่ต้องแนบ → ต้องแนบ
@@ -320,6 +322,8 @@ export async function render(ctx) {
       if (!pickers.costSheet.count() || !pickers.po.count() || !pickers.invoice.count()) return 'กรุณาแนบ Cost sheet, PO และ Invoice ให้ครบ';
     }
     if (!adv && !st.needJob && needReceipt() && !pickers.receipt.count() && !pickers.invoice.count()) return 'กรุณาแนบใบเสร็จ';
+    if (adv && !pickers.budget.count()) return 'ใบ advance ต้องแนบ Budget form';
+    if (!adv && !DOCS.some(([k]) => !$(`[data-doc="${k}"]`, el).classList.contains('hidden') && pickers[k].count())) return 'กรุณาแนบเอกสารอย่างน้อย 1 อย่าง (ใบเสร็จ / Invoice / เอกสารอื่นๆ ฯลฯ)';
     return '';
   }
 
