@@ -38,6 +38,15 @@ export async function initClient() {
     realtime: { params: { eventsPerSecond: 2 } },
   });
   let { data } = await sb.auth.getSession();
+  // session ที่มากับลิงก์ต้องเป็นของลิงก์ "ตั้งรหัสผ่านใหม่" จริง (amr = recovery) — ลิงก์ที่แนบ token ล็อกอินปกติของคนอื่นมา = ไม่รับ
+  // (กันคนส่งลิงก์ให้เราเผลอเข้าไปอยู่ในบัญชีของเขา แล้วกรอกข้อมูลลงผิดบัญชี)
+  const urlToken = linkHash.get('access_token');
+  if (urlToken && data.session && data.session.access_token === urlToken && !fromResetLink(urlToken)) {
+    await sb.auth.signOut({ scope: 'local' }).catch(() => {});
+    state.authNotice = 'ลิงก์นี้ใช้เข้าสู่ระบบไม่ได้ — กรุณาเข้าสู่ระบบด้วยอีเมลและรหัสผ่าน';
+    history.replaceState(null, '', location.pathname + '#/login');
+    data = { session: null };
+  }
   if (isRecovery && prevUid && data.session && data.session.user.id !== prevUid) {
     await sb.auth.signOut({ scope: 'local' }).catch(() => {});
     state.authNotice = 'ลิงก์นี้เป็นของบัญชีอื่น — ระบบออกจากระบบให้เพื่อความปลอดภัย กรุณาเข้าสู่ระบบใหม่';
@@ -55,6 +64,14 @@ export async function initClient() {
   }
 }
 export const supabase = () => sb;
+/** token นี้ออกจากลิงก์ตั้งรหัสผ่าน / ลิงก์อีเมลจริงไหม (ดูจาก amr ใน JWT · ฝั่งเซิร์ฟเวอร์ตรวจซ้ำอีกชั้น) */
+function fromResetLink(token) {
+  try {
+    const part = String(token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const amr = JSON.parse(atob(part.padEnd(Math.ceil(part.length / 4) * 4, '='))).amr;
+    return Array.isArray(amr) && amr.some((a) => ['recovery', 'otp', 'magiclink'].includes(a?.method));
+  } catch { return false; }
+}
 /** กันพลาด: ห้ามเอากุญแจลับมาใส่ในหน้าเว็บ */
 // กันเผลอใส่กุญแจผู้ดูแลระบบ (ขึ้นต้น sb_ + "sec" + "ret_" หรือ JWT ที่ role = "service" + "_role") ในหน้าเว็บ
 const ADMIN_PREFIX = ['sb', 'sec' + 'ret', ''].join('_'), ADMIN_ROLE = ['service', 'role'].join('_');
@@ -156,9 +173,10 @@ async function rawRpc(fn, args) {
     if (!res.ok) throw new Error(out.message || 'เกิดข้อผิดพลาด');
     return out;
   }
-  const { data, error } = await sb.rpc(fn, args || {});
+  const { data, error, status } = await sb.rpc(fn, args || {});
   if (error) {
-    if (/JWT|jwt|401/.test(error.message || '') || error.code === 'PGRST301') { await auth.logout(); location.replace(location.pathname + '#/login'); location.reload(); throw new Error('หมดเวลาเข้าระบบ — กรุณาเข้าสู่ระบบใหม่'); }
+    // หมดเวลาเข้าระบบ: ดูจากรหัสสถานะ / รหัส error เท่านั้น (เดิมดูจากข้อความ → ลิงก์ที่มีคำว่า 401 / jwt ทำให้หลุดระบบ + ร่างหายได้)
+    if (status === 401 || /^PGRST30[123]$/.test(error.code || '')) { await auth.logout(); location.replace(location.pathname + '#/login'); location.reload(); throw new Error('หมดเวลาเข้าระบบ — กรุณาเข้าสู่ระบบใหม่'); }
     if (/Failed to fetch|NetworkError/i.test(error.message || '')) throw new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ — ตรวจอินเทอร์เน็ตแล้วลองใหม่');
     throw new Error(error.message || 'เกิดข้อผิดพลาด');
   }
@@ -219,7 +237,9 @@ export const api = {
         const r = await fetch(`${cfg.MOCK_URL}/storage/upload?path=${encodeURIComponent(bucket + '/' + key)}`, { method: 'POST', headers: { 'x-user': state.session.uid, 'Content-Type': f.type }, body: f });
         if (!r.ok) throw new Error('อัปโหลดไม่สำเร็จ');
       } else {
-        const { error } = await sb.storage.from(bucket).upload(key, f, { contentType: f.type, upsert: false });
+        // บางเครื่องไม่ส่งชนิดไฟล์มา (f.type ว่าง) → ที่เก็บไฟล์ปฏิเสธ · ใส่ชนิดตามนามสกุลที่ตรวจแล้วแทน
+        const ctype = f.type || { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp', heic: 'image/heic', pdf: 'application/pdf' }[ext];
+        const { error } = await sb.storage.from(bucket).upload(key, f, { contentType: ctype, upsert: false });
         if (error) throw new Error('อัปโหลดไม่สำเร็จ: ' + error.message);
       }
     } finally { progress(-1); }

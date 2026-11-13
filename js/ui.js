@@ -1,8 +1,8 @@
 // ════════════════════════════════════════════════════════════════════
 //  ui.js — ชิ้นส่วนหน้าจอที่ใช้ร่วมกัน (dialog / toast / รูปใบเสร็จ / ลายเซ็น / ช่องว่าง)
 // ════════════════════════════════════════════════════════════════════
-import { icon, catIcon } from './icons.js?v=10.4.17';
-import { api, esc, money, kmText, fmtDate, catName, requestBadge } from './core.js?v=10.4.17';
+import { icon, catIcon } from './icons.js?v=10.4.19';
+import { api, esc, money, kmText, fmtDate, catName, requestBadge } from './core.js?v=10.4.19';
 export { icon, catIcon, esc };
 
 /** html`...` — ค่าที่แทรกถูก escape อัตโนมัติ · array ต่อกันให้ · raw(x) = ไม่ escape */
@@ -210,7 +210,16 @@ export async function lightbox(paths, idx = 0, opts = {}) {
       const u = /^blob:/.test(paths[i]) ? paths[i] : await api.fileUrl(paths[i]);
       el.querySelector('[data-open]').href = u;
       if (/^https?:/.test(paths[i])) { img = null; stage.innerHTML = u ? `<div style="color:#fff;text-align:center;padding:24px">ไฟล์นี้อยู่ใน Google Drive ของระบบเดิม<br><br><a class="btn btn-glass" href="${esc(u)}" target="_blank" rel="noopener noreferrer">เปิดใน Google Drive</a></div>` : '<div style="color:#fff">ลิงก์ไฟล์ไม่ถูกต้อง</div>'; return; }
-      if (isPdf(i)) { stage.innerHTML = `<iframe src="${esc(u)}"></iframe>`; img = null; }
+      if (isPdf(i) && /^blob:/.test(u)) {
+        // PDF ที่ยังไม่อัปโหลด (blob:) — แสดงเป็นการ์ดชื่อไฟล์ (เดิมใส่ iframe → โดน CSP บล็อก เห็นเป็นจอขาว คนเข้าใจว่าแนบไม่ได้)
+        const f = opts.files?.[i] || {}, kb = Number(f.size) || 0;
+        stage.innerHTML = `<div class="lb-file"><div class="lb-file-ic">PDF</div><b>${esc(f.name || 'ไฟล์ PDF')}</b>
+          ${kb ? `<span>${kb >= 1048576 ? (kb / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(kb / 1024)) + ' KB'}</span>` : ''}
+          <span class="lb-file-ok">✓ เลือกไฟล์นี้แล้ว — จะอัปโหลดตอนกดส่ง</span>
+          <a class="btn btn-glass btn-sm" href="${esc(u)}" target="_blank" rel="noopener">เปิดดูไฟล์</a></div>`;
+        img = null;
+      }
+      else if (isPdf(i)) { stage.innerHTML = `<iframe src="${esc(u)}"></iframe>`; img = null; }
       else { stage.innerHTML = `<img src="${esc(u)}" alt="ใบเสร็จ" draggable="false">`; img = stage.querySelector('img'); }
     } catch (e) { stage.innerHTML = `<div style="color:#fff">${esc(e.message)}</div>`; }
     apply();
@@ -249,6 +258,8 @@ export async function lightbox(paths, idx = 0, opts = {}) {
  * const rp = receiptPicker(containerEl, {max: 10, existing: [paths]})
  * rp.count() · await rp.uploadAll() → [paths ใหม่ + เดิมที่ยังเก็บไว้]
  */
+/** ไฟล์ PDF ไหม — บางเครื่อง (มือถือ / แอปแชต) ไม่ส่งชนิดไฟล์มา → ดูนามสกุลด้วย */
+const isPdfFile = (f) => (f?.type || '').toLowerCase() === 'application/pdf' || /\.pdf$/i.test(f?.name || '');
 export function receiptPicker(container, { max = 10, existing = [], onChange } = {}) {
   let files = [];               // {file, url}
   let keep = [...existing];     // path เดิม
@@ -258,7 +269,7 @@ export function receiptPicker(container, { max = 10, existing = [], onChange } =
   const box = document.createElement('div'); container.appendChild(box);
   function render() {
     const parts = keep.map((p, i) => `<div class="thumb ${/\.pdf/i.test(p) ? 'pdf' : ''}" data-thumb="${esc(p)}">${/\.pdf/i.test(p) ? 'PDF' : icon('image')}<button class="x" data-rmk="${i}" aria-label="ลบ">${icon('x')}</button></div>`)
-      .concat(files.map((f, i) => f.file.type === 'application/pdf'
+      .concat(files.map((f, i) => isPdfFile(f.file)
         ? `<div class="thumb pdf" data-viewf="${i}" title="แตะเพื่อดูเต็มจอ">PDF<button class="x" data-rmf="${i}" aria-label="ลบ">${icon('x')}</button></div>`
         : `<div class="thumb" data-viewf="${i}" title="แตะเพื่อดูเต็มจอ" style="background-image:url('${f.url}')"><button class="x" data-rmf="${i}" aria-label="ลบ">${icon('x')}</button></div>`));
     if (keep.length + files.length < max) parts.push(`<button type="button" class="thumb add" data-add>${icon('camera')}<span>แนบรูป</span></button>`);
@@ -271,14 +282,16 @@ export function receiptPicker(container, { max = 10, existing = [], onChange } =
   function preview(from, justAdded) {
     if (!files.length) return;
     const list = files.slice();
-    lightbox(list.map((f) => f.url), Math.min(from, list.length - 1), {
-      pdf: list.map((f) => f.file.type === 'application/pdf'),
-      note: 'ตรวจให้เห็นทั้งใบ — ชื่อร้าน วันที่ ยอดเงิน อ่านออกชัด ไม่ตกขอบ',
+    const at = Math.min(from, list.length - 1), onPdf = isPdfFile(list[at].file);
+    lightbox(list.map((f) => f.url), at, {
+      pdf: list.map((f) => isPdfFile(f.file)),
+      files: list.map((f) => ({ name: f.file.name, size: f.file.size })),
+      note: onPdf ? 'ไฟล์ PDF แนบได้ตามปกติ — กด "ใช้ไฟล์นี้" แล้วกดส่งใบ' : 'ตรวจให้เห็นทั้งใบ — ชื่อร้าน วันที่ ยอดเงิน อ่านออกชัด ไม่ตกขอบ',
       actions: [
         justAdded
-          ? { label: `${icon('camera', 'sm')} ถ่ายใหม่`, run: (i, close) => { close(); removeFile(files.indexOf(list[i])); input.click(); } }
+          ? { label: `${icon('camera', 'sm')} ${onPdf ? 'เลือกใหม่' : 'ถ่ายใหม่'}`, run: (i, close) => { close(); removeFile(files.indexOf(list[i])); input.click(); } }
           : { label: `${icon('trash', 'sm')} ลบไฟล์นี้`, run: (i, close) => { close(); removeFile(files.indexOf(list[i])); } },
-        { label: `${icon('check', 'sm')} ${justAdded ? 'ใช้รูปนี้' : 'ปิด'}`, cls: 'btn-primary', run: (i, close) => close() },
+        { label: `${icon('check', 'sm')} ${justAdded ? (onPdf ? 'ใช้ไฟล์นี้' : 'ใช้รูปนี้') : 'ปิด'}`, cls: 'btn-primary', run: (i, close) => close() },
       ],
     });
   }

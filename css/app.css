@@ -702,3 +702,10 @@ a.stat { text-decoration: none; color: inherit; display: block; }
 .pv-rep-tbl td:nth-child(3) { min-width: 170px; }
 .pv-meta > b:not(.pen) { min-height: 34px; display: flex; align-items: flex-end; padding-bottom: 1px; }   /* ID document เว้นระยะเท่าช่อง No. / Date */
 .pv-sheet.pv-full .pv-meta > b:not(.pen) { min-height: 42px; }
+
+/* ตัวอย่างไฟล์ PDF ที่ยังไม่อัปโหลด (แทน iframe ที่โดน CSP บล็อก) */
+.lightbox .lb-file { display: flex; flex-direction: column; align-items: center; gap: 10px; color: #fff; text-align: center; padding: 24px; max-width: 420px; }
+.lightbox .lb-file b { word-break: break-all; font-size: 15px; }
+.lightbox .lb-file span { font-size: 13px; opacity: .8; }
+.lightbox .lb-file .lb-file-ok { opacity: 1; color: #7CE2A4; }
+.lightbox .lb-file-ic { width: 84px; height: 104px; border-radius: 10px; background: #fff; color: #B7081D; font-weight: 800; font-size: 22px; display: grid; place-items: center; box-shadow: 0 6px 24px rgba(0,0,0,.35); }
