@@ -1,14 +1,15 @@
 // ขอเบิก Petty Cash (ใบสำคัญจ่าย) — ค่าใช้จ่าย / Advance entertain · เลือกหมวดทุกบรรทัด · HR กรอกแทนได้ · แก้ใบที่ถูกตีกลับ (?id=)
 // บัญชีแก้ไขใบ (?id=&fin=1): แก้ได้ทุกช่อง + VAT / หัก ณ ที่จ่าย + รหัสแผนก · ไม่เริ่มสายอนุมัติใหม่
 // บัญชี (ทั้งตอนเบิกเอง / กรอกแทน / แก้ไข) เลือกแผนกรายบรรทัดได้ = ลงต้นทุนแยกทีม
-import { api, money, esc, todayYMD, loadPettyCategories, state } from '../core.js?v=10.4.19';
-import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.4.19';
-import { DOCS, whtLines, roundNet, roundAdj, roundText, roundSeg } from './pv-common.js?v=10.4.19';
+import { api, money, esc, todayYMD, loadPettyCategories, state } from '../core.js?v=10.4.20';
+import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.4.20';
+import { DOCS, whtLines, roundNet, roundAdj, roundText, roundSeg } from './pv-common.js?v=10.4.20';
 
 // คำอธิบายหมวด: อะไรเข้าหมวดนี้บ้าง (การ์ดตอนชี้ที่ปุ่มหมวด + ใต้หมวดที่เลือก)
 const CAT_HINT = {
   OFFICE: 'ค่าใช้จ่ายส่วนกลางของสำนักงาน เช่น ค่าน้ำ-ไฟ ค่าอินเทอร์เน็ต/โทรศัพท์สำนักงาน ค่าเช่าเครื่องถ่ายเอกสาร ค่าแม่บ้าน/รปภ.',
   SUPPLY: 'เช่น กระดาษ ปากกา แฟ้ม หมึกพิมพ์ ซองเอกสาร อุปกรณ์คอมพิวเตอร์ชิ้นเล็ก (เมาส์ คีย์บอร์ด)',
+  NAMECARD: 'ค่าพิมพ์นามบัตรพนักงาน (ระบุชื่อคน / จำนวนกล่องในรายละเอียด)',
   POST: 'เช่น ไปรษณีย์ EMS ค่าส่งของ Kerry / Flash / Lalamove ค่าแมสเซนเจอร์ส่งเอกสาร',
   SERVICE: 'เช่น ค่า Service ค่าจ้างช่าง/ผู้รับเหมา ค่าติดตั้ง ค่าสอบเทียบ (Calibration) ค่าตรวจเช็ค',
   MATERIAL: 'เช่น อะไหล่ วัสดุ อุปกรณ์ที่ซื้อเข้างานลูกค้า วัสดุสิ้นเปลืองหน้างาน',
@@ -29,6 +30,7 @@ const CAT_WORDS = {
   ENT: ['เลี้ยง', 'รับรองลูกค้า', 'ของขวัญ', 'ของฝาก', 'entertain'],
   WELFARE: ['ขนม', 'อาหารประชุม', 'เยี่ยมไข้', 'วันเกิด', 'พวงหรีด', 'ทำบุญ', 'สวัสดิการ'],
   SUPPLY: ['กระดาษ', 'ปากกา', 'แฟ้ม', 'หมึก', 'ซองเอกสาร', 'เครื่องเขียน', 'เมาส์', 'คีย์บอร์ด', 'ลวดเย็บ', 'stationery', 'toner'],
+  NAMECARD: ['นามบัตร', 'name card', 'namecard', 'business card'],
   WATER: ['น้ำดื่ม', 'กาแฟ', 'ทิชชู', 'น้ำยา', 'ของใช้ในครัว', 'pantry'],
   REPAIR: ['ซ่อม', 'บำรุง', 'repair', 'maintenance'],
   SERVICE: ['ช่าง', 'ผู้รับเหมา', 'ติดตั้ง', 'สอบเทียบ', 'calibration', 'ค่าจ้าง', 'ค่าแรง', 'contractor'],

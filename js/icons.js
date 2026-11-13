@@ -60,6 +60,7 @@ const P = {
   pen: '<path d="M12 19l7-7 3 3-7 7z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18z"/><path d="m2 2 7.6 7.6"/><circle cx="11" cy="11" r="2"/>',
   'piggy-bank': '<path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2V5z"/><path d="M2 9v1c0 1.1.9 2 2 2h1M16 11h.01"/>',
   briefcase: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
+  'id-card': '<rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="11" r="2"/><path d="M5 16c.6-1.4 1.7-2 3-2s2.4.6 3 2M14 10h5M14 14h4"/>',
   shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>',
   sheet: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M8 13h8M8 17h8M12 11v8"/>',
   crown: '<path d="m2 6 4 12h12l4-12-6 5-4-7-4 7z"/><path d="M6 21h12"/>',
@@ -85,7 +86,7 @@ const CAT = {
   HOTEL: ['bed', 'c-violet'], EXPRESS: ['package', 'c-teal'], MILE: ['map', 'c-amber'], CAR: ['car', 'c-teal'], MOBILE: ['phone', 'c-teal'],
   OVERSEAS: ['globe', 'c-violet'], APT: ['building', 'c-violet'], TRAVEL: ['plane', 'c-blue'], OTHER: ['receipt', ''],
   // เงินสดย่อย
-  SUPPLY: ['package', 'c-blue'], POST: ['send', 'c-teal'], WATER: ['coins', 'c-blue'], REPAIR: ['settings', 'c-amber'], TAXI: ['car', 'c-amber'],
+  SUPPLY: ['package', 'c-blue'], NAMECARD: ['id-card', 'c-teal'], POST: ['send', 'c-teal'], WATER: ['coins', 'c-blue'], REPAIR: ['settings', 'c-amber'], TAXI: ['car', 'c-amber'],
   WELFARE: ['sparkles', 'c-violet'], FEE: ['banknote', 'c-teal'], OFFICE: ['building', 'c-blue'], SERVICE: ['stamp', 'c-violet'], MATERIAL: ['package', 'c-amber'], TOPUP: ['plus-circle', 'c-green'], CLEAR: ['refresh', 'c-green'], COUNT: ['calculator', 'c-amber'],
 };
 export function catIcon(code, size = '') {
