@@ -1,9 +1,9 @@
 // ขอเบิก Petty Cash (ใบสำคัญจ่าย) — ค่าใช้จ่าย / Advance entertain · เลือกหมวดทุกบรรทัด · HR กรอกแทนได้ · แก้ใบที่ถูกตีกลับ (?id=)
 // บัญชีแก้ไขใบ (?id=&fin=1): แก้ได้ทุกช่อง + VAT / หัก ณ ที่จ่าย + รหัสแผนก · ไม่เริ่มสายอนุมัติใหม่
 // บัญชี (ทั้งตอนเบิกเอง / กรอกแทน / แก้ไข) เลือกแผนกรายบรรทัดได้ = ลงต้นทุนแยกทีม
-import { api, money, esc, todayYMD, loadPettyCategories, state } from '../core.js?v=10.4.21';
-import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.4.21';
-import { DOCS, whtLines, roundNet, roundAdj, roundText, roundSeg } from './pv-common.js?v=10.4.21';
+import { api, money, esc, todayYMD, loadPettyCategories, state } from '../core.js?v=10.4.22';
+import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.4.22';
+import { DOCS, whtLines, roundNet, roundAdj, roundText, roundSeg } from './pv-common.js?v=10.4.22';
 
 // คำอธิบายหมวด: อะไรเข้าหมวดนี้บ้าง (การ์ดตอนชี้ที่ปุ่มหมวด + ใต้หมวดที่เลือก)
 const CAT_HINT = {
@@ -368,7 +368,7 @@ export async function render(ctx) {
     } catch { /* เช็คไม่ได้ ไม่ขวางการส่ง */ }
     try {
       const res = await busy('กำลังเตรียมข้อมูล…', async (set) => {
-        const docs = st.type !== 'ADV' ? await uploadDocs(set, false) : {};
+        const docs = await uploadDocs(set, false);   // advance ก็ต้องส่งไฟล์ (Budget form บังคับ · 0068) — เดิมข้ามไป ทำให้ส่งใบ advance ไม่ได้
         set('กำลังส่ง…');
         return api.rpc('pv_submit', { p: { id: old?.id || '', type: st.type, requesterEmail: st.who, fundId: pettyFund() || meta.fund?.fundId || '', ...fields(), docs,
           ...(fin1 ? { vatRate: st.vat, whtLines: st.wht.map((w) => ({ rate: w.rate, base: r2(w.base) })), roundMode: st.rnd } : {}) } });
