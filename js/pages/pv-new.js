@@ -1,9 +1,9 @@
 // ขอเบิก Petty Cash (ใบสำคัญจ่าย) — ค่าใช้จ่าย / Advance entertain · เลือกหมวดทุกบรรทัด · HR กรอกแทนได้ · แก้ใบที่ถูกตีกลับ (?id=)
 // บัญชีแก้ไขใบ (?id=&fin=1): แก้ได้ทุกช่อง + VAT / หัก ณ ที่จ่าย + รหัสแผนก · ไม่เริ่มสายอนุมัติใหม่
 // บัญชี (ทั้งตอนเบิกเอง / กรอกแทน / แก้ไข) เลือกแผนกรายบรรทัดได้ = ลงต้นทุนแยกทีม
-import { api, money, esc, todayYMD, loadPettyCategories, state } from '../core.js?v=10.4.20';
-import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.4.20';
-import { DOCS, whtLines, roundNet, roundAdj, roundText, roundSeg } from './pv-common.js?v=10.4.20';
+import { api, money, esc, todayYMD, loadPettyCategories, state } from '../core.js?v=10.4.21';
+import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.4.21';
+import { DOCS, whtLines, roundNet, roundAdj, roundText, roundSeg } from './pv-common.js?v=10.4.21';
 
 // คำอธิบายหมวด: อะไรเข้าหมวดนี้บ้าง (การ์ดตอนชี้ที่ปุ่มหมวด + ใต้หมวดที่เลือก)
 const CAT_HINT = {
@@ -82,8 +82,8 @@ export async function render(ctx) {
   const tax = fin || fin1;
   // 0056: บัญชี 1 เบิกให้ตัวเอง → ต้องรอคนตรวจ (meta.fin1Check = ชื่อคนตรวจ) · เบิกแทนคนอื่นเป็นแบบเดิม
   const selfChk = () => !!meta.fin1Check && (old ? String(old.requesterEmail || '').toLowerCase() === meta.me.email : (!st.who || st.who === meta.me.email));
-  // แผนกรายบรรทัด (ลงต้นทุนแยกทีม): เฉพาะบัญชี · ว่าง = ตามแผนกของใบ · สายอนุมัติไม่เปลี่ยน
-  const lineDeptOn = !!meta.isFin && (meta.deptCodes || []).length > 0;
+  // แผนกรายบรรทัด (ลงต้นทุนแยกทีม): บัญชี + HR (0072 · meta.canLineDept) · ว่าง = ตามแผนกของใบ · สายอนุมัติไม่เปลี่ยน
+  const lineDeptOn = !!(meta.canLineDept ?? meta.isFin) && (meta.deptCodes || []).length > 0;
   const deptOpts = (sel) => `<option value="">ตามแผนกของใบ</option>
     ${sel && !(meta.deptCodes || []).some((d) => d.code === sel) ? `<option value="${esc(sel)}" selected>${esc(sel)}</option>` : ''}
     ${(meta.deptCodes || []).map((d) => `<option value="${esc(d.code)}" ${d.code === sel ? 'selected' : ''}>${esc(d.code)} · ${esc(d.name)}</option>`).join('')}`;
@@ -129,7 +129,7 @@ export async function render(ctx) {
     <div class="card pad stack-sm">
       <div class="flex between wrap"><b>รายการ</b><span class="text-sm muted">${tax ? 'ยอดก่อน VAT' : 'ยอดก่อน VAT · บัญชีเป็นคนใส่ VAT / หัก ณ ที่จ่าย'}</span></div>
       <p class="hint" data-officehint></p>
-      ${lineDeptOn ? '<p class="hint">บัญชี: เลือก "ลงต้นทุนแผนก" ได้ทีละบรรทัด เช่น ค่าศุลกากรของทีม E&amp;I กับ SI · ใบฟ้า / MSBC / รายงานแยกตามแผนกให้เอง · สายอนุมัติไม่เปลี่ยน</p>' : ''}
+      ${lineDeptOn ? '<p class="hint">บัญชี / HR: เลือก "ลงต้นทุนแผนก" ได้ทีละบรรทัด เช่น ค่าศุลกากรของทีม E&amp;I กับ SI · ใบฟ้า / MSBC / รายงานแยกตามแผนกให้เอง · สายอนุมัติไม่เปลี่ยน</p>' : ''}
       <div class="stack-sm" data-lines></div>
       <button type="button" class="add-item" data-act="add-line">${icon('plus')} เพิ่มบรรทัด</button>
     </div>
