@@ -2,8 +2,8 @@
 //  shell.js — โครงหน้าแอป (เมนูข้าง / แถบล่าง / กระดิ่ง) + ตัวเปลี่ยนหน้า (hash router)
 //  เพิ่มหน้าใหม่: ใส่ใน ROUTES แล้วสร้างไฟล์ js/pages/<ชื่อ>.js ที่ export render(ctx)
 // ════════════════════════════════════════════════════════════════════
-import { api, auth, state, loadProfile, loadCategories, esc, initials, roleLabel, timeAgo, fmtDate, cfg, MOCK_MODE } from './core.js?v=10.4.24';
-import { icon, sheet, toast, errorBox, skeleton, $ } from './ui.js?v=10.4.24';
+import { api, auth, state, loadProfile, loadCategories, esc, initials, roleLabel, timeAgo, fmtDate, cfg, MOCK_MODE } from './core.js?v=10.4.25';
+import { icon, sheet, toast, errorBox, skeleton, $ } from './ui.js?v=10.4.25';
 
 const r = (p) => p || {};
 const isApprover = (p) => r(p.role).isManager || r(p.role).isSenior || r(p.role).isGM;
@@ -32,6 +32,7 @@ const ROUTES = [
   { path: '/pv', page: 'pv-list', title: 'ใบสำคัญจ่าย', app: 'petty', nav: 'p-pv', icon: 'receipt' },
   { path: '/pv/view', page: 'pv-view', title: 'ใบสำคัญจ่าย', app: 'petty', nav: 'p-pv', back: '/pv' },
   { path: '/pv/new', page: 'pv-new', title: 'แก้ไขใบสำคัญจ่าย', app: 'petty', nav: 'p-pv', back: '/pv' },
+  { path: '/pv/clear', page: 'pv-clear', title: 'เคลียร์ advance', app: 'petty', nav: 'p-pv', back: '/pv' },
   { path: '/pv/dashboard', page: 'pv-dash', title: 'Dashboard ใบสำคัญจ่าย', app: 'petty', nav: 'p-dash', icon: 'chart',
     show: (p) => r(p.role).isAccountant || r(p.role).isGM || r(p.role).isCEO || r(p.role).canViewAll || r(p.role).isViewer },
   { path: '/pv/report', page: 'pv-report', title: 'รายการที่จ่ายแล้ว', app: 'petty', nav: 'p-pv', back: '/pv' },
@@ -102,7 +103,7 @@ async function route() {
   const app = document.getElementById('app');
   if (!auth.user) {
     closeBell();
-    const m = await import('./pages/login.js?v=10.4.24');
+    const m = await import('./pages/login.js?v=10.4.25');
     if (seq !== renderSeq) return;
     document.title = 'เข้าสู่ระบบ · EXION Expense';
     return m.render({ el: app, query, go, onLoggedIn: () => { const back = sessionStorage.getItem('exion_after_login'); sessionStorage.removeItem('exion_after_login'); go(back && back !== '/login' ? back : '/'); } });
@@ -141,7 +142,7 @@ async function route() {
     main.innerHTML = '';
     const ctx = { el: main, params, query, profile, go, setTitle, refreshBadges, alive: () => seq === renderSeq, app: rt.app };
     const cleanup = await mod.render(ctx);
-    if (seq === renderSeq) { current = { cleanup }; watchDates(main); }
+    if (seq === renderSeq) { current = { cleanup }; watchDates(main); readForPage(); }
   } catch (e) {
     console.error(e);
     // โหลดไฟล์หน้าไม่ได้ / ไฟล์ไม่เข้ากัน (เพิ่งอัปเวอร์ชัน) → โหลดใหม่ทั้งหน้า 1 ครั้งอัตโนมัติ
@@ -152,7 +153,7 @@ async function route() {
 
 // ─────────────── เวอร์ชันแอป ───────────────
 // เปลี่ยนพร้อม sw.js / index.html ทุกครั้งที่อัปเว็บ (ใช้ต่อท้ายไฟล์ทุกไฟล์ที่ import → ได้ไฟล์ชุดเดียวกันเสมอ)
-const APP_V = '10.4.24';
+const APP_V = '10.4.25';
 let verAt = 0, verNew = false;
 async function newerVersion() {
   if (verNew) return true;
@@ -276,7 +277,7 @@ let pollT = null, bgFor = '';
 function startBackground(profile) {
   if (bgFor === profile.email) return;
   bgFor = profile.email;
-  refreshBadges();
+  refreshBadges().then(readForPage);
   clearInterval(pollT);
   pollT = setInterval(() => { if (!document.hidden) refreshBadges(); }, MOCK_MODE ? 60e3 : 120e3);
   stopRealtime?.();
@@ -288,7 +289,7 @@ function startBackground(profile) {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshBadges(); });
 }
 // แถบ "มีอัปเดตใหม่ · แตะเพื่อโหลด" — ไม่วาดรายการใหม่เอง (กันแถวเลื่อนตอนกำลังกดอนุมัติ) · ไม่โผล่ในหน้าฟอร์ม
-const FORM_PAGES = ['submit', 'preapprove-new', 'finalize', 'set-password', 'petty-request', 'pv-new'];
+const FORM_PAGES = ['submit', 'preapprove-new', 'finalize', 'set-password', 'petty-request', 'pv-new', 'pv-clear'];
 function newItemsBar(n) {
   const cur = match(parseHash().path), main = document.getElementById('main');
   if (!cur || !main || FORM_PAGES.includes(cur.rt.page)) return;
@@ -339,9 +340,8 @@ export async function refreshBadges() {
   }
   if (p.pettyEnabled !== false) jobs.push(api.rpc('get_pv_todo_count', {}, { quiet: true }).then((n) => { badges.pv = Number(n) || 0; }).catch(() => {}));
   await Promise.allSettled(jobs);
+  setBellDot();
   if (JSON.stringify(badges) !== before) {
-    const dot = document.getElementById('bell-dot');
-    if (dot) { dot.textContent = badges.notif > 99 ? '99+' : badges.notif; dot.classList.toggle('hidden', !badges.notif); }
     const cur = match(parseHash().path);
     if (cur && document.getElementById('main')) {   // อัปเดตตัวเลขบนเมนูโดยไม่วาดหน้าใหม่
       document.querySelectorAll('[data-nav="approvals"],[data-nav="p-approve"],[data-nav="p-pv"]').forEach((a) => {
@@ -355,30 +355,86 @@ export async function refreshBadges() {
   }
 }
 let notifCache = null, bellEl = null;
+function setBellDot() {
+  const dot = document.getElementById('bell-dot');
+  if (dot) { dot.textContent = badges.notif > 99 ? '99+' : badges.notif; dot.classList.toggle('hidden', !badges.notif); }
+}
+// เปิดหน้าที่แจ้งเตือนชี้ไป (จากหน้ารายการ / ลิงก์ LINE / กระดิ่ง) = อ่านรายการนั้นแล้ว
+function readForPage() {
+  let h = location.hash; try { h = decodeURIComponent(h); } catch {}
+  const hit = (notifCache?.items || []).filter((x) => x.unread && x.link && x.link === h);
+  if (!hit.length) return;
+  hit.forEach((x) => { x.unread = false; });
+  badges.notif = Math.max(0, badges.notif - hit.length); setBellDot();
+  Promise.all(hit.map((x) => api.rpc('mark_notifications_read', { p_id: x.id }, { quiet: true }))).catch(() => {});
+}
 function closeBell() { bellEl?.remove(); bellEl = null; document.removeEventListener('click', outside); }
 const outside = (e) => { if (bellEl && !bellEl.contains(e.target)) closeBell(); };
 async function toggleBell() {
   if (bellEl) return closeBell();
   bellEl = document.createElement('div');
   bellEl.className = 'notif-panel';
-  bellEl.innerHTML = `<div class="np-head"><b>การแจ้งเตือน</b><button class="btn btn-ghost btn-sm" data-readall>อ่านทั้งหมด</button></div><div class="np-list"><div class="empty"><span class="spin"></span></div></div>`;
+  bellEl.innerHTML = `<div class="np-head"><b>การแจ้งเตือน</b><button class="btn btn-ghost btn-sm" data-readall>อ่านทั้งหมด</button></div><div class="np-list"><div class="empty"><span class="spin"></span></div></div>
+    <div class="np-foot">ปัดรายการไปด้านข้าง หรือกด ${icon('x', 'sm')} เพื่อเอาออกจากรายการ</div>`;
   document.body.appendChild(bellEl);
   setTimeout(() => document.addEventListener('click', outside), 0);
   const list = bellEl.querySelector('.np-list');
+  const emptyHtml = `<div class="empty">${icon('bell')}<p class="mt-8">ยังไม่มีการแจ้งเตือน</p></div>`;
   const paint = (n) => {
     const items = n.items || [];
     list.innerHTML = items.length ? items.map((x) => `<div class="np-item ${x.unread ? 'unread' : ''}" data-id="${esc(x.id)}" data-link="${esc(x.link || '')}">
-      <span class="dot"></span><div class="grow"><div class="t">${esc(x.title)}</div>${x.body ? `<div class="b">${esc(x.body)}</div>` : ''}<div class="w">${esc(timeAgo(x.created_at))}</div></div></div>`).join('')
-      : `<div class="empty">${icon('bell')}<p class="mt-8">ยังไม่มีการแจ้งเตือน</p></div>`;
+      <span class="dot"></span><div class="grow"><div class="t">${esc(x.title)}</div>${x.body ? `<div class="b">${esc(x.body)}</div>` : ''}<div class="w">${esc(timeAgo(x.created_at))}</div></div>
+      <button type="button" class="np-x" data-hide aria-label="เอาออกจากรายการ">${icon('x', 'sm')}</button></div>`).join('')
+      : emptyHtml;
+  };
+  // ปัดทิ้ง / กด ✕: เอาออกจากรายการของตัวเอง (นับว่าอ่านแล้ว) · พลาด = โหลดรายการกลับมา
+  const hideItem = (it) => {
+    const id = it.dataset.id, x = notifCache?.items?.find((i) => i.id === id);
+    if (notifCache?.items) notifCache.items = notifCache.items.filter((i) => i.id !== id);
+    if (x?.unread) { badges.notif = Math.max(0, badges.notif - 1); setBellDot(); }
+    it.style.height = it.offsetHeight + 'px';
+    requestAnimationFrame(() => it.classList.add('gone'));
+    setTimeout(() => { it.remove(); if (bellEl && !list.querySelector('.np-item')) list.innerHTML = emptyHtml; }, 200);
+    api.rpc('hide_notification', { p_id: id }, { quiet: true }).catch(() => { toast('เอาออกไม่สำเร็จ ลองใหม่อีกครั้ง', 'bad'); refreshBadges().then(() => { if (bellEl && notifCache) paint(notifCache); }); });
   };
   if (notifCache) paint(notifCache);
   try { notifCache = await api.rpc('get_notifications', {}, { quiet: true }); if (bellEl) paint(notifCache); } catch (e) { list.innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+  // ปัดด้วยนิ้ว (จอสัมผัส) — เมาส์ใช้ปุ่ม ✕
+  let sw = null, swipedAt = 0;
+  list.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse') return;
+    const it = e.target.closest('.np-item'); if (!it || e.target.closest('[data-hide]')) return;
+    sw = { it, x: e.clientX, y: e.clientY, dx: 0, on: false };
+  });
+  list.addEventListener('pointermove', (e) => {
+    if (!sw) return;
+    const dx = e.clientX - sw.x, dy = e.clientY - sw.y;
+    if (!sw.on) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { sw = null; return; }   // เลื่อนขึ้นลง = ไม่ใช่ปัด
+      if (Math.abs(dx) < 10) return;
+      sw.on = true; sw.it.classList.add('swiping');
+    }
+    sw.dx = dx; sw.it.style.transform = `translateX(${dx}px)`; sw.it.style.opacity = String(Math.max(0.25, 1 - Math.abs(dx) / 260));
+  });
+  const swipeEnd = () => {
+    if (!sw) return;
+    const { it, dx, on: moved } = sw; sw = null;
+    if (!moved) return;
+    swipedAt = Date.now(); it.classList.remove('swiping');
+    if (Math.abs(dx) > 90) { it.style.transform = `translateX(${dx > 0 ? 110 : -110}%)`; it.style.opacity = '0'; hideItem(it); }
+    else { it.style.transform = ''; it.style.opacity = ''; }
+  };
+  list.addEventListener('pointerup', swipeEnd); list.addEventListener('pointercancel', swipeEnd);
   bellEl?.addEventListener('click', async (e) => {
     if (e.target.closest('[data-readall]')) {
       await api.rpc('mark_notifications_read', {}).catch(() => {});
-      badges.notif = 0; notifCache?.items?.forEach((x) => (x.unread = false)); paint(notifCache || {}); refreshBadges(); return;
+      badges.notif = 0; setBellDot(); notifCache?.items?.forEach((x) => (x.unread = false)); paint(notifCache || {}); refreshBadges(); return;
     }
+    if (Date.now() - swipedAt < 400) return;            // เพิ่งปัด → ไม่นับเป็นการกดเปิด
     const it = e.target.closest('.np-item'); if (!it) return;
+    if (e.target.closest('[data-hide]')) { hideItem(it); return; }
+    const x = notifCache?.items?.find((i) => i.id === it.dataset.id);
+    if (x?.unread) { x.unread = false; badges.notif = Math.max(0, badges.notif - 1); setBellDot(); }
     api.rpc('mark_notifications_read', { p_id: it.dataset.id }).then(refreshBadges).catch(() => {});
     closeBell();
     const link = it.dataset.link;
