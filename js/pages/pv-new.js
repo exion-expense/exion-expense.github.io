@@ -1,9 +1,9 @@
 // ขอเบิก Petty Cash (ใบสำคัญจ่าย) — ค่าใช้จ่าย / Advance entertain · เลือกหมวดทุกบรรทัด · HR กรอกแทนได้ · แก้ใบที่ถูกตีกลับ (?id=)
 // บัญชีแก้ไขใบ (?id=&fin=1): แก้ได้ทุกช่อง + VAT / หัก ณ ที่จ่าย + รหัสแผนก · ไม่เริ่มสายอนุมัติใหม่
 // บัญชี (ทั้งตอนเบิกเอง / กรอกแทน / แก้ไข) เลือกแผนกรายบรรทัดได้ = ลงต้นทุนแยกทีม
-import { api, money, esc, todayYMD, loadPettyCategories, state } from '../core.js?v=10.4.22';
-import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.4.22';
-import { DOCS, whtLines, roundNet, roundAdj, roundText, roundSeg } from './pv-common.js?v=10.4.22';
+import { api, money, esc, todayYMD, loadPettyCategories, state } from '../core.js?v=10.4.23';
+import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.4.23';
+import { DOCS, whtLines, roundNet, roundAdj, roundText, roundSeg } from './pv-common.js?v=10.4.23';
 
 // คำอธิบายหมวด: อะไรเข้าหมวดนี้บ้าง (การ์ดตอนชี้ที่ปุ่มหมวด + ใต้หมวดที่เลือก)
 const CAT_HINT = {
@@ -67,8 +67,10 @@ export async function render(ctx) {
   // ใบใหม่: กู้ร่างที่กรอกค้างไว้ (ไม่รวมไฟล์แนบ)
   const draft = old ? null : loadJSON(DRAFT_KEY, null);
   const src = old || draft || {};
+  const taxOld = !!old && (fin || !!meta.isFin1);
   const st = { type: (old?.kind === 'ADV' || draft?.type === 'ADV') ? 'ADV' : 'EXP', who: draft?.who || '', needJob: false, seq: 0, whoDept: '', whoOpen: false,
-    vat: fin ? Number(old.vatRate) || 0 : 0, wht: fin ? whtLines(old).map((w) => ({ rate: Number(w.rate), base: Number(w.base) })) : [], rnd: fin ? old.roundMode || '' : '' };
+    // ค่าภาษีเริ่มต้น = ของใบเดิม ทั้งตอนบัญชีแก้ใบ และตอนบัญชี 1 / 2 แก้ใบที่ตัวเองกรอกแล้วถูกตีกลับ (เดิมกรณีหลังเริ่มที่ 0 → ส่งใหม่แล้ว VAT / หัก ณ ที่จ่ายหายเงียบ ๆ)
+    vat: taxOld ? Number(old.vatRate) || 0 : 0, wht: taxOld ? whtLines(old).map((w) => ({ rate: Number(w.rate), base: Number(w.base) })) : [], rnd: taxOld ? old.roundMode || '' : '' };
   const staff = (meta.staff || []).filter((x) => x.email !== meta.me.email);
   const up = (a) => (a || []).map((d) => String(d).toUpperCase());
   const jobDepts = up(meta.jobDepts), jobCats = up(meta.jobCats || ['MATERIAL', 'SERVICE']), entCats = up(meta.entCats || ['ENT']);
@@ -312,7 +314,9 @@ export async function render(ctx) {
       if (st.wht.reduce((s, w) => s + Number(w.base), 0) > total() + 0.004) return 'ยอดฐานหัก ณ ที่จ่ายรวมเกินยอดก่อน VAT';
     }
     if (fin) {
-      if (paid && Math.abs(taxTotals().net - Number(old.amount)) > 0.004) return `ใบนี้จ่ายแล้ว ยอดสุทธิต้องเท่าเดิม (${money(old.amount)} บาท)`;
+      // จ่ายแล้ว: ยอดก่อนปัดเศษต้องเท่าเดิม · แก้การปัดเศษได้ (ตรงกับที่ฐานข้อมูลยอม · เดิมเช็คยอดหลังปัด → แก้การปัดเศษไม่ได้เลย)
+      const rawOld = r2(Number(old.amount) - roundAdj(old));
+      if (paid && Math.abs(taxTotals().raw - rawOld) > 0.004) return `ใบนี้จ่ายแล้ว ยอดก่อนปัดเศษต้องเท่าเดิม (${money(rawOld)} บาท) — แก้ได้เฉพาะการปัดเศษ`;
       return '';
     }
     if (!val('payBank')) return 'กรุณาใส่ธนาคาร';

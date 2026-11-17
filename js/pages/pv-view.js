@@ -1,8 +1,8 @@
 // ใบสำคัญจ่าย 1 ใบ — ขั้นอนุมัติ / กดอนุมัติ-ตีกลับ / บัญชี 1 เลือก VAT + หัก ณ ที่จ่ายหลายอัตรา / ส่วนของบัญชี (รอบจ่าย · วันที่ + No. ของบัญชี · แก้ไข · สลิป)
 // จ่ายเงิน (+ สลิปโอน) / เคลียร์ advance / พิมพ์ใบฟ้า
-import { api, money, fmtDate, fmtDateTime, esc, todayYMD, catName, loadPettyCategories } from '../core.js?v=10.4.22';
-import { icon, catIcon, toast, toastError, confirmBox, promptBox, busy, withBtn, sheet, thumbs, hydrateThumbs, receiptPicker, errorBox, skeleton, on, $, $$ } from '../ui.js?v=10.4.22';
-import { DOCS, KIND, isTest, stageBadge, kindBadge, roundBadge, roundLabel, whtLines, remarkText, deptInfo, lineDept, roundNet, roundAdj, roundText, roundSeg, voucherHtml, hydrateSigs, printVoucher, PRINT_SIZES, PRINT_ORIENTS, PRINT_COLORS, printPrefs, savePrintPrefs } from './pv-common.js?v=10.4.22';
+import { api, money, fmtDate, fmtDateTime, esc, todayYMD, catName, loadPettyCategories } from '../core.js?v=10.4.23';
+import { icon, catIcon, toast, toastError, confirmBox, promptBox, busy, withBtn, sheet, thumbs, hydrateThumbs, receiptPicker, errorBox, skeleton, on, $, $$ } from '../ui.js?v=10.4.23';
+import { DOCS, KIND, isTest, stageBadge, kindBadge, roundBadge, roundLabel, whtLines, remarkText, deptInfo, lineDept, roundNet, roundAdj, roundText, roundSeg, voucherHtml, hydrateSigs, printVoucher, PRINT_SIZES, PRINT_ORIENTS, PRINT_COLORS, printPrefs, savePrintPrefs } from './pv-common.js?v=10.4.23';
 
 const ACT = { submit: 'ส่งใบเบิก', resubmit: 'แก้แล้วส่งใหม่', approve: 'อนุมัติ', reject: 'ตีกลับ', pay: 'จ่ายเงิน', cancel: 'ยกเลิก',
   adv_clear: 'ส่งเคลียร์', adv_back: 'ตีกลับการเคลียร์', adv_ok: 'เคลียร์เรียบร้อย', edit: 'แก้ไขใบ', receipt: 'แนบใบเสร็จ', round: 'เลือกรอบจ่าย', slip: 'แนบสลิป' };
@@ -29,9 +29,14 @@ export async function render(ctx) {
       [st.v] = await Promise.all([api.rpc('get_pv', { p_id: id }), loadPettyCategories().catch(() => [])]);
       if (!ctx.alive()) return;
       ctx.setTitle(st.v.id);
-      // บัญชี 1 เคยเลือก VAT / หัก ณ ที่จ่ายแล้ว (ใบถูกตีกลับมา) → ใช้ค่าเดิม ไม่ต้องเลือกใหม่
-      // หรือบัญชี 1 เบิกเองแล้วใส่ VAT / หัก ณ ที่จ่ายมาในใบ (0056) → ตั้งค่าตามนั้นให้คนตรวจยืนยัน
-      if (st.v.isFin1Step && st.vat == null && ((st.v.history || []).some((h) => h.act === 'approve' && h.label === 'บัญชี 1')
+      // ตั้งค่า VAT / หัก ณ ที่จ่ายให้ล่วงหน้า เฉพาะเมื่อค่าในใบ "ยังใช้ได้":
+      //  · บัญชี 1 เลือกไว้หลังการส่งครั้งล่าสุด · หรือมีค่าในใบจริง (บัญชี 1 เบิกเองแล้วใส่มา · 0056) → ให้คนตรวจยืนยัน
+      //  · ใบถูกตีกลับแล้วส่งใหม่ = ค่าเดิมถูกล้างเป็น 0 (ตั้งแต่ 0064 ตีกลับ = กลับไปหาคนเบิกเสมอ) → ห้ามเดาว่า "ไม่มี VAT / ไม่หัก"
+      //    ให้บัญชี 1 เลือกใหม่ทุกครั้ง (เดิม: เห็น "ไม่มี / ไม่หัก" ถูกเลือกไว้ให้ กดอนุมัติได้ทันที → ยอดจ่ายผิด)
+      const hist = st.v.history || [];
+      let lastSend = -1; hist.forEach((h, i) => { if (h.act === 'submit' || h.act === 'resubmit') lastSend = i; });
+      const fin1After = hist.some((h, i) => i > lastSend && h.act === 'approve' && h.label === 'บัญชี 1');
+      if (st.v.isFin1Step && st.vat == null && (fin1After
           || Number(st.v.vatRate) > 0 || whtLines(st.v).length > 0 || !!st.v.roundMode)) {
         st.vat = Number(st.v.vatRate) || 0; st.wht = whtLines(st.v).map((w) => ({ rate: Number(w.rate), base: Number(w.base) })); st.rnd = st.v.roundMode || '';
       }

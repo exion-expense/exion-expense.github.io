@@ -1,6 +1,6 @@
 // ใช้ร่วมหน้าใบสำคัญจ่าย (ใบฟ้า): ป้ายสถานะ / แถวรายการ / ใบฟ้าสำหรับพิมพ์
-import { api, money, fmtDate, esc } from '../core.js?v=10.4.22';
-import { icon, catIcon } from '../ui.js?v=10.4.22';
+import { api, money, fmtDate, esc } from '../core.js?v=10.4.23';
+import { icon, catIcon } from '../ui.js?v=10.4.23';
 
 export const KIND = { PCJ: 'มี Job', PCN: 'ทั่วไป', ADV: 'Advance' };
 /** ใบทดลอง (ลบทิ้งทีหลัง) */
@@ -61,7 +61,8 @@ const thd = (d) => { if (!d) return ''; const t = new Date(d); return `${String(
  */
 export function signers(v) {
   const steps = v.steps || [];
-  const dept = steps.filter((s) => s.k === 'dept');
+  // ขั้น "หัวหน้าคนกรอก" (0074 · tag = filer) ไม่ใช่สายของคนเบิก → ไม่ลงช่องผู้ตรวจสอบ / ผู้อนุมัติ (แสดงในบรรทัดเล็กใต้ใบแทน)
+  const dept = steps.filter((s) => s.k === 'dept' && s.tag !== 'filer');
   const by = (s) => (s && s.state === 'done' ? { name: s.byName, sig: s.signature, at: s.at } : null);
   const f = (k) => steps.find((s) => s.k === k);
   const checked = dept.length ? by(dept.length > 1 ? dept[dept.length - 2] : dept[0]) : by(f('fin2'));
@@ -132,7 +133,7 @@ export function voucherHtml(v, { size = 'half', color = 'blue', rows = 0 } = {})
   const dpt = deptInfo(v), adj = roundAdj(v);
   const lay = size === 'a5' ? 'half' : size;   // A5 = หน้าตาแบบครึ่ง A4 พิมพ์ลงกระดาษ A5 ตรง ๆ
   const pad = Math.max(0, (rows || (lay === 'full' ? 12 : 4)) - lines.length);   // rows = จำนวนบรรทัดขั้นต่ำ (แนวนอนเต็มแผ่นใช้น้อยลง)
-  const others = (v.steps || []).filter((s) => s.k === 'fin2' || s.k === 'fin3').filter((s) => s.state === 'done')
+  const others = (v.steps || []).filter((s) => s.tag === 'filer' || s.k === 'fin2' || s.k === 'fin3').filter((s) => s.state === 'done')
     .map((s) => `${s.label}: ${esc(s.byName)} ${thd(s.at)}`);
   if (v.paidAt) others.push(`จ่ายแล้ว ${thd(v.paidAt)}`);
   return `<div class="pv-sheet pv-${lay} pv-c-${color}">

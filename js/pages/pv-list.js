@@ -1,7 +1,7 @@
 // ใบสำคัญจ่าย — รอฉัน / ของฉัน / ทั้งหมด · ค้นหาเลขใบ, Job, PO, Cost sheet, ผู้รับเงิน · กรองตามขั้น · อนุมัติหลายใบพร้อมกัน (ยกเว้นบัญชี 1 ที่ต้องเลือก VAT ทีละใบ)
-import { api, money, esc } from '../core.js?v=10.4.22';
-import { icon, toast, confirmBox, promptBox, busy, empty, errorBox, skeleton, debounce, on, $ } from '../ui.js?v=10.4.22';
-import { STAGES, pvRow } from './pv-common.js?v=10.4.22';
+import { api, money, esc } from '../core.js?v=10.4.23';
+import { icon, toast, confirmBox, promptBox, busy, empty, errorBox, skeleton, debounce, on, $ } from '../ui.js?v=10.4.23';
+import { STAGES, pvRow } from './pv-common.js?v=10.4.23';
 
 export async function render(ctx) {
   const { el, query } = ctx;
@@ -78,7 +78,7 @@ export async function render(ctx) {
     const sum = items.reduce((s, x) => s + Number(x.amount || 0), 0);
     let remark = '';
     if (action === 'reject') {
-      remark = await promptBox({ title: `ตีกลับ ${items.length} ใบ`, label: 'เหตุผล (ใช้กับทุกใบที่เลือก)', hint: 'แต่ละใบจะถอยกลับไปขั้นก่อนหน้า 1 ขั้น', required: true, ok: 'ตีกลับทั้งหมด', danger: true });
+      remark = await promptBox({ title: `ตีกลับ ${items.length} ใบ`, label: 'เหตุผล (ใช้กับทุกใบที่เลือก)', hint: 'แต่ละใบจะกลับไปหาคนเบิกให้แก้ แล้วเริ่มอนุมัติใหม่ตั้งแต่ขั้นแรก', required: true, ok: 'ตีกลับทั้งหมด', danger: true });
       if (remark == null) return;
     } else if (!(await confirmBox({ title: `อนุมัติ ${items.length} ใบ`, message: `รวม ${money(sum)} บาท`, ok: 'อนุมัติทั้งหมด' }))) return;
     let done = 0; const fails = [];
