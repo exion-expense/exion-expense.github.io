@@ -2,8 +2,8 @@
 //  shell.js — โครงหน้าแอป (เมนูข้าง / แถบล่าง / กระดิ่ง) + ตัวเปลี่ยนหน้า (hash router)
 //  เพิ่มหน้าใหม่: ใส่ใน ROUTES แล้วสร้างไฟล์ js/pages/<ชื่อ>.js ที่ export render(ctx)
 // ════════════════════════════════════════════════════════════════════
-import { api, auth, state, loadProfile, loadCategories, esc, initials, roleLabel, timeAgo, fmtDate, cfg, MOCK_MODE } from './core.js?v=10.4.25';
-import { icon, sheet, toast, errorBox, skeleton, $ } from './ui.js?v=10.4.25';
+import { api, auth, state, loadProfile, loadCategories, esc, initials, roleLabel, timeAgo, fmtDate, cfg, MOCK_MODE } from './core.js?v=10.4.26';
+import { icon, sheet, toast, errorBox, skeleton, $ } from './ui.js?v=10.4.26';
 
 const r = (p) => p || {};
 const isApprover = (p) => r(p.role).isManager || r(p.role).isSenior || r(p.role).isGM;
@@ -30,9 +30,10 @@ const ROUTES = [
   { path: '/petty', page: 'petty-home', title: 'เงินสดย่อย', app: 'petty', nav: 'p-home', icon: 'home' },
   { path: '/petty/request', page: 'pv-new', title: 'ขอเบิก (ใบสำคัญจ่าย)', app: 'petty', nav: 'p-request', icon: 'plus-circle' },
   { path: '/pv', page: 'pv-list', title: 'ใบสำคัญจ่าย', app: 'petty', nav: 'p-pv', icon: 'receipt' },
+  { path: '/pv/adv', page: 'pv-adv', title: 'เคลียร์ advance', app: 'petty', nav: 'p-adv', icon: 'coins' },
   { path: '/pv/view', page: 'pv-view', title: 'ใบสำคัญจ่าย', app: 'petty', nav: 'p-pv', back: '/pv' },
   { path: '/pv/new', page: 'pv-new', title: 'แก้ไขใบสำคัญจ่าย', app: 'petty', nav: 'p-pv', back: '/pv' },
-  { path: '/pv/clear', page: 'pv-clear', title: 'เคลียร์ advance', app: 'petty', nav: 'p-pv', back: '/pv' },
+  { path: '/pv/clear', page: 'pv-clear', title: 'เคลียร์ advance', app: 'petty', nav: 'p-adv', back: '/pv/adv' },
   { path: '/pv/dashboard', page: 'pv-dash', title: 'Dashboard ใบสำคัญจ่าย', app: 'petty', nav: 'p-dash', icon: 'chart',
     show: (p) => r(p.role).isAccountant || r(p.role).isGM || r(p.role).isCEO || r(p.role).canViewAll || r(p.role).isViewer },
   { path: '/pv/report', page: 'pv-report', title: 'รายการที่จ่ายแล้ว', app: 'petty', nav: 'p-pv', back: '/pv' },
@@ -103,7 +104,7 @@ async function route() {
   const app = document.getElementById('app');
   if (!auth.user) {
     closeBell();
-    const m = await import('./pages/login.js?v=10.4.25');
+    const m = await import('./pages/login.js?v=10.4.26');
     if (seq !== renderSeq) return;
     document.title = 'เข้าสู่ระบบ · EXION Expense';
     return m.render({ el: app, query, go, onLoggedIn: () => { const back = sessionStorage.getItem('exion_after_login'); sessionStorage.removeItem('exion_after_login'); go(back && back !== '/login' ? back : '/'); } });
@@ -153,7 +154,7 @@ async function route() {
 
 // ─────────────── เวอร์ชันแอป ───────────────
 // เปลี่ยนพร้อม sw.js / index.html ทุกครั้งที่อัปเว็บ (ใช้ต่อท้ายไฟล์ทุกไฟล์ที่ import → ได้ไฟล์ชุดเดียวกันเสมอ)
-const APP_V = '10.4.25';
+const APP_V = '10.4.26';
 let verAt = 0, verNew = false;
 async function newerVersion() {
   if (verNew) return true;

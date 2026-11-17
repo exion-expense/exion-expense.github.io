@@ -1,7 +1,7 @@
 // เคลียร์ advance — กรอกตารางตามฟอร์ม Expenses Claim: วันที่ / รายการ / จำนวนเงิน / มี-ไม่มีใบเสร็จ / หมายเหตุ
 // บันทึกร่างได้ (กรอกทีละวัน) · ยอดใช้จริง = ผลรวมของตาราง · ใช้เกินยอด advance ได้ (ส่วนเกินไปเบิกใบฟ้าหลังบัญชีตรวจ)
-import { api, money, fmtDate, esc, todayYMD } from '../core.js?v=10.4.25';
-import { icon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, skeleton, debounce, on, $, $$ } from '../ui.js?v=10.4.25';
+import { api, money, fmtDate, esc, todayYMD } from '../core.js?v=10.4.26';
+import { icon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, skeleton, debounce, on, $, $$ } from '../ui.js?v=10.4.26';
 
 const OTHER = '__other__';
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;

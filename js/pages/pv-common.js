@@ -1,6 +1,6 @@
 // ใช้ร่วมหน้าใบสำคัญจ่าย (ใบฟ้า): ป้ายสถานะ / แถวรายการ / ใบฟ้าสำหรับพิมพ์
-import { api, money, fmtDate, esc } from '../core.js?v=10.4.25';
-import { icon, catIcon } from '../ui.js?v=10.4.25';
+import { api, money, fmtDate, esc } from '../core.js?v=10.4.26';
+import { icon, catIcon } from '../ui.js?v=10.4.26';
 
 export const KIND = { PCJ: 'มี Job', PCN: 'ทั่วไป', ADV: 'Advance' };
 /** ใบทดลอง (ลบทิ้งทีหลัง) */
@@ -16,7 +16,7 @@ export function roundBadge(x) {
 }
 export const STAGES = [
   ['', 'ทั้งหมด'], ['dept', 'รออนุมัติ'], ['fin1', 'บัญชี 1'], ['fin2', 'บัญชี 2'], ['fin3', 'บัญชี 3'],
-  ['pay', 'รอจ่าย'], ['d20', 'รอบวันที่ 20'], ['adv_open', 'Advance ค้าง'], ['adv_check', 'รอตรวจเคลียร์'], ['returned', 'ตีกลับ'], ['paid', 'จ่ายแล้ว'], ['cancelled', 'ยกเลิก'],
+  ['pay', 'รอจ่าย'], ['d20', 'รอบวันที่ 20'], ['adv_open', 'รอเคลียร์ advance'], ['adv_check', 'รอตรวจเคลียร์'], ['returned', 'ตีกลับ'], ['paid', 'จ่ายแล้ว'], ['cancelled', 'ยกเลิก'],
 ];
 
 const daysSince = (t) => Math.max(0, Math.floor((Date.now() - new Date(t).getTime()) / 86400e3));

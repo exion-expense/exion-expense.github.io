@@ -1,6 +1,6 @@
 // หน้าแรกเงินสดย่อย — เงินในกล่อง / ทางลัด / คำขอล่าสุด / งานที่รอ (ผู้อนุมัติ, คนถือกล่อง)
-import { api, money, fmtDate, esc, catName, statusBadge, loadPettyCategories } from '../core.js?v=10.4.25';
-import { icon, catIcon, empty, errorBox, skeleton, on } from '../ui.js?v=10.4.25';
+import { api, money, fmtDate, esc, catName, statusBadge, loadPettyCategories } from '../core.js?v=10.4.26';
+import { icon, catIcon, empty, errorBox, skeleton, on } from '../ui.js?v=10.4.26';
 
 // กล่องเงินที่เลือกไว้ (ใช้ร่วมทุกหน้าเงินสดย่อย) · ว่าง = กล่องหลัก
 const FUND_KEY = 'exion_petty_fund';
@@ -45,6 +45,8 @@ async function loadHome(ctx, st) {
   const d = st.home;
   // ใบสำคัญจ่ายที่รอฉัน (อนุมัติ / จ่าย / ตรวจเคลียร์)
   api.rpc('get_pv_todo_count', {}, { quiet: true }).then((n) => { st.pv = Number(n) || 0; if (ctx.alive() && st.pv) paint(ctx, st); }).catch(() => {});
+  // advance ของฉันที่รอกรอกตารางเคลียร์ → ตัวเลขบนการ์ด "เคลียร์ advance"
+  api.rpc('get_pv_list', { p_scope: 'mine', p_q: '', p_stage: 'adv_open', p_limit: 50 }, { quiet: true }).then((x) => { st.adv = (x || []).length; if (ctx.alive() && st.adv) paint(ctx, st); }).catch(() => {});
   // มีงานรอ → ดึงรายการมาแสดงบางส่วน
   if (d && (d.toApprove || d.toPay)) {
     api.load('get_petty_inbox', args(), (x) => { st.inbox = x; if (ctx.alive()) paint(ctx, st); }).catch(() => {});
@@ -93,6 +95,8 @@ function paint(ctx, st) {
       <div class="stack">
         ${st.pv ? `<a class="card row" href="#/pv?scope=todo"><span class="row-icon c-red">${icon('receipt')}</span><div class="row-main"><div class="row-title">ใบสำคัญจ่ายรอคุณ <span class="badge b-pending plain">${st.pv}</span></div>
           <div class="row-sub">อนุมัติ / จ่ายเงิน / ตรวจเคลียร์ advance</div></div>${icon('chevron-right')}</a>` : ''}
+        <a class="card row" href="#/pv/adv"><span class="row-icon c-teal">${icon('coins')}</span><div class="row-main"><div class="row-title">เคลียร์ advance${st.adv ? ` <span class="badge b-pending plain">${st.adv}</span>` : ''}</div>
+          <div class="row-sub">${st.adv ? 'มี advance รอกรอกตารางเคลียร์' : 'กรอกตารางเคลียร์ / เบิกส่วนเกิน / Excel'}</div></div>${icon('chevron-right')}</a>
         ${pendingCard(d, st.inbox)}
         ${recentCard(d, profile)}
       </div>

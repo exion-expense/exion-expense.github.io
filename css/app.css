@@ -738,3 +738,8 @@ a.stat { text-decoration: none; color: inherit; display: block; }
 .clr-sum .k { color: var(--muted); } .clr-sum .v { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
 .clr-sum .tot { border-top: 1px solid var(--line); padding-top: 8px; font-size: 16px; color: var(--ink); font-weight: 650; }
 .clr-sum .tot.over { color: var(--warn); } .clr-sum .tot.back { color: var(--ok); }
+
+/* ─── หน้ารวมเคลียร์ advance (pv-adv) ─── */
+.adv-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; align-items: start; }
+.adv-item .adv-end { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.adv-item .adv-btn { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; }
