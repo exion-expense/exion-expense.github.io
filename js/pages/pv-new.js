@@ -1,9 +1,9 @@
 // ขอเบิก Petty Cash (ใบสำคัญจ่าย) — ค่าใช้จ่าย / Advance entertain · เลือกหมวดทุกบรรทัด · HR กรอกแทนได้ · แก้ใบที่ถูกตีกลับ (?id=)
 // บัญชีแก้ไขใบ (?id=&fin=1): แก้ได้ทุกช่อง + VAT / หัก ณ ที่จ่าย + รหัสแผนก · ไม่เริ่มสายอนุมัติใหม่
 // บัญชี (ทั้งตอนเบิกเอง / กรอกแทน / แก้ไข) เลือกแผนกรายบรรทัดได้ = ลงต้นทุนแยกทีม
-import { api, money, esc, todayYMD, loadPettyCategories, state } from '../core.js?v=10.4.23';
-import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.4.23';
-import { DOCS, whtLines, roundNet, roundAdj, roundText, roundSeg } from './pv-common.js?v=10.4.23';
+import { api, money, esc, todayYMD, loadPettyCategories, state } from '../core.js?v=10.4.24';
+import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.4.24';
+import { DOCS, whtLines, roundNet, roundAdj, roundText, roundSeg } from './pv-common.js?v=10.4.24';
 
 // คำอธิบายหมวด: อะไรเข้าหมวดนี้บ้าง (การ์ดตอนชี้ที่ปุ่มหมวด + ใต้หมวดที่เลือก)
 const CAT_HINT = {
@@ -102,7 +102,7 @@ export async function render(ctx) {
         <button type="button" data-t="EXP" class="${st.type === 'EXP' ? 'on' : ''}">${icon('receipt', 'sm')} ค่าใช้จ่าย</button>
         <button type="button" data-t="ADV" class="${st.type === 'ADV' ? 'on' : ''}">${icon('utensils', 'sm')} Advance entertain</button></div>` : ''}
       ${meta.canBehalf && !old ? `<div class="field"><label>เบิกให้</label><div class="pv-who" data-whobox></div>
-        <div class="hint">HR / บัญชีกรอกแทนได้ — ใบเป็นของคนที่เลือก และขึ้นว่ากรอกโดยคุณ</div></div>` : ''}
+        <div class="hint">กรอกแทนคนอื่นได้ — ใบเป็นของคนที่เลือก และขึ้นว่ากรอกโดยคุณ</div></div>` : ''}
       <p class="hint" data-typehint></p>
     </div>` : ''}
 
@@ -131,7 +131,7 @@ export async function render(ctx) {
     <div class="card pad stack-sm">
       <div class="flex between wrap"><b>รายการ</b><span class="text-sm muted">${tax ? 'ยอดก่อน VAT' : 'ยอดก่อน VAT · บัญชีเป็นคนใส่ VAT / หัก ณ ที่จ่าย'}</span></div>
       <p class="hint" data-officehint></p>
-      ${lineDeptOn ? '<p class="hint">บัญชี / HR: เลือก "ลงต้นทุนแผนก" ได้ทีละบรรทัด เช่น ค่าศุลกากรของทีม E&amp;I กับ SI · ใบฟ้า / MSBC / รายงานแยกตามแผนกให้เอง · สายอนุมัติไม่เปลี่ยน</p>' : ''}
+      ${lineDeptOn ? '<p class="hint">เลือก "ลงต้นทุนแผนก" ได้ทีละบรรทัด เช่น ค่าศุลกากรของทีม E&amp;I กับ SI · ใบฟ้า / MSBC / รายงานแยกตามแผนกให้เอง · สายอนุมัติไม่เปลี่ยน</p>' : ''}
       <div class="stack-sm" data-lines></div>
       <button type="button" class="add-item" data-act="add-line">${icon('plus')} เพิ่มบรรทัด</button>
     </div>
@@ -145,7 +145,7 @@ export async function render(ctx) {
           <div class="flex gap-8"><input class="input grow" id="pv-job" data-f="jobNo" maxlength="50" value="${esc(src.jobNo || '')}">
             ${fin ? '' : '<button type="button" class="btn btn-ghost btn-sm nowrap" data-act="job-none" title="ไม่มี Job · ใช้ Job กลาง">ไม่มี Job (Z-NONE)</button>'}</div>
           <div class="hint hidden" data-jobhint>ซื้อของหน้างาน ต้องใช้ Job No. จริง</div></div>
-        <div class="field"><label data-jreq for="pv-po">PO No.</label><input class="input" id="pv-po" data-f="poNo" maxlength="50" value="${esc(src.poNo || '')}"></div>
+        <div class="field"><label data-jreq for="pv-po">PO No. <span class="opt" style="color:var(--warn)">PO ที่เปิดให้ผู้ขาย ไม่ใช่ PO ลูกค้า</span></label><input class="input" id="pv-po" data-f="poNo" maxlength="50" value="${esc(src.poNo || '')}"></div>
         <div class="field"><label data-jreq for="pv-cs">Cost sheet No.</label><input class="input" id="pv-cs" data-f="costSheetNo" maxlength="50" value="${esc(src.costSheetNo || '')}"></div>
         <div class="field"><label for="pv-dd">วันที่จัดส่งสินค้า <span class="opt">ไม่บังคับ</span></label><input type="date" class="input" id="pv-dd" data-f="deliveryDate" value="${esc(src.deliveryDate || '')}"></div>
       </div>
@@ -154,7 +154,7 @@ export async function render(ctx) {
     <div class="card pad stack-sm" data-filebox>
       <b>ไฟล์แนบ</b> <span class="text-sm muted">ถ่ายรูปหรือเลือกไฟล์ (รูป / PDF)</span>
       <div class="hint" data-docmin>ต้องแนบอย่างน้อย 1 อย่าง (ช่องไหนก็ได้)</div>
-      ${DOCS.map(([k, label]) => `<div class="field" data-doc="${k}"><label>${label}</label><div data-picker="${k}"></div></div>`).join('')}
+      ${DOCS.map(([k, label]) => `<div class="field" data-doc="${k}"><label>${label}${k === 'po' ? ' <span class="opt" style="color:var(--warn)">ต้องเป็น PO ที่เปิดให้ผู้ขาย ไม่ใช่ PO ลูกค้า</span>' : ''}</label><div data-picker="${k}"></div></div>`).join('')}
     </div>
 
     <div class="card pad stack-sm">
