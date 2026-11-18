@@ -726,6 +726,14 @@ a.stat { text-decoration: none; color: inherit; display: block; }
 .clr-lab { display: none; font-size: 12.5px; color: var(--muted); margin-bottom: 4px; }
 .clr-row .seg { display: flex; width: 100%; } .clr-row .seg button { flex: 1; padding: 10px 4px; }
 .clr-rm { align-self: center; }
+/* ไฟล์ของบรรทัด: แถวที่สองของบรรทัด (เต็มความกว้าง) */
+.c-files { grid-column: 2 / -1; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.c-files.hidden { display: none; }
+.clr-flab { font-size: 12.5px; color: var(--muted); }
+.c-files .thumb { width: 56px; height: 56px; border-radius: 10px; }
+.c-files .thumb.add { font-size: 10px; }
+.thumbs-sm { margin-top: 4px; } .thumbs-sm .thumbs { gap: 4px; flex-wrap: nowrap; }
+.thumbs-sm .thumb { width: 40px; height: 40px; border-radius: 8px; font-size: 9.5px; }
 @media (max-width: 1099px) {
   .clr-head { display: none; }
   .clr-row { grid-template-columns: 26px minmax(0, 1fr) minmax(0, 1fr) 34px;
@@ -733,6 +741,7 @@ a.stat { text-decoration: none; color: inherit; display: block; }
   .clr-no { grid-area: no; align-self: end; padding-bottom: 12px; } .c-date { grid-area: date; } .c-desc { grid-area: desc; } .c-amt { grid-area: amt; }
   .c-rc { grid-area: rc; } .c-rm { grid-area: rmk; } .clr-rm { grid-area: rm; align-self: end; margin-bottom: 6px; }
   .clr-lab { display: block; }
+  .c-files { grid-column: 1 / -1; }
 }
 .clr-sum { display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; font-size: 14.5px; }
 .clr-sum .k { color: var(--muted); } .clr-sum .v { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }

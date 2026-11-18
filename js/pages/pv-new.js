@@ -1,9 +1,9 @@
 // ขอเบิก Petty Cash (ใบสำคัญจ่าย) — ค่าใช้จ่าย / Advance entertain · เลือกหมวดทุกบรรทัด · HR กรอกแทนได้ · แก้ใบที่ถูกตีกลับ (?id=)
 // บัญชีแก้ไขใบ (?id=&fin=1): แก้ได้ทุกช่อง + VAT / หัก ณ ที่จ่าย + รหัสแผนก · ไม่เริ่มสายอนุมัติใหม่
 // บัญชี (ทั้งตอนเบิกเอง / กรอกแทน / แก้ไข) เลือกแผนกรายบรรทัดได้ = ลงต้นทุนแยกทีม
-import { api, money, esc, todayYMD, loadPettyCategories, state } from '../core.js?v=10.4.26';
-import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.4.26';
-import { DOCS, whtLines, roundNet, roundAdj, roundText, roundSeg } from './pv-common.js?v=10.4.26';
+import { api, money, esc, todayYMD, loadPettyCategories, state } from '../core.js?v=10.4.27';
+import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.4.27';
+import { DOCS, whtLines, roundNet, roundAdj, roundText, roundSeg } from './pv-common.js?v=10.4.27';
 
 // คำอธิบายหมวด: อะไรเข้าหมวดนี้บ้าง (การ์ดตอนชี้ที่ปุ่มหมวด + ใต้หมวดที่เลือก)
 const CAT_HINT = {
@@ -62,6 +62,8 @@ export async function render(ctx) {
   if (!ctx.alive()) return;
   const fin = !!(old && query.fin && old.canFinEdit);   // บัญชีแก้ไขใบ
   if (old && !fin && !old.canEdit) { ctx.go('/pv/view?id=' + encodeURIComponent(old.id)); return; }
+  // 0079: ใบที่ออกจากตารางเคลียร์ (ไม่มีใบ advance) → คนเบิกแก้ที่ตาราง (ยอดใบ = ผลรวมตาราง) · บัญชีแก้ไขใบ (fin) ใช้ฟอร์มนี้ได้ตามเดิม
+  if (old && !fin && (old.history || []).some((h) => h.act === 'clr')) { ctx.go('/pv/clear?id=' + encodeURIComponent(old.id)); return; }
   if (old) ctx.setTitle((fin ? 'บัญชีแก้ไข ' : 'แก้ไข ') + old.id);
 
   // ใบใหม่: กู้ร่างที่กรอกค้างไว้ (ไม่รวมไฟล์แนบ)

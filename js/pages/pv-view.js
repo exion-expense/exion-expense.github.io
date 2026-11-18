@@ -1,11 +1,11 @@
 // ใบสำคัญจ่าย 1 ใบ — ขั้นอนุมัติ / กดอนุมัติ-ตีกลับ / บัญชี 1 เลือก VAT + หัก ณ ที่จ่ายหลายอัตรา / ส่วนของบัญชี (รอบจ่าย · วันที่ + No. ของบัญชี · แก้ไข · สลิป)
 // จ่ายเงิน (+ สลิปโอน) / เคลียร์ advance / พิมพ์ใบฟ้า
-import { api, money, fmtDate, fmtDateTime, esc, todayYMD, catName, loadPettyCategories } from '../core.js?v=10.4.26';
-import { icon, catIcon, toast, toastError, confirmBox, promptBox, busy, withBtn, sheet, thumbs, hydrateThumbs, receiptPicker, errorBox, skeleton, on, $, $$ } from '../ui.js?v=10.4.26';
-import { DOCS, KIND, isTest, stageBadge, kindBadge, roundBadge, roundLabel, whtLines, remarkText, deptInfo, lineDept, roundNet, roundAdj, roundText, roundSeg, voucherHtml, hydrateSigs, printVoucher, PRINT_SIZES, PRINT_ORIENTS, PRINT_COLORS, printPrefs, savePrintPrefs } from './pv-common.js?v=10.4.26';
+import { api, money, fmtDate, fmtDateTime, esc, todayYMD, catName, loadPettyCategories } from '../core.js?v=10.4.27';
+import { icon, catIcon, toast, toastError, confirmBox, promptBox, busy, withBtn, sheet, thumbs, hydrateThumbs, receiptPicker, errorBox, skeleton, on, $, $$ } from '../ui.js?v=10.4.27';
+import { DOCS, KIND, isTest, stageBadge, kindBadge, roundBadge, roundLabel, whtLines, remarkText, deptInfo, lineDept, roundNet, roundAdj, roundText, roundSeg, voucherHtml, hydrateSigs, printVoucher, PRINT_SIZES, PRINT_ORIENTS, PRINT_COLORS, printPrefs, savePrintPrefs } from './pv-common.js?v=10.4.27';
 
 const ACT = { submit: 'ส่งใบเบิก', resubmit: 'แก้แล้วส่งใหม่', approve: 'อนุมัติ', reject: 'ตีกลับ', pay: 'จ่ายเงิน', cancel: 'ยกเลิก',
-  adv_clear: 'ส่งเคลียร์', adv_back: 'ตีกลับการเคลียร์', adv_ok: 'เคลียร์เรียบร้อย', adv_extra: 'ส่งใบส่วนเกิน', edit: 'แก้ไขใบ', receipt: 'แนบใบเสร็จ', round: 'เลือกรอบจ่าย', slip: 'แนบสลิป' };
+  adv_clear: 'ส่งเคลียร์', adv_back: 'ตีกลับการเคลียร์', adv_ok: 'เคลียร์เรียบร้อย', adv_extra: 'ส่งใบส่วนเกิน', clr: 'ตารางเคลียร์', edit: 'แก้ไขใบ', receipt: 'แนบใบเสร็จ', round: 'เลือกรอบจ่าย', slip: 'แนบสลิป' };
 const WHT_RATES = [1, 3, 5];
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
@@ -42,7 +42,8 @@ export async function render(ctx) {
       }
       st.cash = (st.v.canPay || st.v.canSetRound) ? await api.rpc('get_pv_cash_check', {}, { quiet: true }).catch(() => null) : null;
       // ตารางเคลียร์: ใบ advance เอง หรือใบส่วนเกินที่สร้างจากการเคลียร์ (ดูตารางของ advance ต้นทาง) · ฐานข้อมูลยังไม่มี (ยังไม่รัน 0078) = null → ใช้แบบเดิม
-      const fromAdv = st.v.kind !== 'ADV' && (st.v.history || []).some((h) => /^สร้างจากการเคลียร์ /.test(h.label || ''));
+      //  0079: ใบฟ้าที่ออกจากตารางเคลียร์แบบไม่มีใบ advance (ประวัติมี act = clr) → ตารางอยู่ในใบนี้เอง (st.adv.direct)
+      const fromAdv = st.v.kind !== 'ADV' && (st.v.history || []).some((h) => h.act === 'clr' || /^สร้างจากการเคลียร์ /.test(h.label || ''));
       st.adv = (st.v.kind === 'ADV' && st.v.status === 'Paid') || fromAdv ? await api.rpc('get_pv_adv', { p_id: st.v.id }, { quiet: true }).catch(() => null) : null;
       if (ctx.alive()) paint();
     } catch (e) { if (ctx.alive()) errorBox(el, e, load); }
@@ -60,7 +61,7 @@ export async function render(ctx) {
     <div class="stack">
       <div class="card pad stack-sm">
         <div class="flex between wrap gap-8">
-          <div class="stack-sm" style="gap:4px"><div class="flex wrap gap-8"><b class="mono text-lg">${esc(v.id)}</b>${isTest(v.id) ? '<span class="badge b-pending">ข้อมูลทดลอง</span>' : ''}${kindBadge(v.kind)}${v.isOffice ? '<span class="badge b-info plain">Office expenses</span>' : ''}</div>
+          <div class="stack-sm" style="gap:4px"><div class="flex wrap gap-8"><b class="mono text-lg">${esc(v.id)}</b>${isTest(v.id) ? '<span class="badge b-pending">ข้อมูลทดลอง</span>' : ''}${kindBadge(v.kind)}${v.isOffice ? '<span class="badge b-info plain">Office expenses</span>' : ''}${st.adv?.direct ? '<span class="badge b-info plain">เคลียร์ advance · ไม่มีใบ advance</span>' : ''}</div>
             <div><b>${esc(v.supplier || v.payee)}</b></div>
             <div class="text-sm muted">${esc(v.requesterName)}${v.department ? ' · ' + esc(v.department) : ''}${v.onBehalfBy ? ` · <span class="badge b-info plain">กรอกโดย ${esc(v.onBehalfBy)}</span>` : ''} · ${fmtDateTime(v.createdAt)}</div></div>
           <div class="text-right"><div class="callout-amount"><span class="v amount">${money(v.amount)}</span><span class="muted">บาท</span></div>
@@ -190,7 +191,10 @@ export async function render(ctx) {
         <div class="btn-row"><button type="button" class="btn btn-danger" data-act="adv-back">${icon('x')} ตีกลับ</button>
         <button type="button" class="btn btn-success" data-act="adv-ok">${icon('check')} ยืนยันเคลียร์</button></div></div>`);
     }
-    if (v.canEdit) parts.push(`<div class="btn-row"><a class="btn btn-primary" href="#/pv/new?id=${encodeURIComponent(v.id)}">${icon('edit')} แก้ไขแล้วส่งใหม่</a></div>`);
+    // ใบที่ออกจากตารางเคลียร์ (ไม่มีใบ advance) → แก้ที่ตาราง (ยอดใบ = ผลรวมตาราง) · ใบอื่นแก้ที่ฟอร์มใบฟ้า
+    if (v.canEdit) parts.push(st.adv?.direct
+      ? `<div class="btn-row"><a class="btn btn-primary" href="#/pv/clear?id=${encodeURIComponent(v.id)}">${icon('edit')} แก้ตารางแล้วส่งใหม่</a></div>`
+      : `<div class="btn-row"><a class="btn btn-primary" href="#/pv/new?id=${encodeURIComponent(v.id)}">${icon('edit')} แก้ไขแล้วส่งใหม่</a></div>`);
     if (v.canAddReceipt) parts.push(`<div class="stack-sm"><b>แนบใบเสร็จเพิ่ม</b><div class="text-sm muted">ได้ใบเสร็จมาทีหลัง แนบที่นี่ได้เลย · ไม่ต้องส่งใบใหม่ · สถานะใบไม่เปลี่ยน</div><div data-rcpt2pick></div>
       <div><button type="button" class="btn btn-secondary btn-sm" data-act="add-rcpt">${icon('paperclip', 'sm')} แนบใบเสร็จ</button></div></div>`);
     if (v.canCancel) parts.push(`<div class="btn-row"><button type="button" class="btn btn-ghost btn-sm" data-act="cancel">${icon('trash', 'sm')} ยกเลิกใบนี้</button></div>`);
@@ -208,20 +212,24 @@ export async function render(ctx) {
   // ตารางเคลียร์ advance (อ่านอย่างเดียว) — แสดงหลังส่งเคลียร์แล้ว ทั้งในใบ advance และใบส่วนเกินของมัน
   function advCard(v) {
     const a = st.adv;
-    if (!a || !a.status) return '';
+    if (!a || (!a.status && !a.direct)) return '';
     const rows = a.rows || [], paths = a.paths || [], slips = a.returnPaths || [];
     if (!rows.length && !paths.length && !slips.length) return '';
     const sum = rows.length ? r2(rows.reduce((s, r) => s + (Number(r.amount) || 0), 0)) : r2(a.actual), rem = r2(Number(a.amount) - sum);
+    // ไม่มีใบ advance: ยอดก่อน VAT ของใบ = ผลรวมตาราง · ต่างกัน = บัญชีแก้ยอดในใบ (ตารางคงตามที่คนเบิกกรอก)
+    const off = a.direct && Math.abs(r2(a.voucherBase) - sum) > 0.004;
     return `<div class="card pad stack-sm">
-      <div class="flex between wrap"><b>${icon('sheet', 'sm')} ตารางเคลียร์ advance${v.kind !== 'ADV' ? ` <a href="#/pv/view?id=${encodeURIComponent(a.id)}">${esc(a.id)}</a>` : ''}</b>
+      <div class="flex between wrap"><b>${icon('sheet', 'sm')} ตารางเคลียร์ advance${a.direct ? ' <span class="badge b-info plain">ไม่มีใบ advance</span>' : v.kind !== 'ADV' ? ` <a href="#/pv/view?id=${encodeURIComponent(a.id)}">${esc(a.id)}</a>` : ''}</b>
         ${rows.length ? `<button type="button" class="btn btn-secondary btn-sm" data-act="adv-xlsx">${icon('download', 'sm')} Excel</button>` : ''}</div>
       ${a.trip ? `<div class="text-sm">Trip: <b>${esc(a.trip)}</b></div>` : ''}
       ${rows.length ? `<div class="table-wrap" style="max-height:none"><table class="tbl"><thead><tr><th>#</th><th>วันที่</th><th>รายการ</th><th class="r">จำนวนเงิน</th><th>ใบเสร็จ</th><th>หมายเหตุ</th></tr></thead><tbody>
-        ${rows.map((r, i) => `<tr><td>${i + 1}</td><td class="nowrap">${r.date ? fmtDate(r.date) : ''}</td><td>${esc(r.desc)}</td><td class="r">${money(r.amount)}</td><td>${r.receipt === false ? '<span class="badge b-pending plain">ไม่มี</span>' : 'มี'}</td><td>${esc(r.remark || '')}</td></tr>`).join('')}
-        </tbody><tfoot><tr><td></td><td></td><td>รวมใช้จริง (${rows.length} รายการ)</td><td class="r">${money(sum)}</td><td></td><td></td></tr></tfoot></table></div>` : ''}
-      <div class="text-sm">รับ advance ${money(a.amount)} · ใช้จริง <b>${money(sum)}</b> → ${rem > 0 ? `คงเหลือ คืนบริษัท <b>${money(rem)}</b>` : rem < 0 ? `ใช้เกิน <b>${money(-rem)}</b>` : 'ยอดตรงกัน'}</div>
+        ${rows.map((r, i) => `<tr><td>${i + 1}</td><td class="nowrap">${r.date ? fmtDate(r.date) : ''}</td><td>${esc(r.desc)}</td><td class="r">${money(r.amount)}</td><td>${r.receipt === false ? '<span class="badge b-pending plain">ไม่มี</span>' : `มี${(r.files || []).length ? `<div class="thumbs-sm">${thumbs(r.files)}</div>` : ''}`}</td><td>${esc(r.remark || '')}</td></tr>`).join('')}
+        </tbody><tfoot><tr><td></td><td></td><td>${a.direct ? 'รวมที่จ่ายไป' : 'รวมใช้จริง'} (${rows.length} รายการ)</td><td class="r">${money(sum)}</td><td></td><td></td></tr></tfoot></table></div>` : ''}
+      ${a.direct ? `<div class="text-sm">จ่ายไปก่อน ไม่ได้ขอ advance · รวมตาราง <b>${money(sum)}</b> บาท = ยอดที่เบิกในใบนี้</div>
+        ${off ? `<div class="alert warn">${icon('info')}<div>ยอดก่อน VAT ของใบ (${money(a.voucherBase)}) ไม่เท่ากับผลรวมของตาราง (${money(sum)}) — บัญชีแก้ไขยอดในใบ ดูรายละเอียดในประวัติ</div></div>` : ''}`
+        : `<div class="text-sm">รับ advance ${money(a.amount)} · ใช้จริง <b>${money(sum)}</b> → ${rem > 0 ? `คงเหลือ คืนบริษัท <b>${money(rem)}</b>` : rem < 0 ? `ใช้เกิน <b>${money(-rem)}</b>` : 'ยอดตรงกัน'}</div>`}
       ${a.note ? `<div class="text-sm muted">“${esc(a.note)}”</div>` : ''}
-      ${paths.length ? `<div><div class="text-sm muted mb-8">ใบเสร็จ (${paths.length})</div>${thumbs(paths)}</div>` : ''}
+      ${paths.length ? `<div><div class="text-sm muted mb-8">${a.rowFiles ? 'ไฟล์อื่นๆ' : 'ใบเสร็จ'} (${paths.length})</div>${thumbs(paths)}</div>` : ''}
       ${slips.length ? `<div><div class="text-sm muted mb-8">สลิปโอนคืนเงินที่เหลือ (${slips.length})</div>${thumbs(slips)}</div>` : ''}
     </div>`;
   }
@@ -236,7 +244,7 @@ export async function render(ctx) {
         <dl class="kv">${[
           ['ประเภท', 'ใบฟ้าปกติ (ไม่ใช่ advance)'], ['รายการ', `Clear advance trip${a.trip ? ' · ' + a.trip : ''} (${a.id})`], ['จำนวนเงิน', money(a.extraDue) + ' บาท'],
           ['ผู้เบิก', a.requesterName], ['จ่ายให้', a.payee], ['ธนาคาร', a.payBank], ['เลขบัญชี', a.payAccount], ['Job No.', a.jobNo],
-          ['ใบเสร็จ', (a.paths || []).length ? `ชุดเดียวกับที่ส่งเคลียร์ (${a.paths.length} ไฟล์)` : ''],
+          ['ใบเสร็จ', (a.filesTotal ?? (a.paths || []).length) ? `ชุดเดียวกับที่ส่งเคลียร์ (${a.filesTotal ?? a.paths.length} ไฟล์)` : ''],
         ].filter(([, x]) => x).map(([k, x]) => `<dt>${k}</dt><dd>${esc(x)}</dd>`).join('')}</dl>
         <div class="hint mt-8">ยอดเท่ากับส่วนที่ใช้เกิน (ใช้จริง ${money(a.actual)} − advance ${money(a.amount)}) แก้ไม่ได้</div>`,
       foot: `<button class="btn btn-secondary" data-x>ยกเลิก</button><button class="btn btn-primary" data-ok>${icon('send')} ส่งใบเบิกส่วนเกิน</button>`,
@@ -280,7 +288,9 @@ export async function render(ctx) {
   }
 
   function filesCard(v) {
-    const groups = DOCS.map(([k, label]) => [label, v.docs?.[k] || []]).filter(([, p]) => p.length);
+    // ใบที่ออกจากตารางเคลียร์ (ไม่มีใบ advance): ใบเสร็จทั้งหมดอยู่ในกล่องตารางเคลียร์แล้ว → ไม่แสดงซ้ำตรงนี้
+    const inTable = new Set(st.adv?.direct ? [...(st.adv.paths || []), ...(st.adv.rows || []).flatMap((r) => r.files || [])] : []);
+    const groups = DOCS.map(([k, label]) => [label, (v.docs?.[k] || []).filter((p) => !inTable.has(p))]).filter(([, p]) => p.length);
     if (v.docs?.slip?.length) groups.push(['สลิปโอนเงิน', v.docs.slip]);
     if (!st.adv && v.advClearPaths?.length && !v.canConfirmAdv) groups.push(['ใบเสร็จเคลียร์ advance', v.advClearPaths]);   // มีข้อมูลตาราง → ไฟล์อยู่ในกล่องตารางเคลียร์
     if (!groups.length) return '';
