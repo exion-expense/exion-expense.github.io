@@ -1,10 +1,10 @@
 // เคลียร์ advance — กรอกตารางตามฟอร์ม Expenses Claim: วันที่ / รายการ / จำนวนเงิน / มี-ไม่มีใบเสร็จ / หมายเหตุ
 // (ก) มีใบ advance (?id=ADV-…): บันทึกร่างได้ · ยอดใช้จริง = ผลรวมของตาราง · ใช้เกินยอด advance ได้ (ส่วนเกินไปเบิกใบฟ้าหลังบัญชีตรวจ)
 // แนบไฟล์รายบรรทัด (0079): บรรทัดที่ติ๊ก "มี" ใบเสร็จ ต้องแนบไฟล์ของบรรทัดนั้น · ช่องรวมด้านล่าง = "ไฟล์อื่นๆ" (ไม่บังคับ)
-// Amount / Currency (0080): ยอดเงินสกุลอื่น + สกุลเงิน อยู่หน้าช่องจำนวนเงิน (บาท) · ไม่บังคับ กรอกคู่กัน · ยอดรวมคิดจากช่องบาท
+// Amount(Cur) / Currency (0080): ยอดเงินสกุลอื่น + สกุลเงิน อยู่ถัดจากช่องจำนวนเงิน (บาท) · ไม่บังคับ กรอกคู่กัน · ยอดรวมคิดจากช่องบาท
 // (ข) ไม่มีใบ advance — จ่ายไปก่อน (?new=1 · ?id=CLR-… = ร่าง · ?id=PCN-… = ใบที่ถูกตีกลับ): ส่งแล้วระบบออกใบฟ้า 1 ใบตามยอดรวมของตาราง (0079)
-import { api, money, fmtDate, esc, todayYMD, state } from '../core.js?v=10.4.28';
-import { icon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, skeleton, debounce, on, $, $$ } from '../ui.js?v=10.4.28';
+import { api, money, fmtDate, esc, todayYMD, state } from '../core.js?v=10.4.29';
+import { icon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, skeleton, debounce, on, $, $$ } from '../ui.js?v=10.4.29';
 
 const OTHER = '__other__';
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
@@ -63,9 +63,9 @@ export async function render(ctx) {
       <div class="clr-c c-desc"><label class="clr-lab" for="clr-s-${k}">รายการ</label>
         <select class="input" id="clr-s-${k}" data-r="sel" aria-label="รายการ"><option value="">เลือกรายการ</option>${items.map((i) => `<option value="${esc(i)}" ${sel === i ? 'selected' : ''}>${esc(i)}</option>`).join('')}<option value="${OTHER}" ${sel === OTHER ? 'selected' : ''}>อื่นๆ (พิมพ์เอง)</option></select>
         <input class="input mt-8 ${isOther ? '' : 'hidden'}" data-r="other" maxlength="120" aria-label="รายการ (พิมพ์เอง)" value="${isOther ? esc(r.desc) : ''}"></div>
-      ${FX() ? `<div class="clr-c c-fx"><label class="clr-lab" for="clr-f-${k}">Amount <span class="opt">เงินสกุลอื่น</span></label><input type="number" class="input" id="clr-f-${k}" data-r="fx" inputmode="decimal" step="0.01" min="0" value="${r.fx ?? ''}" aria-label="Amount (ยอดเงินสกุลอื่น)"></div>
-      <div class="clr-c c-cur"><label class="clr-lab" for="clr-c-${k}">Currency</label><select class="input" id="clr-c-${k}" data-r="cur" aria-label="Currency (สกุลเงิน)"><option value="">-</option>${[...new Set([...(st.a.curs || []), ...(r.cur ? [r.cur] : [])])].map((c) => `<option value="${esc(c)}" ${c === r.cur ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>` : ''}
       <div class="clr-c c-amt"><label class="clr-lab" for="clr-a-${k}">จำนวนเงิน (บาท)</label><input type="number" class="input" id="clr-a-${k}" data-r="amount" inputmode="decimal" step="0.01" min="0" value="${r.amount ?? ''}" aria-label="จำนวนเงิน"></div>
+      ${FX() ? `<div class="clr-c c-fx"><label class="clr-lab" for="clr-f-${k}">Amount(Cur) <span class="opt">เงินสกุลอื่น</span></label><input type="number" class="input" id="clr-f-${k}" data-r="fx" inputmode="decimal" step="0.01" min="0" value="${r.fx ?? ''}" aria-label="Amount(Cur) ยอดเงินสกุลอื่น"></div>
+      <div class="clr-c c-cur"><label class="clr-lab" for="clr-c-${k}">Currency</label><select class="input" id="clr-c-${k}" data-r="cur" aria-label="Currency (สกุลเงิน)"><option value="">-</option>${[...new Set([...(st.a.curs || []), ...(r.cur ? [r.cur] : [])])].map((c) => `<option value="${esc(c)}" ${c === r.cur ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>` : ''}
       <div class="clr-c c-rc"><span class="clr-lab">ใบเสร็จ</span><div class="seg sm" role="group" aria-label="ใบเสร็จ"><button type="button" data-rc="1" class="${r.receipt === false ? '' : 'on'}">มี</button><button type="button" data-rc="0" class="${r.receipt === false ? 'on' : ''}">ไม่มี</button></div></div>
       <div class="clr-c c-rm"><label class="clr-lab" for="clr-m-${k}">หมายเหตุ <span class="opt">ไม่บังคับ</span></label><input class="input" id="clr-m-${k}" data-r="remark" maxlength="200" value="${esc(r.remark || '')}" aria-label="หมายเหตุ"></div>
       <button type="button" class="btn-icon sm clr-rm" data-act="rm-row" aria-label="ลบบรรทัด">${icon('trash')}</button>
@@ -184,8 +184,8 @@ export async function render(ctx) {
 
       <div class="card pad stack-sm ${FX() ? 'clr-fx' : ''}">
         <div class="flex between wrap"><b>${dr ? 'รายการที่จ่ายจริง' : 'รายการที่ใช้จริง'}</b><span class="text-sm muted">กรอกทีละรายการตามใบเสร็จ${RF() ? ' · บรรทัดที่ติ๊ก "มี" ต้องแนบรูปใบเสร็จของบรรทัดนั้น' : ''}</span></div>
-        ${FX() ? '<div class="hint">Amount / Currency กรอกเฉพาะรายการที่จ่ายเป็นเงินสกุลอื่น · ยอดรวมคิดจากช่องจำนวนเงิน (บาท)</div>' : ''}
-        <div class="clr-head"><span></span><span>วันที่</span><span>รายการ</span>${FX() ? '<span>Amount</span><span>Currency</span>' : ''}<span>จำนวนเงิน (บาท)</span><span>ใบเสร็จ</span><span>หมายเหตุ</span><span></span></div>
+        ${FX() ? '<div class="hint">Amount(Cur) / Currency กรอกเฉพาะรายการที่จ่ายเป็นเงินสกุลอื่น · ยอดรวมคิดจากช่องจำนวนเงิน (บาท)</div>' : ''}
+        <div class="clr-head"><span></span><span>วันที่</span><span>รายการ</span><span>จำนวนเงิน (บาท)</span>${FX() ? '<span>Amount(Cur)</span><span>Currency</span>' : ''}<span>ใบเสร็จ</span><span>หมายเหตุ</span><span></span></div>
         <div class="stack-sm" data-rows>${list.map(rowHtml).join('')}</div>
         <div><button type="button" class="btn btn-secondary btn-sm" data-act="add-row">${icon('plus', 'sm')} เพิ่มบรรทัด</button></div>
       </div>
@@ -219,8 +219,8 @@ export async function render(ctx) {
     for (const d of els) {
       const r = readRow(d); if (blank(r)) continue; n++;
       const msg = !r.date ? 'ยังไม่ได้ใส่วันที่' : r.date > todayYMD() ? 'วันที่ยังมาไม่ถึง' : !r.desc ? (r.other ? 'ยังไม่ได้พิมพ์รายการ' : 'ยังไม่ได้เลือกรายการ') : !(r.amount > 0) ? 'ยังไม่ได้ใส่จำนวนเงิน (บาท)'
-        : FX() && r.fx != null && !(r.fx > 0) ? 'ช่อง Amount ต้องมากกว่า 0'
-        : FX() && (r.fx != null) !== !!r.cur ? 'กรอก Amount กับ Currency ให้ครบคู่ (จ่ายเป็นเงินบาท ให้เว้นว่างทั้งสองช่อง)'
+        : FX() && r.fx != null && !(r.fx > 0) ? 'ช่อง Amount(Cur) ต้องมากกว่า 0'
+        : FX() && (r.fx != null) !== !!r.cur ? 'กรอก Amount(Cur) กับ Currency ให้ครบคู่ (จ่ายเป็นเงินบาท ให้เว้นว่างทั้งสองช่อง)'
         : RF() && r.receipt && !r.nfile ? 'ติ๊กว่ามีใบเสร็จ แต่ยังไม่ได้แนบรูปใบเสร็จของบรรทัดนี้ (ไม่มีใบเสร็จให้กด "ไม่มี")' : '';
       if (msg) { d.classList.add('err'); d.scrollIntoView({ block: 'center', behavior: 'smooth' }); return `บรรทัดที่ ${n}: ${msg}`; }
     }

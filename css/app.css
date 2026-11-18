@@ -743,12 +743,12 @@ a.stat { text-decoration: none; color: inherit; display: block; }
   .clr-lab { display: block; }
   .c-files { grid-column: 1 / -1; }
 }
-/* มีช่อง Amount / Currency (0080): 9 คอลัมน์ · จอแคบกว่า 1280 เรียงซ้อน (Amount คู่ Currency · บาทคู่ใบเสร็จ) */
-.clr-fx .clr-head, .clr-fx .clr-row { grid-template-columns: 26px 138px minmax(130px, 1.1fr) 96px 88px 116px 92px minmax(96px, 1fr) 34px; }
+/* มีช่อง Amount(Cur) / Currency (0080): 9 คอลัมน์ บาท → Amount(Cur) → Currency · จอแคบกว่า 1280 เรียงซ้อน (บาทคู่ใบเสร็จ · Amount(Cur) คู่ Currency) */
+.clr-fx .clr-head, .clr-fx .clr-row { grid-template-columns: 26px 138px minmax(130px, 1.1fr) 116px 100px 88px 92px minmax(96px, 1fr) 34px; }
 @media (max-width: 1279px) {
   .clr-fx .clr-head { display: none; }
   .clr-fx .clr-row { grid-template-columns: 26px minmax(0, 1fr) minmax(0, 1fr) 34px;
-    grid-template-areas: "no date date rm" "desc desc desc desc" "fx fx cur cur" "amt amt rc rc" "rmk rmk rmk rmk"; }
+    grid-template-areas: "no date date rm" "desc desc desc desc" "amt amt rc rc" "fx fx cur cur" "rmk rmk rmk rmk"; }
   .clr-fx .clr-no { grid-area: no; align-self: end; padding-bottom: 12px; } .clr-fx .c-date { grid-area: date; } .clr-fx .c-desc { grid-area: desc; }
   .clr-fx .c-fx { grid-area: fx; } .clr-fx .c-cur { grid-area: cur; } .clr-fx .c-amt { grid-area: amt; }
   .clr-fx .c-rc { grid-area: rc; } .clr-fx .c-rm { grid-area: rmk; } .clr-fx .clr-rm { grid-area: rm; align-self: end; margin-bottom: 6px; }
