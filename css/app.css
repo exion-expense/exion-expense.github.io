@@ -716,49 +716,91 @@ a.stat { text-decoration: none; color: inherit; display: block; }
 .lightbox .lb-file .lb-file-ok { opacity: 1; color: #7CE2A4; }
 .lightbox .lb-file-ic { width: 84px; height: 104px; border-radius: 10px; background: #fff; color: #B7081D; font-weight: 800; font-size: 22px; display: grid; place-items: center; box-shadow: 0 6px 24px rgba(0,0,0,.35); }
 
-/* ─── ตารางเคลียร์ advance (pv-clear) ─── */
-.clr-head, .clr-row { display: grid; grid-template-columns: 26px 150px minmax(150px, 1.15fr) 124px 96px minmax(110px, 1fr) 34px; gap: 8px; align-items: start; }
-.clr-head { padding: 0 11px; font-size: 12.5px; color: var(--muted); font-weight: 600; }
-.clr-row { padding: 10px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface-2); }
-.clr-row.err { border-color: var(--bad); background: var(--bad-bg); }
-.clr-c { min-width: 0; }
-.clr-no { align-self: center; text-align: center; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
-.clr-lab { display: none; font-size: 12.5px; color: var(--muted); margin-bottom: 4px; }
-.clr-row .seg { display: flex; width: 100%; } .clr-row .seg button { flex: 1; padding: 10px 4px; }
-.clr-rm { align-self: center; }
-/* ไฟล์ของบรรทัด: แถวที่สองของบรรทัด (เต็มความกว้าง) */
-.c-files { grid-column: 2 / -1; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.c-files.hidden { display: none; }
-.clr-flab { font-size: 12.5px; color: var(--muted); }
-.c-files .thumb { width: 56px; height: 56px; border-radius: 10px; }
-.c-files .thumb.add { font-size: 10px; }
+/* ─── ตารางเคลียร์ advance (pv-clear · 0082) ───
+   จอเล็ก / กลาง: 20 บรรทัดย่อเป็นบรรทัดเดียว (เลข · วันที่ · รายการ · ยอด) แตะเพื่อเปิดกรอกทีละบรรทัด
+   จอกว้าง (≥1280): ตารางแน่น 1 บรรทัดต่อ 1 รายการ · บรรทัดว่างสีจาง ไม่รกตา */
+.cg { border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; background: var(--surface); }
+.cg-head { display: none; }
+.cg-row + .cg-row { border-top: 1px solid var(--line-2); }
+.cg-sum { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 38px; padding: 6px 10px 6px 8px; border: 0; background: transparent; text-align: left; cursor: pointer; color: var(--faint); }
+.cg-sum svg.i { color: var(--faint); transition: transform .15s; }
+.cg-no { width: 24px; flex: none; text-align: center; font-size: 12.5px; font-weight: 600; color: var(--faint); font-variant-numeric: tabular-nums; }
+.cg-no.d { display: none; }
+.cg-txt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; }
+.cg-amt { font-size: 14px; }
+.cg-row.filled .cg-sum { min-height: 44px; color: var(--ink); } .cg-row.filled .cg-no { color: var(--ink-2); }
+.cg-row.open { background: var(--surface-2); box-shadow: inset 3px 0 0 var(--brand); }
+.cg-row.open .cg-sum svg.i { transform: rotate(180deg); }
+.cg-row.err { background: var(--bad-bg); box-shadow: inset 3px 0 0 var(--bad); }
+.cg-fields { display: none; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; padding: 4px 12px 14px 42px;
+  grid-template-areas: "date date" "desc desc" "amt rc" "rmk rmk" "x x"; }
+.cg-fx .cg-fields { grid-template-areas: "date date" "desc desc" "amt rc" "fx cur" "rmk rmk" "x x"; }
+.cg-row.open .cg-fields { display: grid; }
+.cg-c { min-width: 0; } .cg-lab { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 4px; }
+.cg-fields .c-date { grid-area: date; } .cg-fields .c-desc { grid-area: desc; display: flex; flex-wrap: wrap; gap: 6px; } .cg-fields .c-desc .cg-lab { flex: 0 0 100%; margin: 0; }
+.cg-fields .c-desc .input { flex: 1 1 160px; min-width: 0; }
+.cg-fields .c-amt { grid-area: amt; } .cg-fields .c-fx { grid-area: fx; } .cg-fields .c-cur { grid-area: cur; } .cg-fields .c-rm { grid-area: rmk; }
+.cg-fields .c-rc { grid-area: rc; align-self: end; min-height: 44px; }
+.cg-chk { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; white-space: nowrap; user-select: none; }
+.cg-chk input { width: 20px; height: 20px; margin: 0; accent-color: var(--brand); cursor: pointer; flex: none; }
+.cg-fields .input.r { text-align: right; font-variant-numeric: tabular-nums; }
+.cg-fields .cg-x { grid-area: x; justify-self: end; width: auto; min-height: 36px; padding: 0 10px; gap: 6px; display: inline-flex; align-items: center; font-size: 13px; color: var(--muted); white-space: nowrap; }
+.cg-x::after { content: 'ล้างบรรทัดนี้'; }
+.cg-row:not(.filled) .cg-x { display: none; }
+@media (min-width: 700px) and (max-width: 1279px) {
+  .cg-fields { grid-template-columns: 170px minmax(0, 1fr) minmax(0, 1fr) 130px; grid-template-areas: "date desc desc desc" "amt rmk rmk rc" "x x x x"; }
+  .cg-fx .cg-fields { grid-template-areas: "date desc desc desc" "amt fx cur rc" "rmk rmk rmk rmk" "x x x x"; }
+}
+@media (min-width: 1280px) {
+  .cg { border: 0; border-radius: 0; overflow: visible; }
+  .cg-head, .cg-fields { display: grid; grid-template-columns: 26px 138px minmax(170px, 1.25fr) 124px 104px minmax(130px, 1fr) 30px; gap: 6px; align-items: center; grid-template-areas: none; }
+  .cg-fx .cg-head, .cg-fx .cg-fields { grid-template-columns: 26px 134px minmax(150px, 1.25fr) 118px 104px 82px 100px minmax(110px, 1fr) 30px; grid-template-areas: none; }
+  .cg-head { padding: 0 0 6px; font-size: 12.5px; font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--line); }
+  .cg-head .r { text-align: right; padding-right: 10px; }
+  .cg-row + .cg-row { border-top: 0; }
+  .cg-row, .cg-row.open { background: transparent; box-shadow: none; }
+  .cg-sum, .cg-lab { display: none; }
+  .cg-no.d { display: block; width: auto; }
+  .cg-fields { padding: 3px 0; }
+  .cg-fields > * { grid-area: auto !important; }
+  .cg-fields .c-desc { flex-wrap: nowrap; } .cg-fields .c-desc .input { flex: 1 1 0; }
+  .cg-fields .c-rc { align-self: center; min-height: 0; font-size: 13px; } .cg-chk input { width: 17px; height: 17px; }
+  .cg-fields .input { min-height: 36px; padding: 6px 9px; border-radius: 9px; font-size: 14px; }
+  .cg-row:not(.filled) .input { background: var(--surface-2); border-color: var(--line); color: var(--faint); }
+  .cg-row:not(.filled) .input:focus { background: var(--surface); border-color: var(--brand); color: var(--ink); }
+  .cg-row:not(.filled) .cg-chk { opacity: .45; }
+  .cg-row.err .cg-fields { background: var(--bad-bg); border-radius: 10px; box-shadow: 0 0 0 4px var(--bad-bg), 0 0 0 5px var(--bad); }
+  .cg-fields .cg-x { width: 30px; min-height: 30px; padding: 0; display: inline-grid; justify-self: center; }
+  .cg-x::after { content: none; }
+  .cg-row:not(.filled) .cg-x { display: inline-grid; visibility: hidden; }
+}
+/* สรุปยอด: รับ advance / ใช้จริง / ส่วนต่าง */
+.clr-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.clr-tile { padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface-2); min-width: 0; }
+.clr-tile .k { font-size: 12.5px; color: var(--muted); } .clr-tile .v { font-size: 21px; font-weight: 700; line-height: 1.3; }
+.clr-tile.pay { background: var(--warn-bg); border-color: transparent; } .clr-tile.pay .v { color: var(--warn); }
+.clr-tile.back { background: var(--ok-bg); border-color: transparent; } .clr-tile.back .v { color: var(--ok); }
+.clr-tile.done { background: var(--line-2); border-color: transparent; }
+/* กล่องโอนคืนบริษัท + เลขบัญชี */
+.clr-ret { padding: 14px; border-radius: var(--r); background: var(--ok-bg); display: flex; flex-direction: column; gap: 10px; }
+.clr-ret.hidden { display: none; }
+.clr-acc { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
+.clr-acc .no { font-size: 19px; font-weight: 700; letter-spacing: .04em; }
+.clr-more > summary { cursor: pointer; font-size: 13.5px; color: var(--brand); font-weight: 500; list-style: none; }
+.clr-more > summary::-webkit-details-marker { display: none; }
+.clr-more > summary::before { content: '+ '; } .clr-more[open] > summary::before { content: '− '; }
+/* สรุปตามรายการ (แถบสัดส่วนของแต่ละกลุ่ม) */
+.clr-bars { display: flex; flex-direction: column; gap: 12px; }
+.clr-bar .h { display: grid; grid-template-columns: minmax(0, 1fr) auto 42px; gap: 10px; align-items: baseline; font-size: 14px; }
+.clr-bar .h b { font-weight: 600; } .clr-bar .p { text-align: right; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.clr-bar .t { height: 8px; margin-top: 5px; border-radius: 99px; background: var(--line-2); overflow: hidden; }
+.clr-bar .t > i { display: block; height: 100%; border-radius: inherit; background: var(--brand); }
+.clr-bar .s { display: flex; flex-wrap: wrap; gap: 2px 14px; margin-top: 5px; font-size: 12.5px; color: var(--muted); }
+.clr-bar .s b { font-weight: 600; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.clr-bar.tot { border-top: 1px solid var(--line); padding-top: 10px; }
+/* รูปย่อไฟล์รายบรรทัดของข้อมูลเดิม (หน้าใบฟ้า) */
 .thumbs-sm { margin-top: 4px; } .thumbs-sm .thumbs { gap: 4px; flex-wrap: nowrap; }
 .thumbs-sm .thumb { width: 40px; height: 40px; border-radius: 8px; font-size: 9.5px; }
-@media (max-width: 1099px) {
-  .clr-head { display: none; }
-  .clr-row { grid-template-columns: 26px minmax(0, 1fr) minmax(0, 1fr) 34px;
-    grid-template-areas: "no date date rm" "desc desc desc desc" "amt amt rc rc" "rmk rmk rmk rmk"; }
-  .clr-no { grid-area: no; align-self: end; padding-bottom: 12px; } .c-date { grid-area: date; } .c-desc { grid-area: desc; } .c-amt { grid-area: amt; }
-  .c-rc { grid-area: rc; } .c-rm { grid-area: rmk; } .clr-rm { grid-area: rm; align-self: end; margin-bottom: 6px; }
-  .clr-lab { display: block; }
-  .c-files { grid-column: 1 / -1; }
-}
-/* มีช่อง Amount(Cur) / Currency (0080): 9 คอลัมน์ บาท → Amount(Cur) → Currency · จอแคบกว่า 1280 เรียงซ้อน (บาทคู่ใบเสร็จ · Amount(Cur) คู่ Currency) */
-.clr-fx .clr-head, .clr-fx .clr-row { grid-template-columns: 26px 138px minmax(130px, 1.1fr) 116px 100px 88px 92px minmax(96px, 1fr) 34px; }
-@media (max-width: 1279px) {
-  .clr-fx .clr-head { display: none; }
-  .clr-fx .clr-row { grid-template-columns: 26px minmax(0, 1fr) minmax(0, 1fr) 34px;
-    grid-template-areas: "no date date rm" "desc desc desc desc" "amt amt rc rc" "fx fx cur cur" "rmk rmk rmk rmk"; }
-  .clr-fx .clr-no { grid-area: no; align-self: end; padding-bottom: 12px; } .clr-fx .c-date { grid-area: date; } .clr-fx .c-desc { grid-area: desc; }
-  .clr-fx .c-fx { grid-area: fx; } .clr-fx .c-cur { grid-area: cur; } .clr-fx .c-amt { grid-area: amt; }
-  .clr-fx .c-rc { grid-area: rc; } .clr-fx .c-rm { grid-area: rmk; } .clr-fx .clr-rm { grid-area: rm; align-self: end; margin-bottom: 6px; }
-  .clr-fx .clr-lab { display: block; }
-  .clr-fx .c-files { grid-column: 1 / -1; }
-}
-.clr-sum { display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; font-size: 14.5px; }
-.clr-sum .k { color: var(--muted); } .clr-sum .v { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
-.clr-sum .tot { border-top: 1px solid var(--line); padding-top: 8px; font-size: 16px; color: var(--ink); font-weight: 650; }
-.clr-sum .tot.over { color: var(--warn); } .clr-sum .tot.back { color: var(--ok); }
 
 /* ─── หน้ารวมเคลียร์ advance (pv-adv) ─── */
 .adv-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; align-items: start; }

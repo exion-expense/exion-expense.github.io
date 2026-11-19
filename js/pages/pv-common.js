@@ -1,6 +1,6 @@
 // ใช้ร่วมหน้าใบสำคัญจ่าย (ใบฟ้า): ป้ายสถานะ / แถวรายการ / ใบฟ้าสำหรับพิมพ์
-import { api, money, fmtDate, esc } from '../core.js?v=10.4.29';
-import { icon, catIcon } from '../ui.js?v=10.4.29';
+import { api, money, fmtDate, esc } from '../core.js?v=10.4.30';
+import { icon, catIcon } from '../ui.js?v=10.4.30';
 
 export const KIND = { PCJ: 'มี Job', PCN: 'ทั่วไป', ADV: 'Advance' };
 /** ใบทดลอง (ลบทิ้งทีหลัง) */
@@ -8,6 +8,36 @@ export const isTest = (id) => String(id || '').startsWith('TEST-');
 export const DOCS = [['costSheet', 'Cost sheet'], ['po', 'PO'], ['invoice', 'Invoice'], ['receipt', 'ใบเสร็จ'], ['budget', 'Budget form'], ['other', 'เอกสารอื่นๆ']];   // budget = เฉพาะใบ advance (0066) · other = ทุกใบ (0068)
 /** รอบจ่าย: Petty cash (เงินออกจากกล่อง) / รอบวันที่ 20 (โอนจากบัญชีบริษัท) */
 export const ROUND = { PETTY: 'รอบ Petty cash', D20: 'รอบวันที่ 20' };
+
+// ─────────────── ตารางเคลียร์ advance: สรุปตามรายการ (0082) ───────────────
+const c2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+/** สรุปตารางเคลียร์ตามกลุ่ม (groups = [{name, items[]}] จากตั้งค่า PV_ADV_CLEAR_GROUPS) · รายการที่ไม่อยู่ในกลุ่มไหน = "อื่นๆ"
+ *  คืน [{name, total, items: [{name, total}]}] เฉพาะกลุ่มที่มียอด · รายการในกลุ่มเรียงจากยอดมากไปน้อย (ตรรกะเดียวกับไฟล์ Excel) */
+export function clrSummary(rows, groups) {
+  const by = new Map();
+  for (const r of rows || []) { const k = String(r?.desc || '').trim() || '(ไม่ระบุรายการ)', a = Number(r?.amount) || 0; if (a) by.set(k, c2((by.get(k) || 0) + a)); }
+  const used = new Set(), out = [];
+  const pack = (name, keys) => {
+    const items = keys.filter((k) => by.has(k)).map((k) => ({ name: k, total: by.get(k) })).sort((a, b) => b.total - a.total);
+    if (items.length) out.push({ name, total: c2(items.reduce((t, i) => t + i.total, 0)), items });
+    keys.forEach((k) => used.add(k));
+  };
+  for (const g of Array.isArray(groups) ? groups : []) if (g?.name) pack(String(g.name), (g.items || []).map(String));
+  pack('อื่นๆ', [...by.keys()].filter((k) => !used.has(k)));
+  return out;
+}
+/** กล่องสรุปตามรายการ: แถบของแต่ละกลุ่ม + รายการย่อย · total = ยอดใช้จริงทั้งหมด */
+export function clrSummaryHtml(rows, groups) {
+  const sum = clrSummary(rows, groups), total = c2(sum.reduce((t, g) => t + g.total, 0));
+  if (!sum.length) return '<div class="hint">ยังไม่มีรายการ — กรอกตารางแล้วสรุปจะขึ้นที่นี่</div>';
+  const pct = (n) => (total > 0 ? Math.round(n / total * 100) : 0);
+  return `<div class="clr-bars">${sum.map((g) => `<div class="clr-bar">
+      <div class="h"><b>${esc(g.name)}</b><span class="amount">${money(g.total)}</span><span class="p">${pct(g.total)}%</span></div>
+      <div class="t"><i style="width:${Math.max(2, pct(g.total))}%"></i></div>
+      ${g.items.length > 1 || g.items[0].name !== g.name ? `<div class="s">${g.items.map((i) => `<span>${esc(i.name)} <b>${money(i.total)}</b></span>`).join('')}</div>` : ''}
+    </div>`).join('')}
+    <div class="clr-bar tot"><div class="h"><b>รวมใช้จริง</b><span class="amount">${money(total)}</span><span class="p">100%</span></div></div></div>`;
+}
 const dm = (d) => { if (!d) return ''; const t = new Date(d); return `${t.getDate()} ${['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'][t.getMonth()]}`; };
 export function roundLabel(x) { return x.payRound === 'D20' ? `รอบวันที่ 20${x.payDue ? ' (' + dm(x.payDue) + ')' : ''}` : x.payRound === 'PETTY' ? 'รอบ Petty cash' : ''; }
 export function roundBadge(x) {
@@ -129,10 +159,14 @@ export function deptInfo(v) {
 
 /** HTML ใบฟ้า (ใช้ทั้งดูตัวอย่างและพิมพ์) · No. = เลขของบัญชี (กรอกเอง) · ID document = เลขใบในระบบ */
 export function voucherHtml(v, { size = 'half', color = 'blue', rows = 0 } = {}) {
-  const lines = v.lines || [];
+  const raw = v.lines || [];
+  // ใบเคลียร์ที่หักลบกับใบ advance (0082 · หน้าใบส่ง v.clrAdv มา): บรรทัดแรก = ยอดใช้จริง · ถัดมา = หัก advance · รวม = ยอดจ่ายเพิ่ม (ใช้ไม่ถึง = 0 + บรรทัดโอนคืน)
+  //  ยอดในใบไม่ตรงกับ ใช้จริง − advance (บัญชีแก้ยอดเอง) → แสดงตามบรรทัดจริงของใบ
+  const ca = v.clrAdv && raw.length === 1 && Math.abs(c2(raw[0].amount) - Math.max(c2(v.clrAdv.actual - v.clrAdv.advance), 0)) < 0.005 ? v.clrAdv : null;
+  const lines = ca ? [{ ...raw[0], description: String(raw[0].description || '').split(' · ใช้จริง ')[0], amount: ca.actual }] : raw;
   const dpt = deptInfo(v), adj = roundAdj(v);
   const lay = size === 'a5' ? 'half' : size;   // A5 = หน้าตาแบบครึ่ง A4 พิมพ์ลงกระดาษ A5 ตรง ๆ
-  const pad = Math.max(0, (rows || (lay === 'full' ? 12 : 4)) - lines.length);   // rows = จำนวนบรรทัดขั้นต่ำ (แนวนอนเต็มแผ่นใช้น้อยลง)
+  const pad = Math.max(0, (rows || (lay === 'full' ? 12 : 4)) - lines.length - (ca ? 1 : 0));   // rows = จำนวนบรรทัดขั้นต่ำ (แนวนอนเต็มแผ่นใช้น้อยลง)
   const others = (v.steps || []).filter((s) => s.tag === 'filer' || s.k === 'fin2' || s.k === 'fin3').filter((s) => s.state === 'done')
     .map((s) => `${s.label}: ${esc(s.byName)} ${thd(s.at)}`);
   if (v.paidAt) others.push(`จ่ายแล้ว ${thd(v.paidAt)}`);
@@ -155,11 +189,13 @@ export function voucherHtml(v, { size = 'half', color = 'blue', rows = 0 } = {})
       <thead><tr><th style="width:52px">ลำดับ<br>ITEM</th><th>รายการ<br>DESCRIPTION</th><th style="width:150px">จำนวนเงิน<br>AMOUNT</th></tr></thead>
       <tbody>
         ${lines.map((l, i) => `<tr><td class="c">${i + 1}</td><td class="pen">${esc(l.description)}${dpt.mixed ? ` (${esc(lineDept(v, l))})` : ''}</td><td class="r pen">${money(l.amount)}</td></tr>`).join('')}
+        ${ca ? `<tr><td></td><td class="pen">หัก advance ${esc(ca.advId)} (รับเงินไปแล้ว) / LESS ADVANCE</td><td class="r pen">(${money(ca.advance)})</td></tr>` : ''}
         ${'<tr><td>&nbsp;</td><td></td><td></td></tr>'.repeat(pad)}
         ${Number(v.vatAmount) ? `<tr><td></td><td class="r">VAT ${Number(v.vatRate)}%</td><td class="r pen">${money(v.vatAmount)}</td></tr>` : ''}
         ${whtLines(v).map((w) => `<tr><td></td><td class="r">หัก ณ ที่จ่าย ${Number(w.rate)}% / WHT${Math.abs(Number(w.base) - Number(v.base)) > 0.004 ? ` (ฐาน ${money(w.base)})` : ''}</td><td class="r pen">(${money(w.amount)})</td></tr>`).join('')}
         ${adj ? `<tr><td></td><td class="r">ปัดเศษ / ROUNDING</td><td class="r pen">${roundText(adj)}</td></tr>` : ''}
-        <tr class="tot"><td></td><td class="r">รวมทั้งสิ้น / TOTAL</td><td class="r">${money(v.amount)}</td></tr>
+        <tr class="tot"><td></td><td class="r">${ca ? 'ยอดจ่ายเพิ่ม / NET PAYABLE' : 'รวมทั้งสิ้น / TOTAL'}</td><td class="r">${money(v.amount)}</td></tr>
+        ${ca && ca.returnDue > 0 ? `<tr class="tot"><td></td><td class="r">พนักงานโอนคืนบริษัท / RETURN TO COMPANY</td><td class="r">${money(ca.returnDue)}</td></tr>` : ''}
       </tbody>
     </table>
     <div class="pv-foot">
