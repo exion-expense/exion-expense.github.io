@@ -4,11 +4,13 @@
 //  · ใบเคลียร์ที่ถูกตีกลับ (?id=PCN-…): แก้ตารางแล้วส่งใหม่ (เลขเดิม)
 // ตาราง: เริ่มต้น 20 บรรทัดแบบกระชับ (บรรทัดว่างไม่นับ) · จอเล็กย่อเป็นบรรทัดเดียว แตะเพื่อกรอก · ใบเสร็จ = ติ๊กมี / ไม่มี (ไม่บังคับแนบไฟล์)
 // ช่อง Amount(Cur) / Currency (0080): ยอดเงินสกุลอื่น ไม่บังคับ กรอกคู่กัน · ยอดรวมคิดจากช่องบาท
-import { api, money, fmtDate, esc, todayYMD, state } from '../core.js?v=10.4.30';
-import { icon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, skeleton, debounce, on, $, $$ } from '../ui.js?v=10.4.30';
-import { clrSummaryHtml } from './pv-common.js?v=10.4.30';
+// วางจาก Excel: ปุ่มใต้ตาราง (หรือกดวางหลายช่องลงในตารางตรง ๆ) → ดูตัวอย่างก่อน แล้วต่อท้ายบรรทัดที่กรอกไว้ (pv-paste.js)
+import { api, money, fmtDate, esc, todayYMD, state } from '../core.js?v=10.4.32';
+import { icon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, skeleton, debounce, on, sheet, $, $$ } from '../ui.js?v=10.4.32';
+import { clrSummaryHtml } from './pv-common.js?v=10.4.32';
+import { parsePaste } from './pv-paste.js?v=10.4.32';
 
-const OTHER = '__other__', MIN_ROWS = 20;
+const OTHER = '__other__', MIN_ROWS = 20, MAX_ROWS = 100;      // MAX_ROWS = เพดานของฐานข้อมูล (app.pv_adv_rows)
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const pettyFund = () => { try { return localStorage.getItem('exion_petty_fund') || ''; } catch { return ''; } };   // กล่องที่เลือกไว้ในหน้าแรกเงินสดย่อย
 const dmy = (d) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d || '')); return m ? `${m[3]}/${m[2]}` : ''; };
@@ -205,7 +207,8 @@ export async function render(ctx) {
           <div class="cg-head"><span>#</span><span>วันที่</span><span>รายการ</span><span class="r">จำนวนเงิน (บาท)</span>${FX() ? '<span class="r">Amount(Cur)</span><span>Currency</span>' : ''}<span>ใบเสร็จ</span><span>หมายเหตุ</span><span></span></div>
           ${list.map(rowHtml).join('')}
         </div>
-        <div class="flex between wrap gap-8"><button type="button" class="btn btn-secondary btn-sm" data-act="add-rows">${icon('plus', 'sm')} เพิ่ม 5 บรรทัด</button>
+        <div class="flex between wrap gap-8"><div class="flex wrap gap-8"><button type="button" class="btn btn-secondary btn-sm" data-act="add-rows">${icon('plus', 'sm')} เพิ่ม 5 บรรทัด</button>
+          <button type="button" class="btn btn-secondary btn-sm" data-act="paste">${icon('sheet', 'sm')} วางจาก Excel</button></div>
           ${FX() ? '<span class="hint">Amount(Cur) / Currency กรอกเฉพาะรายการที่จ่ายเป็นเงินสกุลอื่น · ยอดรวมคิดจากช่องบาท</span>' : ''}</div>
       </div>
 
@@ -358,6 +361,62 @@ export async function render(ctx) {
     if (h) { h.textContent = filled ? 'เติมธนาคาร / เลขบัญชีจากใบก่อนหน้าให้แล้ว — ตรวจให้ถูกก่อนส่ง' : ''; h.classList.toggle('hidden', !filled); }
     changed();
   }
+  // ─────────────── วางจาก Excel ───────────────
+  // ต่อท้ายบรรทัดสุดท้ายที่กรอกไว้ (ไม่ทับของเดิม) · บรรทัดไม่พอ เพิ่มให้เอง
+  function insertRows(list) {
+    let at = 0;
+    rowEls().forEach((d, i) => { if (!blank(readRow(d))) at = i + 1; });
+    const need = at + list.length - rowEls().length;
+    if (need > 0) box().insertAdjacentHTML('beforeend', Array.from({ length: need }, () => rowHtml({})).join(''));
+    const els = rowEls();
+    list.forEach((r, i) => { els[at + i].outerHTML = rowHtml(r); });
+    renumber(); changed();
+    rowEls()[at]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    toast(`วางแล้ว ${list.length} รายการ · ตรวจให้ถูกก่อนส่ง`);
+  }
+  function pasteDialog(text = '') {
+    const room = MAX_ROWS - rows().length;
+    let res = { rows: [] };
+    const s = sheet({
+      title: 'วางจาก Excel', wide: true,
+      body: `<div class="stack-sm">
+        <div class="hint">ใน Excel ลากเลือกช่องของรายการ (วันที่ · รายการ · ยอดบาท · ถ้ามี: ยอดเงินสกุลอื่น / สกุลเงิน / หมายเหตุ) กดคัดลอก แล้ววางในช่องนี้ · เลือกหัวตารางมาด้วยก็ได้ ระบบดูเองว่าคอลัมน์ไหนคืออะไร</div>
+        <textarea class="input paste-in" data-pin rows="4" aria-label="วางข้อมูลที่คัดลอกจาก Excel" spellcheck="false" autofocus></textarea>
+        <div class="stack-sm" data-pout></div>
+      </div>`,
+      foot: '<button type="button" class="btn btn-secondary" data-x>ยกเลิก</button><button type="button" class="btn btn-primary" data-ok disabled>ใส่ลงตาราง</button>',
+      onMount: (bx, close) => {
+        const ta = $('[data-pin]', bx), out = $('[data-pout]', bx), ok = $('[data-ok]', bx);
+        const show = () => {
+          res = parsePaste(ta.value, { items: st.a.items || [], curs: st.a.curs || [], today: todayYMD() });
+          const list = res.rows, n = list.length, fx = FX() && list.some((r) => r.fx != null);
+          ok.disabled = !n || n > room;
+          if (!ta.value.trim()) { out.innerHTML = ''; return; }
+          if (!n) { out.innerHTML = `<div class="alert bad">${icon('alert')}<div>ไม่พบบรรทัดที่มียอดเงิน — เลือกช่องให้มีคอลัมน์ยอดเงิน (บาท) มาด้วย แล้ววางใหม่</div></div>`; return; }
+          const noCur = fx ? res.noCur : 0;
+          out.innerHTML = `
+            <div class="flex between wrap gap-8" style="align-items:baseline"><b>พบ ${n} รายการ · รวม ${money(res.total)} บาท</b>
+              ${res.skipped ? `<span class="text-sm muted">ข้าม ${res.skipped} บรรทัด (หัวตาราง / บรรทัดรวม / ไม่มีวันที่หรือยอดเงิน)</span>` : ''}</div>
+            ${n > room ? `<div class="alert bad">${icon('alert')}<div>ตารางใส่ได้อีก ${room} บรรทัด (สูงสุด ${MAX_ROWS} บรรทัดต่อใบ) — เลือกมาให้น้อยลงแล้ววางใหม่</div></div>` : ''}
+            ${noCur ? `<div class="field" style="margin:0"><label for="paste-cur">สกุลเงินของช่อง Amount(Cur) <span class="opt">${noCur} บรรทัดยังไม่รู้สกุล · เลือกทีหลังในตารางก็ได้</span></label>
+              <select class="input" id="paste-cur" data-pcur><option value="">-</option>${(st.a.curs || []).map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join('')}</select></div>` : ''}
+            <div class="table-wrap paste-prev"><table class="tbl"><thead><tr><th>#</th><th>วันที่</th><th>รายการ</th><th class="r">บาท</th>${fx ? '<th class="r">Amount(Cur)</th><th>Currency</th>' : ''}<th>ใบเสร็จ</th><th>หมายเหตุ</th></tr></thead>
+              <tbody>${list.map((r, i) => `<tr><td class="muted">${i + 1}</td><td class="nowrap">${r.date ? (r.date > todayYMD() ? `<span class="bad">${esc(fmtDate(r.date))} (ยังมาไม่ถึง)</span>` : esc(fmtDate(r.date))) : '<span class="bad">ไม่มีวันที่</span>'}</td>
+                <td>${r.desc ? esc(r.desc) : '<span class="bad">ไม่มีรายการ</span>'}</td><td class="r">${money(r.amount)}</td>${fx ? `<td class="r">${r.fx != null ? money(r.fx) : ''}</td><td${r.fx != null && !r.cur ? ' data-pcc' : ''}>${esc(r.cur || '')}</td>` : ''}
+                <td class="nowrap">${r.receipt ? 'มี' : '<span class="bad">ไม่มี</span>'}</td><td>${esc(r.remark || '')}</td></tr>`).join('')}</tbody></table></div>
+            <div class="hint">ใส่ต่อท้ายบรรทัดที่กรอกไว้แล้ว ไม่ทับของเดิม · ใส่แล้วแก้ทีละบรรทัดในตารางได้</div>`;
+        };
+        ta.addEventListener('input', show);
+        out.addEventListener('change', (e) => { if (e.target.matches('[data-pcur]')) $$('[data-pcc]', out).forEach((td) => { td.textContent = e.target.value; }); });      // เลือกสกุลแล้วเห็นในตัวอย่างทันที
+        ok.onclick = () => {
+          const dc = $('[data-pcur]', bx)?.value || '';
+          close(res.rows.map((r) => (FX() ? (r.fx != null && !r.cur && dc ? { ...r, cur: dc } : r) : { ...r, fx: null, cur: '' })));
+        };
+        if (text) { ta.value = text; show(); }
+      },
+    });
+    s.done.then((list) => { if (Array.isArray(list) && list.length && box()?.isConnected) insertRows(list); });
+  }
   // จอเล็ก: เปิดกรอกทีละบรรทัด
   function openRow(d) {
     rowEls().forEach((x) => { if (x !== d) { x.classList.remove('open'); $('.cg-sum', x)?.setAttribute('aria-expanded', 'false'); } });
@@ -394,9 +453,16 @@ export async function render(ctx) {
       const els = rowEls(), nx = els[els.indexOf(t.closest('.cg-row')) + 1];
       if (nx) { openRow(nx); $(`[data-r="${t.dataset.r}"]`, nx)?.focus(); }
     }),
+    // กดวางข้อมูลหลายช่อง (คัดลอกจาก Excel) ลงในตารางตรง ๆ → เปิดหน้าต่างวางจาก Excel ให้ · ช่องเดียว = วางตามปกติ
+    on(el, 'paste', '.cg-row input', (e) => {
+      const tx = e.clipboardData?.getData('text/plain') || '';
+      if (!tx.includes('\t') && tx.split(/\r?\n/).filter((l) => l.trim()).length < 2) return;
+      e.preventDefault(); pasteDialog(tx);
+    }),
     on(el, 'click', '[data-act]', async (e, t) => {
       const a = t.dataset.act;
-      if (a === 'add-rows') {
+      if (a === 'paste') pasteDialog();
+      else if (a === 'add-rows') {
         box().insertAdjacentHTML('beforeend', Array.from({ length: 5 }, () => rowHtml({})).join(''));
         renumber();
       } else if (a === 'rm-row') {

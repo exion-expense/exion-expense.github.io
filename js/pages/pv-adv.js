@@ -2,9 +2,9 @@
 // ใช้ข้อมูลจาก get_pv_list (ใบที่ฉันเบิก หรือกรอกแทน) · ปุ่มในแต่ละแถวพาไปหน้ากรอกตาราง / ใบ advance
 // 0079: ปุ่ม "เคลียร์ advance" ด้านบน = เคลียร์แบบไม่มีใบ advance (จ่ายไปก่อน) → ร่าง / ใบฟ้าที่ออกจากตาราง มาจาก get_pv_clr_list
 // 0082: เคลียร์ = ออกใบฟ้า (ใบเคลียร์) ทุกกรณี · ใบเคลียร์ของ advance อยู่ในรายการเดียวกัน (advId) · ใช้ไม่ถึง = ขึ้น "ต้องโอนคืนบริษัท"
-import { api, money, fmtDate, esc } from '../core.js?v=10.4.30';
-import { icon, empty, errorBox, skeleton, toast, toastError, confirmBox, on } from '../ui.js?v=10.4.30';
-import { isTest } from './pv-common.js?v=10.4.30';
+import { api, money, fmtDate, esc } from '../core.js?v=10.4.32';
+import { icon, empty, errorBox, skeleton, toast, toastError, confirmBox, on } from '../ui.js?v=10.4.32';
+import { isTest } from './pv-common.js?v=10.4.32';
 
 const VST = { Pending: ['b-pending', 'รออนุมัติ'], Approved: ['b-info', 'รอจ่ายเงิน'], Paid: ['b-paid', 'จ่ายแล้ว'], Returned: ['b-rejected', 'ตีกลับ'], Cancelled: ['b-neutral', 'ยกเลิก'] };
 

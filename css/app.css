@@ -747,6 +747,13 @@ a.stat { text-decoration: none; color: inherit; display: block; }
 .cg-fields .cg-x { grid-area: x; justify-self: end; width: auto; min-height: 36px; padding: 0 10px; gap: 6px; display: inline-flex; align-items: center; font-size: 13px; color: var(--muted); white-space: nowrap; }
 .cg-x::after { content: 'ล้างบรรทัดนี้'; }
 .cg-row:not(.filled) .cg-x { display: none; }
+/* วางจาก Excel (pv-clear): ช่องวาง + ตารางตัวอย่างก่อนใส่ลงตาราง */
+.paste-in { min-height: 96px; max-height: 28vh; font-size: 13px; line-height: 1.45; white-space: pre; overflow: auto; }
+.paste-prev { max-height: 36vh; }
+.paste-prev .tbl th, .paste-prev .tbl td { padding: 6px 10px; }
+.paste-prev .tbl td { vertical-align: baseline; }
+.paste-prev .tbl td:nth-child(3) { min-width: 150px; } .paste-prev .tbl td:last-child { min-width: 110px; }
+.paste-prev .bad { color: var(--bad); font-weight: 600; }
 @media (min-width: 700px) and (max-width: 1279px) {
   .cg-fields { grid-template-columns: 170px minmax(0, 1fr) minmax(0, 1fr) 130px; grid-template-areas: "date desc desc desc" "amt rmk rmk rc" "x x x x"; }
   .cg-fx .cg-fields { grid-template-areas: "date desc desc desc" "amt fx cur rc" "rmk rmk rmk rmk" "x x x x"; }

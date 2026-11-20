@@ -1,9 +1,9 @@
 // ขอเบิก Petty Cash (ใบสำคัญจ่าย) — ค่าใช้จ่าย / Advance entertain · เลือกหมวดทุกบรรทัด · HR กรอกแทนได้ · แก้ใบที่ถูกตีกลับ (?id=)
 // บัญชีแก้ไขใบ (?id=&fin=1): แก้ได้ทุกช่อง + VAT / หัก ณ ที่จ่าย + รหัสแผนก · ไม่เริ่มสายอนุมัติใหม่
 // บัญชี (ทั้งตอนเบิกเอง / กรอกแทน / แก้ไข) เลือกแผนกรายบรรทัดได้ = ลงต้นทุนแยกทีม
-import { api, money, esc, todayYMD, loadPettyCategories, state } from '../core.js?v=10.4.30';
-import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.4.30';
-import { DOCS, whtLines, roundNet, roundAdj, roundText, roundSeg } from './pv-common.js?v=10.4.30';
+import { api, money, esc, todayYMD, loadPettyCategories, state } from '../core.js?v=10.4.32';
+import { icon, catIcon, toast, toastError, confirmBox, busy, receiptPicker, errorBox, debounce, on, $, $$ } from '../ui.js?v=10.4.32';
+import { DOCS, whtLines, roundNet, roundAdj, roundText, roundSeg } from './pv-common.js?v=10.4.32';
 
 // คำอธิบายหมวด: อะไรเข้าหมวดนี้บ้าง (การ์ดตอนชี้ที่ปุ่มหมวด + ใต้หมวดที่เลือก)
 const CAT_HINT = {
@@ -83,21 +83,37 @@ export async function render(ctx) {
   const paid = fin && old.status === 'Paid';
   // บัญชี 1 กรอกเอง (เบิกเอง / เบิกแทน) → ไม่ผ่านขั้นอนุมัติ ไปรอจ่ายทันที · ใส่ VAT / หัก ณ ที่จ่าย / ปัดเศษ ในฟอร์มนี้เลย
   const fin1 = !fin && !!meta.isFin1;
-  const tax = fin || fin1;
+  // 0084 (meta.finBehalfLoop): บัญชีเบิก "แทนคนอื่น" → ใบเดินตามสายอนุมัติของคนเบิกตามปกติ ไม่ใช่ทางตรงของบัญชี · VAT ใส่ตอนบัญชี 1 ตรวจ
+  //  ฐานข้อมูลที่ยังไม่รัน 0084 = ไม่มีธงนี้ → ทำงานแบบเดิม (ทางตรงทั้งเบิกเองและเบิกแทน)
+  const loop = !!meta.finBehalfLoop;
+  const isSelf = () => (old ? String(old.requesterEmail || '').toLowerCase() === meta.me.email : (!st.who || st.who === meta.me.email));
+  const finDirect = () => fin1 && (!loop || isSelf());
+  const tax = () => fin || finDirect();
   // 0056: บัญชี 1 เบิกให้ตัวเอง → ต้องรอคนตรวจ (meta.fin1Check = ชื่อคนตรวจ) · เบิกแทนคนอื่นเป็นแบบเดิม
-  const selfChk = () => !!meta.fin1Check && (old ? String(old.requesterEmail || '').toLowerCase() === meta.me.email : (!st.who || st.who === meta.me.email));
+  const selfChk = () => !!meta.fin1Check && isSelf();
   // แผนกรายบรรทัด (ลงต้นทุนแยกทีม): บัญชี + HR (0072 · meta.canLineDept) · ว่าง = ตามแผนกของใบ · สายอนุมัติไม่เปลี่ยน
   const lineDeptOn = !!(meta.canLineDept ?? meta.isFin) && (meta.deptCodes || []).length > 0;
   const deptOpts = (sel) => `<option value="">ตามแผนกของใบ</option>
     ${sel && !(meta.deptCodes || []).some((d) => d.code === sel) ? `<option value="${esc(sel)}" selected>${esc(sel)}</option>` : ''}
     ${(meta.deptCodes || []).map((d) => `<option value="${esc(d.code)}" ${d.code === sel ? 'selected' : ''}>${esc(d.code)} · ${esc(d.name)}</option>`).join('')}`;
 
+  // แถบของบัญชี: ทางตรง (เบิกของตัวเอง · หรือฐานข้อมูลก่อน 0084) / เดินตามสายของคนเบิก (0084 · เบิกแทนคนอื่น)
+  const fin1No = meta.fin1Mode === 'fin3' ? '2' : '1';
+  const finBarHtml = () => (loop && !isSelf())
+    ? `<div class="alert">${icon('info')}<div><b>คุณเป็นบัญชี ${fin1No} · เบิกแทนคนอื่น</b> — ใบนี้เดินตามสายอนุมัติของคนเบิกตามปกติ (หัวหน้า → ผู้บริหารตามยอด → บัญชี 1 → บัญชี 2 → บัญชี 3) · VAT / หัก ณ ที่จ่าย ใส่ตอนบัญชี 1 ตรวจ</div></div>`
+    : loop
+      ? `<div class="alert ok">${icon('check')}<div><b>คุณเป็นบัญชี ${fin1No} · เบิกของตัวเอง</b> — ${selfChk() ? `รอ <b>${esc(meta.fin1Check)}</b> ตรวจก่อน → บัญชี 2 → บัญชี 3 → รอจ่าย`
+          : meta.fin1Mode === 'pay' ? 'ใบนี้ไม่ต้องผ่านขั้นอนุมัติ ส่งแล้วไป<b>รอจ่ายเงินทันที</b>'
+          : meta.fin1Mode === 'fin3' ? 'ใบนี้ข้ามหัวหน้าแผนก บัญชี 1 และบัญชี 2 ส่งแล้วไป<b>บัญชี 3 → รอจ่าย</b>' : 'ใบนี้ข้ามหัวหน้าแผนกและบัญชี 1 ส่งแล้วไป<b>บัญชี 2 → บัญชี 3 → รอจ่าย</b>'}
+          — ใส่ VAT / หัก ณ ที่จ่าย / ปัดเศษ ให้ครบก่อนส่ง<br><span class="text-sm">เบิกแทนคนอื่น (เลือกที่ช่อง "เบิกให้") = ใบเดินตามสายอนุมัติของคนนั้น</span></div></div>`
+      : `<div class="alert ok">${icon('check')}<div><b>คุณเป็นบัญชี ${meta.fin1Mode === 'fin3' ? '2' : '1'}</b> · ${meta.fin1Mode === 'pay' ? 'ใบนี้ไม่ต้องผ่านขั้นอนุมัติ ส่งแล้วไป<b>รอจ่ายเงินทันที</b>'
+      : meta.fin1Mode === 'fin3' ? 'ใบนี้ข้ามหัวหน้าแผนก บัญชี 1 และบัญชี 2 ส่งแล้วไป<b>บัญชี 3 → รอจ่าย</b>' : 'ใบนี้ข้ามหัวหน้าแผนกและบัญชี 1 ส่งแล้วไป<b>บัญชี 2 → บัญชี 3 → รอจ่าย</b>'}${meta.fin1Check ? ` (กรอกแทนคนอื่น)<br>· <b>เบิกให้ตัวเอง: รอ ${esc(meta.fin1Check)} ตรวจก่อน</b> → บัญชี 2 → บัญชี 3 → รอจ่าย<br>` : ' (ทั้งเบิกเองและเบิกแทน)'} — ใส่ VAT / หัก ณ ที่จ่าย / ปัดเศษ ให้ครบก่อนส่ง</div></div>`;
+
   el.innerHTML = `
   <div class="stack">
     ${draft ? `<div class="alert" data-draftbar>${icon('info')}<div class="grow">กู้ข้อมูลที่กรอกค้างไว้แล้ว · ไฟล์แนบต้องแนบใหม่</div><button type="button" class="btn btn-ghost btn-sm" data-act="draft-clear">เริ่มใหม่</button></div>` : ''}
     ${old && !fin ? `<div class="alert bad">${icon('alert')}<div><b>ถูกตีกลับ:</b> ${esc(old.remark || '-')}<br><span class="text-sm">แก้ไขแล้วกดส่งใหม่ ใบจะเริ่มอนุมัติใหม่ตั้งแต่ขั้นแรก (เลขเดิม ${esc(old.id)})</span></div></div>` : ''}
-    ${fin1 ? `<div class="alert ok">${icon('check')}<div><b>คุณเป็นบัญชี ${meta.fin1Mode === 'fin3' ? '2' : '1'}</b> · ${meta.fin1Mode === 'pay' ? 'ใบนี้ไม่ต้องผ่านขั้นอนุมัติ ส่งแล้วไป<b>รอจ่ายเงินทันที</b>'
-      : meta.fin1Mode === 'fin3' ? 'ใบนี้ข้ามหัวหน้าแผนก บัญชี 1 และบัญชี 2 ส่งแล้วไป<b>บัญชี 3 → รอจ่าย</b>' : 'ใบนี้ข้ามหัวหน้าแผนกและบัญชี 1 ส่งแล้วไป<b>บัญชี 2 → บัญชี 3 → รอจ่าย</b>'}${meta.fin1Check ? ` (กรอกแทนคนอื่น)<br>· <b>เบิกให้ตัวเอง: รอ ${esc(meta.fin1Check)} ตรวจก่อน</b> → บัญชี 2 → บัญชี 3 → รอจ่าย<br>` : ' (ทั้งเบิกเองและเบิกแทน)'} — ใส่ VAT / หัก ณ ที่จ่าย / ปัดเศษ ให้ครบก่อนส่ง</div></div>` : ''}
+    ${fin1 ? `<div data-finbar>${finBarHtml()}</div>` : ''}
     ${fin ? `<div class="alert">${icon('edit')}<div><b>บัญชีแก้ไขใบ ${esc(old.id)}</b> · ${esc(old.requesterName)}<br><span class="text-sm">ไม่เริ่มสายอนุมัติใหม่ · ระบบบันทึกว่าแก้อะไรในประวัติ และแจ้งคนเบิก${paid ? ' · <b>ใบนี้จ่ายแล้ว แก้ยอดเงินไม่ได้</b>' : ''}</span></div></div>` : ''}
     ${!fin ? `<div class="card pad stack-sm">
       ${!old ? `<div class="seg" role="tablist" data-type>
@@ -131,14 +147,14 @@ export async function render(ctx) {
     </div>
 
     <div class="card pad stack-sm">
-      <div class="flex between wrap"><b>รายการ</b><span class="text-sm muted">${tax ? 'ยอดก่อน VAT' : 'ยอดก่อน VAT · บัญชีเป็นคนใส่ VAT / หัก ณ ที่จ่าย'}</span></div>
+      <div class="flex between wrap"><b>รายการ</b><span class="text-sm muted" data-vatlab>${tax() ? 'ยอดก่อน VAT' : 'ยอดก่อน VAT · บัญชีเป็นคนใส่ VAT / หัก ณ ที่จ่าย'}</span></div>
       <p class="hint" data-officehint></p>
       ${lineDeptOn ? '<p class="hint">เลือก "ลงต้นทุนแผนก" ได้ทีละบรรทัด เช่น ค่าศุลกากรของทีม E&amp;I กับ SI · ใบฟ้า / MSBC / รายงานแยกตามแผนกให้เอง · สายอนุมัติไม่เปลี่ยน</p>' : ''}
       <div class="stack-sm" data-lines></div>
       <button type="button" class="add-item" data-act="add-line">${icon('plus')} เพิ่มบรรทัด</button>
     </div>
 
-    ${tax ? `<div class="card pad stack-sm"><b>VAT / หัก ณ ที่จ่าย</b><div class="stack-sm" data-taxbox></div></div>` : ''}
+    ${fin || fin1 ? `<div class="card pad stack-sm ${tax() ? '' : 'hidden'}" data-taxcard><b>VAT / หัก ณ ที่จ่าย</b><div class="stack-sm" data-taxbox></div></div>` : ''}
 
     <div class="card pad stack-sm" data-jobbox>
       <b>ข้อมูล Job <span class="opt" data-jopt>Job No. บังคับ (ไม่มี Job กด Z-NONE) · PO / Cost sheet ไม่บังคับ</span></b>
@@ -219,7 +235,7 @@ export async function render(ctx) {
     $$('.cat-opt', card).forEach((o) => o.classList.toggle('on', o.dataset.cat === code));
     $('[data-catchosen]', card).innerHTML = chosenHtml(code);
     checkOther(card); hideTip();
-    layout(); preview(); saveDraft(); if (tax) paintTax();
+    layout(); preview(); saveDraft(); if (tax()) paintTax();
   }
   // ใบนี้เป็นค่าใช้จ่ายสำนักงาน = ทุกบรรทัดเป็นหมวดสำนักงาน (ส่งไปผู้อนุมัติค่าใช้จ่ายสำนักงาน)
   const isOffice = () => st.type !== 'ADV' && lines().length > 0 && lines().every((l) => officeCats.includes(l.category));
@@ -267,8 +283,8 @@ export async function render(ctx) {
   // แนบใบเสร็จตามกฎหมวด: มีบรรทัดไหนเป็นหมวดที่ต้องแนบ → ต้องแนบ
   function needReceipt() { return lines().some((l) => l.category && (catOf(l.category)?.need_receipt || 'YES') === 'YES'); }   // ยังไม่เลือกหมวด = ยังไม่บังคับ
   function recalc() {
-    $('[data-count]', el).textContent = `${lineRows().length} บรรทัด · ${tax ? 'ยอดจ่ายสุทธิ' : 'ยอดก่อน VAT'}`;
-    $('[data-total]', el).textContent = money(tax ? taxTotals().net : total()) + ' บาท';
+    $('[data-count]', el).textContent = `${lineRows().length} บรรทัด · ${tax() ? 'ยอดจ่ายสุทธิ' : 'ยอดก่อน VAT'}`;
+    $('[data-total]', el).textContent = money(tax() ? taxTotals().net : total()) + ' บาท';
   }
   // ถามฐานข้อมูลว่าใบนี้ต้องกรอก Job ไหม (เซลล์ + ซื้อของหน้างาน) · ไม่แสดงสายอนุมัติบนฟอร์ม
   const preview = debounce(async () => {
@@ -311,7 +327,7 @@ export async function render(ctx) {
     if (!adv && L.some((l) => !l.category)) return 'กรุณาเลือกหมวดให้ครบทุกบรรทัด';
     if (!fin && mixedOffice()) return 'ค่าใช้จ่ายสำนักงานต้องแยกเป็นอีกใบ (ไม่ปนกับหมวดอื่น)';
     if (L.some((l) => l.amount <= 0)) return 'กรุณาใส่จำนวนเงินให้ครบทุกบรรทัด';
-    if (tax) {
+    if (tax()) {
       if (st.wht.some((w) => !(Number(w.base) > 0))) return 'ใส่ยอดฐานหัก ณ ที่จ่ายให้ครบ';
       if (st.wht.reduce((s, w) => s + Number(w.base), 0) > total() + 0.004) return 'ยอดฐานหัก ณ ที่จ่ายรวมเกินยอดก่อน VAT';
     }
@@ -377,10 +393,10 @@ export async function render(ctx) {
         const docs = await uploadDocs(set, false);   // advance ก็ต้องส่งไฟล์ (Budget form บังคับ · 0068) — เดิมข้ามไป ทำให้ส่งใบ advance ไม่ได้
         set('กำลังส่ง…');
         return api.rpc('pv_submit', { p: { id: old?.id || '', type: st.type, requesterEmail: st.who, fundId: pettyFund() || meta.fund?.fundId || '', ...fields(), docs,
-          ...(fin1 ? { vatRate: st.vat, whtLines: st.wht.map((w) => ({ rate: w.rate, base: r2(w.base) })), roundMode: st.rnd } : {}) } });
+          ...(finDirect() ? { vatRate: st.vat, whtLines: st.wht.map((w) => ({ rate: w.rate, base: r2(w.base) })), roundMode: st.rnd } : {}) } });
       });
       if (!old) { st.sent = true; saveJSON(DRAFT_KEY, null); }
-      toast(`${old ? 'ส่งใหม่แล้ว' : 'ส่งแล้ว'} ${res.id}${fin1 ? (selfChk() ? ` · รอ ${meta.fin1Check} ตรวจ` : meta.fin1Mode === 'pay' ? ' · รอจ่ายเงิน' : meta.fin1Mode === 'fin3' ? ' · รอบัญชี 3' : ' · รอบัญชี 2') : ''}`);
+      toast(`${old ? 'ส่งใหม่แล้ว' : 'ส่งแล้ว'} ${res.id}${finDirect() ? (selfChk() ? ` · รอ ${meta.fin1Check} ตรวจ` : meta.fin1Mode === 'pay' ? ' · รอจ่ายเงิน' : meta.fin1Mode === 'fin3' ? ' · รอบัญชี 3' : ' · รอบัญชี 2') : ''}`);
       ctx.refreshBadges();
       ctx.go('/pv/view?id=' + encodeURIComponent(res.id));
     } catch (e) { toastError(e); }
@@ -468,8 +484,17 @@ export async function render(ctx) {
   }
   function hideTip() { tip.classList.add('hidden'); }
 
-  if (tax) paintTax();
+  if (tax()) paintTax();
   paintWho();
+  // เปลี่ยน "เบิกให้" → เส้นทางของบัญชี / ช่อง VAT เปลี่ยนตาม (0084)
+  function syncFin() {
+    if (!fin1) return;
+    const bar = $('[data-finbar]', el); if (bar) bar.innerHTML = finBarHtml();
+    $('[data-taxcard]', el)?.classList.toggle('hidden', !tax());
+    const lab = $('[data-vatlab]', el); if (lab) lab.textContent = tax() ? 'ยอดก่อน VAT' : 'ยอดก่อน VAT · บัญชีเป็นคนใส่ VAT / หัก ณ ที่จ่าย';
+    if (tax()) paintTax();
+    recalc();
+  }
   layout(); recalc(); preview();
   const offs = [
     on(el, 'click', '[data-t]', (e, t) => { st.type = t.dataset.t; $$('[data-t]', el).forEach((b) => b.classList.toggle('on', b === t)); layout(); preview(); saveDraft(); lineRows().forEach(checkOther); }),
@@ -485,14 +510,14 @@ export async function render(ctx) {
     on(el, 'click', '[data-whopick]', (e, t) => {
       st.who = t.dataset.whopick; st.whoOpen = false;
       if (st.who) saveJSON(RECENT_KEY, [st.who, ...loadJSON(RECENT_KEY, []).filter((x) => x !== st.who)].slice(0, 6));
-      paintWho(); preview(); saveDraft();
+      paintWho(); preview(); saveDraft(); syncFin();
     }),
     // ผู้รับเงินที่เคยจ่าย → เติมธนาคาร/เลขบัญชีให้ (เฉพาะช่องที่ยังว่าง)
     on(el, 'change', '[data-f=payee]', () => fillPayee()),
     on(el, 'change', '[data-l=dept]', () => saveDraft()),
     on(el, 'input', 'input, textarea', () => saveDraft()),
     on(el, 'input', '[data-l=description]', (e, t) => checkOther(t.closest('.pv-line-card'))),
-    on(el, 'input', '[data-l=amount]', () => { recalc(); preview(); if (tax) paintTax(); }),
+    on(el, 'input', '[data-l=amount]', () => { recalc(); preview(); if (tax()) paintTax(); }),
     // VAT / หัก ณ ที่จ่าย (บัญชีแก้ไข)
     on(el, 'click', '[data-vat]', (e, t) => { st.vat = Number(t.dataset.vat); paintTax(); }),
     on(el, 'click', '[data-rnd]', (e, t) => { st.rnd = t.dataset.rnd; paintTax(); }),
@@ -505,7 +530,7 @@ export async function render(ctx) {
       else if (a === 'cat-change') { t.closest('.pv-line-card').classList.add('picking'); }
       else if (a === 'who-open') { st.whoOpen = !st.whoOpen; paintWho(); if (st.whoOpen) $('[data-whoq]', el)?.focus(); }
       else if (a === 'draft-clear') { saveJSON(DRAFT_KEY, null); ctx.go('/petty/request?r=' + Date.now()); }
-      else if (a === 'rm-line') { t.closest('.pv-line-card').remove(); renumber(); recalc(); layout(); preview(); saveDraft(); if (tax) paintTax(); }
+      else if (a === 'rm-line') { t.closest('.pv-line-card').remove(); renumber(); recalc(); layout(); preview(); saveDraft(); if (tax()) paintTax(); }
       else if (a === 'job-none') { const j = $('[data-f=jobNo]', el); j.value = 'Z-NONE'; j.dispatchEvent(new Event('input', { bubbles: true })); }
       else if (a === 'payee-same') { const p = $('[data-f=payee]', el); p.value = val('supplier'); fillPayee(); }
       else if (a === 'wht-add') { const left = r2(total() - st.wht.reduce((s, w) => s + Number(w.base || 0), 0)); st.wht.push({ rate: 3, base: Math.max(0, left) }); paintTax(); }
